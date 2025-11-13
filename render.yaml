@@ -1,0 +1,46 @@
+services:
+  - type: web
+    name: htmldrop-cms
+    env: node
+    region: oregon
+    plan: starter
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 3000
+      - key: DB_CLIENT
+        value: pg
+      - key: DB_HOST
+        fromDatabase:
+          name: htmldrop-db
+          property: host
+      - key: DB_PORT
+        fromDatabase:
+          name: htmldrop-db
+          property: port
+      - key: DB_USER
+        fromDatabase:
+          name: htmldrop-db
+          property: user
+      - key: DB_PASSWORD
+        fromDatabase:
+          name: htmldrop-db
+          property: password
+      - key: DB_NAME
+        fromDatabase:
+          name: htmldrop-db
+          property: database
+      - key: JWT_SECRET
+        generateValue: true
+      - key: JWT_REFRESH_SECRET
+        generateValue: true
+      - key: SESSION_SECRET
+        generateValue: true
+
+databases:
+  - name: htmldrop-db
+    databaseName: htmldrop
+    plan: starter

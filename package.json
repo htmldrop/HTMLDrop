@@ -1,12 +1,81 @@
 {
   "name": "htmldrop",
-  "version": "0.0.0",
-  "main": "index.js",
-  "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
-  },
-  "author": "",
+  "version": "0.0.1",
   "type": "module",
-  "license": "ISC",
-  "description": ""
+  "main": "hd-core/index.mjs",
+  "types": "hd-core/types/index.d.ts",
+  "description": "Dynamic Node.js CMS with SSR, plugin system, hooks/filters, multi-database support, and optional WebSockets",
+  "author": "Siglar Development AS",
+  "license": "GPL-2.0-or-later",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/htmldrop/htmldrop.git"
+  },
+  "keywords": [
+    "cms",
+    "nodejs",
+    "ssr",
+    "plugins",
+    "vue",
+    "react",
+    "wordpress"
+  ],
+  "scripts": {
+    "bundle": "node hd-core/bundle.mjs",
+    "start": "node hd-core/index.mjs",
+    "prod": "node hd-core/index.mjs",
+    "dev": "nodemon --config hd-core/config/nodemon.json hd-core/index.mjs",
+    "make:migration": "knex --knexfile ./hd-core/knexfile.mjs migrate:make",
+    "migrate": "knex --knexfile ./hd-core/knexfile.mjs migrate:latest",
+    "rollback": "knex --knexfile ./hd-core/knexfile.mjs migrate:rollback",
+    "seed": "knex --knexfile ./hd-core/knexfile.mjs seed:run",
+    "lint": "eslint hd-core --config hd-core/config/eslint.config.mjs",
+    "lint:fix": "eslint hd-core --fix --config hd-core/config/eslint.config.mjs",
+    "format": "prettier --write \"hd-core/**/*.{js,mjs,json}\" --config hd-core/config/.prettierrc.json",
+    "format:check": "prettier --check \"hd-core/**/*.{js,mjs,json}\" --config hd-core/config/.prettierrc.json",
+    "test": "vitest run --config hd-core/config/vitest.config.mjs",
+    "test:watch": "vitest watch --config hd-core/config/vitest.config.mjs",
+    "test:ui": "vitest --ui --config hd-core/config/vitest.config.mjs",
+    "test:coverage": "vitest run --coverage --config hd-core/config/vitest.config.mjs"
+  },
+  "dependencies": {
+    "@vue/compiler-sfc": "^3.5.22",
+    "adm-zip": "^0.5.16",
+    "bcrypt": "^6.0.0",
+    "better-sqlite3": "^12.3.0",
+    "cors": "^2.8.5",
+    "dotenv": "^17.2.2",
+    "esbuild": "^0.25.10",
+    "express": "^5.1.0",
+    "express-rate-limit": "^8.2.1",
+    "helmet": "^8.1.0",
+    "jsonwebtoken": "^9.0.2",
+    "knex": "^3.1.0",
+    "multer": "^2.0.2",
+    "mysql2": "^3.15.0",
+    "pg": "^8.16.3",
+    "redoc-express": "^2.1.3",
+    "sqlite3": "^5.1.7",
+    "swagger-jsdoc": "^6.2.8",
+    "swagger-ui-express": "^5.0.1",
+    "vue": "^3.5.22",
+    "ws": "^8.18.3",
+    "zod": "^4.1.12"
+  },
+  "devDependencies": {
+    "@vitest/coverage-v8": "^4.0.8",
+    "@vitest/ui": "^4.0.8",
+    "@vue/eslint-config-prettier": "^10.2.0",
+    "c8": "^10.1.3",
+    "eslint": "^9.39.1",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-vue": "^10.5.1",
+    "happy-dom": "^20.0.10",
+    "nodemon": "^3.1.10",
+    "prettier": "^3.6.2",
+    "vitest": "^4.0.8"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
 }

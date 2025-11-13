@@ -1,0 +1,67 @@
+{
+  "name": "HTMLDrop CMS",
+  "description": "A powerful, extensible, and developer-friendly CMS built with Node.js, Vue 3, and modern JavaScript.",
+  "repository": "https://github.com/htmldrop/htmldrop",
+  "logo": "https://raw.githubusercontent.com/htmldrop/htmldrop/main/hd-core/admin/src/assets/logo.png",
+  "keywords": [
+    "cms",
+    "nodejs",
+    "vue",
+    "express",
+    "content-management",
+    "wordpress-alternative"
+  ],
+  "image": "heroku/nodejs",
+  "buildpacks": [
+    {
+      "url": "heroku/nodejs"
+    }
+  ],
+  "addons": [
+    {
+      "plan": "heroku-postgresql:mini",
+      "as": "DATABASE"
+    }
+  ],
+  "env": {
+    "NODE_ENV": {
+      "description": "Node environment",
+      "value": "production",
+      "required": true
+    },
+    "DB_CLIENT": {
+      "description": "Database client (pg for PostgreSQL)",
+      "value": "pg",
+      "required": true
+    },
+    "JWT_SECRET": {
+      "description": "Secret key for JWT tokens",
+      "generator": "secret",
+      "required": true
+    },
+    "JWT_REFRESH_SECRET": {
+      "description": "Secret key for JWT refresh tokens",
+      "generator": "secret",
+      "required": true
+    },
+    "SESSION_SECRET": {
+      "description": "Secret key for sessions",
+      "generator": "secret",
+      "required": true
+    },
+    "CORS_ORIGIN": {
+      "description": "CORS allowed origins (comma-separated URLs)",
+      "value": "*",
+      "required": false
+    }
+  },
+  "formation": {
+    "web": {
+      "quantity": 1,
+      "size": "basic"
+    }
+  },
+  "scripts": {
+    "postdeploy": "npm run migrate:latest"
+  }
+}

@@ -1,0 +1,208 @@
+#htmldrop-admin-bar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 32px;
+  z-index: 99999;
+
+  font-family: Avenir, Helvetica, Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+
+  /* Background */
+  --color-bg: rgb(248, 250, 252);
+  --color-bg-alt: #ffffff;
+  --color-bg-navigation: #ecf0f6;
+  --color-border-navigation: rgb(224, 230, 236);
+  --color-bg-badges: #009deb;
+  --color-bg-forms: #ffffff;
+
+  /* Color */
+  --color: #000;
+  --color-badge: #ffffff;
+  --color-navigation: #0c1b2d;
+  --color-navigation-hover: #253344;
+  --color-navigation-active: rgba(255, 255, 255, 1);
+  --color-invert: invert(0);
+  --color-icon: rgb(154, 164, 173);
+
+  /* Gradient */
+  --color-grad-start: #f0f5f2;
+  --color-grad-end: #ebedf2;
+  --color-grad-start-hover: #ebf6f0;
+  --color-grad-end-hover: #e1e5f0;
+
+  /* Base */
+  --color-surface: #f3f4f6;
+  --color-border: #d2d6df;
+  --color-header: #485166;
+  --color-text: #111827;
+  --color-text-muted: #202525;
+  --color-text-navigation: #dddfe4;
+
+  /* Brand / Accent */
+  --color-primary: #42b883;
+  --color-primary-weak: #5eb28d;
+  --color-primary-hover: #369870;
+  --color-secondary: #35495e;
+  --color-accent: #3b82f6;
+
+  /* Semantic */
+  --color-success: #10b981;
+  --color-warning: #f59e0b;
+  --color-danger: #ef4444;
+
+  /* Shadows */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.1);
+  --shadow-lg: 0 10px 15px rgba(0, 0, 0, 0.15);
+}
+
+[data-theme="dark"] #htmldrop-admin-bar {
+  /* Background */
+  --color-bg: #0f172a;
+  --color-bg-alt: #000000;
+  --color-bg-navigation: #1e293b;
+  --color-border-navigation: #334155;
+  --color-bg-badges: #009deb;
+  --color-bg-forms: #1e293b;
+
+  /* Color */
+  --color: #fff;
+  --color-badge: #ffffff;
+  --color-navigation: #ffffff;
+  --color-navigation-hover: rgba(255, 255, 255, 0.4);
+  --color-navigation-active: rgba(255, 255, 255, 0.3);
+  --color-invert: invert(1);
+  --color-icon: rgb(131, 152, 171);
+
+  /* Gradient */
+  --color-grad-start: #28444d;
+  --color-grad-end: #2b4761;
+  --color-grad-start-hover: #15444b;
+  --color-grad-end-hover: #476466;
+
+  /* Base */
+  --color-surface: #272e3f;
+  --color-border: #374151;
+  --color-header: rgb(150, 160, 181);
+  --color-text: #f9fafb;
+  --color-text-muted: #374151;
+  --color-text-navigation: #cfd3dc;
+
+  /* Brand / Accent */
+  --color-primary: #42b883;
+  --color-primary-weak: #6fbc9a;
+  --color-primary-hover: #5fd1a0;
+  --color-secondary: #4b5563;
+  --color-accent: #60a5fa;
+
+  /* Semantic */
+  --color-success: #34d399;
+  --color-warning: #fbbf24;
+  --color-danger: #f87171;
+
+  /* Shadows */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.4);
+  --shadow-lg: 0 10px 15px rgba(0, 0, 0, 0.5);
+
+  /* Custom */
+  color-scheme: dark;
+
+  input, select, textarea, button {
+    background-color: rgb(35, 47, 59);
+  }
+}
+
+#htmldrop-admin-bar svg {
+    color: var(--color-icon)
+}
+#htmldrop-admin-bar .active svg {
+    color: var(--color-bg);
+}
+#htmldrop-admin-bar.topbar {
+    align-items: center;
+    color: var(--color-text-navigation);
+    box-sizing: border-box;
+    font-size: 14px;
+    font-weight: 600;
+    /*position: sticky;
+    top: 0;*/
+    width: 100%;
+    height: 32px;
+    flex-shrink: 0;
+    flex-grow: 0;
+    background-color: var(--color-navigation);
+    z-index: 150;
+}
+#htmldrop-admin-bar .container {
+    display: flex;
+    align-items: center;
+    flex-grow: 1;
+    max-width: 100%;
+}
+#htmldrop-admin-bar .profile-container {
+    display: flex;
+    justify-self: flex-end;
+    padding-right: 10px
+}
+#htmldrop-admin-bar .profile-container:hover .profile {
+    display: flex;
+}
+#htmldrop-admin-bar .profile {
+    right: 0px;
+    left: auto!important;
+}
+#htmldrop-admin-bar .profile, .dropdown {
+    display: none;
+    position: absolute;
+    padding: 5px;
+    top: 100%;
+    left: 0px;
+    background-color: var(--color-navigation-hover);
+    color: var(--color-text-navigation);
+    box-shadow: var(--shadow-md);
+    font-weight: 500;
+}
+#htmldrop-admin-bar .dropdown {
+    flex-direction: column;
+    min-width: 150px;
+    align-items: start;
+}
+#htmldrop-admin-bar button:hover .dropdown, #htmldrop-admin-bar .button:hover .dropdown {
+    display: flex;
+}
+#htmldrop-admin-bar button, #htmldrop-admin-bar .button, #htmldrop-admin-bar a {
+    position: relative;
+    background: none;
+    border: none;
+    margin: 0;
+    font: inherit;
+    color: inherit;
+    text-align: inherit;
+    text-decoration: none;
+    appearance: none;
+    -webkit-appearance: none; /* Safari */
+    -moz-appearance: none;    /* Firefox */
+    cursor: pointer;
+    padding: 0 5px;
+    height: 32px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+#htmldrop-admin-bar a:hover, #htmldrop-admin-bar button:hover, #htmldrop-admin-bar .button:hover {
+    background-color: var(--color-navigation-hover);
+    color: var(--color-primary-weak);
+}
+
+/* Adjust body to account for admin bar */
+body.htmldrop-admin-bar-visible {
+  margin-top: 32px !important;
+}
+
+#htmldrop-admin-bar .user-email.admin-bar {
+    margin-left: 4px;
+}

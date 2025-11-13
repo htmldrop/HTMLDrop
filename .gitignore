@@ -1,0 +1,20 @@
+# Node modules
+node_modules
+
+# User content
+hd-content/plugins/*
+hd-content/themes/*
+hd-content/uploads/*
+hd-content/config/*
+
+# Keep README files
+!hd-content/plugins/README.md
+!hd-content/plugins/CREATING_NPM_PLUGINS.md
+!hd-content/themes/README.md
+!hd-content/uploads/README.md
+!hd-content/config/README.md
+
+# Config overrides
+.env
+.claude
+config/local.json

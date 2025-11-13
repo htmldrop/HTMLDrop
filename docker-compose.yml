@@ -1,0 +1,86 @@
+version: '3.8'
+
+services:
+  # HTMLDrop CMS Application
+  app:
+    image: node:20-alpine
+    container_name: htmldrop-cms
+    restart: unless-stopped
+    working_dir: /app
+    ports:
+      - "3000:3000"
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      DB_CLIENT: mysql2
+      DB_HOST: mysql
+      DB_PORT: 3306
+      DB_USER: htmldrop
+      DB_PASSWORD: htmldrop_password
+      DB_NAME: htmldrop
+      JWT_SECRET: ${JWT_SECRET:-change-this-secret-in-production}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:-change-this-refresh-secret-in-production}
+      SESSION_SECRET: ${SESSION_SECRET:-change-this-session-secret-in-production}
+      CORS_ORIGIN: ${CORS_ORIGIN:-*}
+      REDIS_URL: redis://redis:6379
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - .:/app
+      - /app/node_modules
+    networks:
+      - htmldrop-network
+    command: sh -c "npm install && npm start"
+
+  # MySQL Database
+  mysql:
+    image: mysql:8.0
+    container_name: htmldrop-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: root_password
+      MYSQL_DATABASE: htmldrop
+      MYSQL_USER: htmldrop
+      MYSQL_PASSWORD: htmldrop_password
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql-data:/var/lib/mysql
+    command: --default-authentication-plugin=mysql_native_password
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "htmldrop", "-phtmldrop_password"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - htmldrop-network
+
+  # Redis Cache (Optional)
+  redis:
+    image: redis:7-alpine
+    container_name: htmldrop-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - htmldrop-network
+
+volumes:
+  mysql-data:
+    driver: local
+  redis-data:
+    driver: local
+
+networks:
+  htmldrop-network:
+    driver: bridge
