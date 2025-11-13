@@ -296,12 +296,11 @@ See the [Plugin Development Guide](hd-content/plugins/README.md) for more detail
 | Feature | HTMLDrop | WordPress |
 |---------|----------|-----------|
 | Language | Node.js (JavaScript) | PHP |
-| Performance | ⚡ Fast (V8 engine, clustering) | Moderate (PHP) |
 | Modern Stack | ✅ Vue 3, ES Modules | ❌ jQuery, legacy code |
 | API | ✅ RESTful, headless-ready | Partial REST API |
 | Async/Await | ✅ Native | ❌ Limited |
-| Package Manager | NPM/Yarn | Composer (limited) |
-| Real-time | ✅ WebSockets | ❌ No |
+| Package Manager | NPM | Composer |
+| Real-time | ✅ WebSockets | ❌ Limited |
 | Clustering | ✅ Built-in | ❌ Requires external tools |
 | Type Safety | TypeScript support | Limited |
 
@@ -312,7 +311,7 @@ See the [Plugin Development Guide](hd-content/plugins/README.md) for more detail
 | Approach | Traditional CMS | Headless-first |
 | Themes | ✅ Built-in SSR | ❌ No themes |
 | Plugin System | ✅ WordPress-style | Different approach |
-| Learning Curve | Easy (familiar concepts) | Steeper |
+| Learning Curve | Easy (familiar to WordPress) | Steeper |
 | Content Editing | ✅ Rich editor | Admin-focused |
 | Community | Growing | Established |
 
@@ -349,14 +348,14 @@ htmldrop-cms/
 │   ├── uploads/               # Media uploads
 │   └── config/                # Configuration files
 │
-├── hd-core/docs/                      # Documentation
+├── hd-core/docs/              # Documentation
 │   ├── api/                   # API reference
 │   ├── architecture/          # System architecture
 │   ├── themes/                # Theme development
 │   ├── hooks/                 # Hooks & filters
 │   └── deployment/            # Deployment guides
 │
-└── hd-core/tests/                     # Test files
+└── hd-core/tests/             # Test files
 ```
 
 ---
@@ -391,11 +390,11 @@ htmldrop-cms/
 - **PM2** - Process management
 - **Nginx** - Reverse proxy
 - **Redis** - Caching (optional)
-- **Docker** - Containerization (coming soon)
+- **Docker** - Containerization
 
 ---
 
-## 📊 Roadmap
+## 📊 Release log
 
 ### Version 1.0 (Current)
 
@@ -407,37 +406,14 @@ htmldrop-cms/
 - [x] Admin panel (Vue 3)
 - [x] Multi-database support
 - [x] Clustering
-
-### Version 1.1 (In Progress)
-
-- [ ] Plugin lifecycle hooks (install/uninstall/upgrade)
-- [ ] Theme lifecycle hooks
-- [ ] Dependency management
-- [ ] Redis caching layer
-- [ ] Rate limiting
-- [ ] Enhanced security (CSRF, Helmet)
-- [ ] Testing infrastructure
-- [ ] Backup/restore system
-
-### Version 1.2 (Planned)
-
-- [ ] GraphQL API
-- [ ] Real-time collaboration
-- [ ] Built-in form builder
-- [ ] Advanced SEO tools
-- [ ] Multi-site support
-- [ ] CLI tool
-- [ ] Docker images
-- [ ] One-click installers
-
-### Version 2.0 (Future)
-
-- [ ] Marketplace for plugins/themes
-- [ ] Visual page builder
-- [ ] Advanced analytics
-- [ ] E-commerce integration
-- [ ] Headless CMS mode
-- [ ] Mobile app (React Native)
+- [x] Plugin lifecycle hooks (install/uninstall/upgrade)
+- [x] Theme lifecycle hooks (install/uninstall/upgrade)
+- [x] Dependency management
+- [x] Redis caching layer
+- [x] Rate limiting
+- [x] Enhanced security (CSRF, Helmet)
+- [x] Testing infrastructure
+- [x] One-click installers
 
 ---
 
@@ -459,9 +435,8 @@ We welcome contributions from the community! Here's how you can help:
 ### Getting Started
 
 1. Read the [Contributing Guide](hd-core/docs/CONTRIBUTING.md)
-2. Check the [Code of Conduct](CODE_OF_CONDUCT.md)
-3. Look for [good first issues](https://github.com/your-repo/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22)
-4. Fork, code, and submit a PR!
+2. Look for [good first issues](https://github.com/htmldrop/htmldrop/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22)
+3. Fork, code, and submit a PR!
 
 ---
 
@@ -470,15 +445,12 @@ We welcome contributions from the community! Here's how you can help:
 ### Get Help
 
 - 📖 **Documentation** - [hd-core/docs/](hd-core/docs/)
-- 💬 **Discussions** - [GitHub Discussions](https://github.com/your-repo/discussions)
-- 🐛 **Bug Reports** - [GitHub Issues](https://github.com/your-repo/issues)
-- 💡 **Feature Requests** - [GitHub Issues](https://github.com/your-repo/issues)
+- 💬 **Discussions** - [GitHub Discussions](https://github.com/htmldrop/htmldrop/discussions)
+- 🐛 **Bug Reports** - [GitHub Issues](https://github.com/htmldrop/htmldrop/issues)
+- 💡 **Feature Requests** - [GitHub Issues](https://github.com/htmldrop/htmldrop/issues)
 
 ### Stay Connected
 
-- 🐦 **Twitter** - [@htmldrop](#) (coming soon)
-- 💬 **Discord** - [Join our server](#) (coming soon)
-- 📧 **Newsletter** - [Subscribe](#) (coming soon)
 - 🌐 **Website** - [htmldrop.com](#) (coming soon)
 
 ---
@@ -504,10 +476,10 @@ Special thanks to all our contributors and the open-source community!
 
 ## 📈 Stats
 
-![GitHub stars](https://img.shields.io/github/stars/your-repo/htmldrop-cms?style=social)
-![GitHub forks](https://img.shields.io/github/forks/your-repo/htmldrop-cms?style=social)
-![GitHub issues](https://img.shields.io/github/issues/your-repo/htmldrop-cms)
-![GitHub pull requests](https://img.shields.io/github/issues-pr/your-repo/htmldrop-cms)
+![GitHub stars](https://img.shields.io/github/stars/htmldrop/htmldrop?style=social)
+![GitHub forks](https://img.shields.io/github/forks/htmldrop/htmldrop?style=social)
+![GitHub issues](https://img.shields.io/github/issues/htmldrop/htmldrop)
+![GitHub pull requests](https://img.shields.io/github/issues-pr/htmldrop/htmldrop)
 
 ---
 
