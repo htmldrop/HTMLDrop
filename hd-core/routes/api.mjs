@@ -30,9 +30,9 @@ export default (context) => {
   router.use(
     express.json({
       type: (req) => {
-        // always parse as JSON, even without Content-Type header, except for uploads
+        
         const contentType = req.headers['content-type'] || ''
-        return !contentType.startsWith('multipart/form-data')
+        return contentType === '' || contentType.includes('json') || contentType.includes('text/plain')
       }
     })
   )

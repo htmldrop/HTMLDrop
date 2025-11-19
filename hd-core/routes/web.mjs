@@ -34,7 +34,7 @@ export default (context) => {
   }
 
   // Web routes - dynamic theme loading per request
-  router.get(/.*/, async (req, res, next) => {
+  router.all(/.*/, async (req, res, next) => {
     try {
       const { options, knex } = req.context
 
