@@ -1,9 +1,15 @@
 <template>
   <router-view />
+  <JobQueue />
 </template>
 
 <script>
+import JobQueue from './components/JobQueue.vue'
+
 export default {
+  components: {
+    JobQueue
+  },
   inject: ['apiBase', 'user'],
   data: () => ({
     currentLoc: 'en_US',

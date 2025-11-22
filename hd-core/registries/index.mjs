@@ -6,6 +6,7 @@ import RegisterPostTypes from './RegisterPostTypes.mjs'
 import RegisterTaxonomies from './RegisterTaxonomies.mjs'
 import RegisterThemes from './RegisterThemes.mjs'
 import RegisterPlugins from './RegisterPlugins.mjs'
+import RegisterJobs from './RegisterJobs.mjs'
 
 export default class Registry {
   constructor(req, res, next) {
@@ -35,7 +36,8 @@ export default class Registry {
       postTypes: new RegisterPostTypes(req, res, next),
       themes: new RegisterThemes(req, res, next),
       taxonomies: new RegisterTaxonomies(req, res, next),
-      plugins: new RegisterPlugins(req, res, next)
+      plugins: new RegisterPlugins(req, res, next),
+      jobs: new RegisterJobs(req.context)
     }
 
     // Attach registry methods

@@ -15,6 +15,7 @@
                     <a :href="apiBase || getOrigin()">{{ translate('Show website') }}</a>
                 </div>
             </button>
+            <TopbarJobs />
             <slot />
         </div>
         <button class="profile-container">
@@ -36,8 +37,9 @@
 
 <script>
 import Logo from './Logo.vue'
+import TopbarJobs from './TopbarJobs.vue'
 export default {
-    components: { Logo },
+    components: { Logo, TopbarJobs },
     inject: ['translate', 'apiBase', 'user'],
     data: () => ({
     }),

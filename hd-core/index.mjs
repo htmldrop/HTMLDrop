@@ -14,6 +14,7 @@ import net from 'net'
 import parseVue from './utils/parseVue.mjs'
 import UserGuard from './utils/UserGuard.mjs'
 import translate from './utils/translation.mjs'
+import createWsAuthMiddleware from './utils/wsAuthMiddleware.mjs'
 
 dotenv.config({ quiet: !cluster.isPrimary })
 
@@ -173,6 +174,13 @@ if (cluster.isPrimary) {
 
         workerResponses.clear()
       }
+    } else if (message.type === 'job_broadcast') {
+      // Forward job broadcast to all other workers
+      for (const id in cluster.workers) {
+        if (cluster.workers[id].id !== worker.id) {
+          cluster.workers[id].send(message)
+        }
+      }
     }
   })
 } else {
@@ -214,8 +222,40 @@ if (cluster.isPrimary) {
     context.options = await initializeOptions(context.knex, context.table)
   })
 
-  wss.on('connection', (ws) => {
-    ws.send('Welcome to HTMLDrop WebSocket!')
+  // WebSocket authentication and connection handling
+  const wsAuth = createWsAuthMiddleware(context)
+
+  wss.on('connection', async (ws, req) => {
+    // Authenticate WebSocket connection
+    const authenticated = await wsAuth(ws, req)
+
+    if (!authenticated) {
+      return // Connection will be closed by wsAuth
+    }
+
+    ws.send(JSON.stringify({
+      type: 'connected',
+      message: 'Welcome to HTMLDrop WebSocket!',
+      authenticated: true
+    }))
+
+    // Handle incoming messages
+    ws.on('message', (message) => {
+      try {
+        const data = JSON.parse(message)
+
+        // Handle ping/pong for keepalive
+        if (data.type === 'ping') {
+          ws.send(JSON.stringify({ type: 'pong' }))
+        }
+      } catch (error) {
+        // Ignore malformed messages
+      }
+    })
+
+    ws.on('close', () => {
+      // Cleanup on disconnect
+    })
   })
 
   app.set('json spaces', 2)
@@ -295,6 +335,30 @@ if (cluster.isPrimary) {
         console.error(`Worker ${process.pid} failed to reinitialize options:`, error)
         process.send({ type: 'worker_error', action: 'Options reinitialization', error: error.message })
       }
+    }
+
+    // Handle job broadcast messages from other workers
+    if (msg?.type === 'job_broadcast') {
+      const { jobData } = msg
+      const message = JSON.stringify({
+        type: 'job_update',
+        job: jobData
+      })
+
+      // Broadcast to all WebSocket clients on this worker
+      wss.clients.forEach((client) => {
+        if (client.readyState === 1 && client.authenticated) {
+          // Only send to clients with appropriate capabilities
+          const hasCapability = client.capabilities &&
+            (client.capabilities.includes('manage_jobs') ||
+             client.capabilities.includes('read_job') ||
+             client.capabilities.includes('read_jobs'))
+
+          if (hasCapability) {
+            client.send(message)
+          }
+        }
+      })
     }
   })
 }
