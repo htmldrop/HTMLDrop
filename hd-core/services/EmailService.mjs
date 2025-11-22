@@ -17,13 +17,13 @@ export default class EmailService {
     const emailProviders = this.context.req?.hooks?.emailProviders || this.context.emailProviders
 
     if (!emailProviders) {
-      throw new Error('Email providers registry not available')
+      throw new Error('Email providers registry not available. Please ensure the registry system is initialized.')
     }
 
     const activeProvider = await emailProviders.getActiveProvider()
 
     if (!activeProvider) {
-      throw new Error('No email provider is configured')
+      throw new Error('No email provider is configured. Please configure SMTP settings (smtp_host, smtp_user, smtp_password) in your database options table.')
     }
 
     const config = await activeProvider.configure(this.context)
