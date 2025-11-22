@@ -22,6 +22,7 @@ export const seed = async (knex) => {
     { id: 15, name: 'Manage menus', slug: 'manage_menus' },
     { id: 16, name: 'Manage plugins', slug: 'manage_plugins' },
     { id: 17, name: 'Manage themes', slug: 'manage_themes' },
+    { id: 18, name: 'Manage jobs', slug: 'manage_jobs' },
 
     // Post types
     { id: 20, name: 'Read post type', slug: 'read_post_type' },
@@ -105,7 +106,14 @@ export const seed = async (knex) => {
     { id: 76, name: 'Upload themes', slug: 'upload_themes' },
     { id: 77, name: 'Activate themes', slug: 'activate_themes' },
     { id: 78, name: 'Deactivate themes', slug: 'deactivate_themes' },
-    { id: 79, name: 'Delete themes', slug: 'delete_themes' }
+    { id: 79, name: 'Delete themes', slug: 'delete_themes' },
+
+    // Jobs
+    { id: 80, name: 'Read job', slug: 'read_job' },
+    { id: 81, name: 'Create jobs', slug: 'create_jobs' },
+    { id: 82, name: 'Edit job', slug: 'edit_job' },
+    { id: 83, name: 'Edit jobs', slug: 'edit_jobs' },
+    { id: 84, name: 'Delete jobs', slug: 'delete_jobs' },
   ]
 
   for (const seed of seeds) {

@@ -84,7 +84,14 @@ export const seed = async (knex) => {
     { id: 57, parent_capability_id: 17, child_capability_id: 76 },
     { id: 58, parent_capability_id: 17, child_capability_id: 77 },
     { id: 59, parent_capability_id: 17, child_capability_id: 78 },
-    { id: 60, parent_capability_id: 17, child_capability_id: 79 }
+    { id: 60, parent_capability_id: 17, child_capability_id: 79 },
+
+    // Manage Jobs
+    { id: 61, parent_capability_id: 18, child_capability_id: 80 },
+    { id: 62, parent_capability_id: 18, child_capability_id: 81 },
+    { id: 63, parent_capability_id: 18, child_capability_id: 82 },
+    { id: 64, parent_capability_id: 18, child_capability_id: 83 },
+    { id: 65, parent_capability_id: 18, child_capability_id: 84 }
   ]
 
   for (const seed of seeds) {
