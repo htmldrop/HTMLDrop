@@ -2,6 +2,7 @@ import { createApp, ref, computed } from 'vue'
 import App from './App.vue'
 import router from './router/router.js'
 import apiFetch from './utils/apiFetch.js'
+import createTokenRefreshManager from './utils/tokenRefresh.js'
 
 const getUser = () => {
   try {
@@ -18,6 +19,7 @@ const getUser = () => {
     const obj = JSON.parse(jsonPayload)
     obj.id = obj.sub
     delete obj.sub
+    accessToken.value = token
     return obj
   } catch (e) {
     return null
@@ -28,6 +30,12 @@ const app = createApp(App)
 const navTree = ref([])
 const controls = ref()
 const user = ref(getUser())
+const accessToken = ref('')
+
+// Set up automatic token refresh (refreshes 10 minutes before expiration)
+const tokenRefreshManager = createTokenRefreshManager(() => {
+  user.value = getUser()
+})
 
 app.use(router)
 
@@ -37,7 +45,10 @@ app.provide(
   'user',
   computed(() => user.value)
 )
-app.provide('reloadUser', () => (user.value = getUser()))
+app.provide('reloadUser', () => {
+  user.value = getUser()
+  tokenRefreshManager.resetTimer()
+})
 
 app.provide('tokens', () => {
   try {
@@ -46,10 +57,8 @@ app.provide('tokens', () => {
     return null
   }
 })
-app.provide(
-  'navTree',
-  computed(() => navTree.value)
-)
+app.provide('navTree', computed(() => navTree.value))
+app.provide('accessToken', computed(() => accessToken.value))
 app.provide('updateNavTree', async (tree) => {
   for (const branch of (tree?.filter((b) => !navTree.value.some((bb) => b.slug === bb.slug)) || [])) {
     const blob = new Blob([branch.vue_instance], { type: 'application/javascript' })
