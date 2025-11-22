@@ -18,13 +18,13 @@
             <slot />
         </div>
         <button class="profile-container">
-            {{ translate('Hi') }}, {{ user.email }}
+            {{ translate('Hi') }}, {{ user?.email }}
             <img style="margin-left: 10px" src="@/assets/avatar.svg" width="20" height="20"/>
             <div class="profile">
                 <img style="margin: 20px" width="60" height="60" src="@/assets/avatar.svg"/>
                 <div style="margin: 20px 20px 10px">
                     <router-link :to="'/users/' + user.id" style="flex-direction: column; align-items: start; margin-bottom: 20px">
-                        <div>{{ user.email }}</div>
+                        <div>{{ user?.email }}</div>
                         <div>{{ translate('Edit profile') }}</div>
                     </router-link>
                     <button @click="logout">{{ translate('Logout') }}</button>

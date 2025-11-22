@@ -6,8 +6,9 @@ import createTokenRefreshManager from './utils/tokenRefresh.js'
 
 const getUser = () => {
   try {
-    const tokens = localStorage.getItem('tokens')
-    const token = JSON.parse(tokens)?.accessToken
+    const userTokens = localStorage.getItem('tokens')
+    tokens.value = JSON.parse(userTokens)
+    const token = tokens.value?.accessToken
     const base64Url = token.split('.')[1]
     const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/')
     const jsonPayload = decodeURIComponent(
@@ -19,18 +20,18 @@ const getUser = () => {
     const obj = JSON.parse(jsonPayload)
     obj.id = obj.sub
     delete obj.sub
-    accessToken.value = token
     return obj
   } catch (e) {
     return null
   }
 }
 
+const tokensJSON = localStorage.getItem('tokens')
+const tokens = ref(tokensJSON ? JSON.parse(tokensJSON) : {})
 const app = createApp(App)
 const navTree = ref([])
 const controls = ref()
 const user = ref(getUser())
-const accessToken = ref('')
 
 // Set up automatic token refresh (refreshes 10 minutes before expiration)
 const tokenRefreshManager = createTokenRefreshManager(() => {
@@ -50,15 +51,8 @@ app.provide('reloadUser', () => {
   tokenRefreshManager.resetTimer()
 })
 
-app.provide('tokens', () => {
-  try {
-    return JSON.parse(localStorage.getItem('tokens'))
-  } catch (e) {
-    return null
-  }
-})
 app.provide('navTree', computed(() => navTree.value))
-app.provide('accessToken', computed(() => accessToken.value))
+app.provide('tokens', computed(() => tokens.value))
 app.provide('updateNavTree', async (tree) => {
   for (const branch of (tree?.filter((b) => !navTree.value.some((bb) => b.slug === bb.slug)) || [])) {
     const blob = new Blob([branch.vue_instance], { type: 'application/javascript' })
