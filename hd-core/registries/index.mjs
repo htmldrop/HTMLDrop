@@ -7,6 +7,8 @@ import RegisterTaxonomies from './RegisterTaxonomies.mjs'
 import RegisterThemes from './RegisterThemes.mjs'
 import RegisterPlugins from './RegisterPlugins.mjs'
 import RegisterJobs from './RegisterJobs.mjs'
+import RegisterEmailProviders from './RegisterEmailProviders.mjs'
+import * as emailHelper from '../utils/email-helper.mjs'
 
 export default class Registry {
   constructor(req, res, next) {
@@ -37,20 +39,30 @@ export default class Registry {
       themes: new RegisterThemes(req, res, next),
       taxonomies: new RegisterTaxonomies(req, res, next),
       plugins: new RegisterPlugins(req, res, next),
-      jobs: new RegisterJobs(req.context)
+      jobs: new RegisterJobs(req.context),
+      emailProviders: new RegisterEmailProviders(req.context)
     }
 
     // Attach registry methods
     for (const registry of Object.values(this.registries)) {
       for (const key of Object.getOwnPropertyNames(Object.getPrototypeOf(registry))) {
         if (key !== 'constructor' && typeof registry[key] === 'function') {
-          // Don’t overwrite existing hooks
+          // Don't overwrite existing hooks
           if (!this.req.hooks[key]) {
             this.req.hooks[key] = registry[key].bind(registry)
           }
         }
       }
     }
+
+    // Attach email helper functions
+    this.req.hooks.sendEmail = (options) => emailHelper.sendEmail(this.req.context, options)
+    this.req.hooks.sendWelcomeEmail = (user) => emailHelper.sendWelcomeEmail(this.req.context, user)
+    this.req.hooks.sendPasswordResetEmail = (user, token, expiry) =>
+      emailHelper.sendPasswordResetEmail(this.req.context, user, token, expiry)
+    this.req.hooks.sendTemplateEmail = (to, templateFn, data) =>
+      emailHelper.sendTemplateEmail(this.req.context, to, templateFn, data)
+    this.req.hooks.verifyEmailConnection = () => emailHelper.verifyEmailConnection(this.req.context)
   }
 
   // ----------------------

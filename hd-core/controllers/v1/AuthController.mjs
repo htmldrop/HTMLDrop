@@ -4,6 +4,8 @@ import crypto from 'crypto'
 import { hash, validate as validatePassword, verify } from '../../utils/password.mjs'
 import { validate as validateEmail } from '../../utils/email.mjs'
 import { buildPayload } from '../../utils/payload.mjs'
+import PasswordResetService from '../../services/PasswordResetService.mjs'
+import EmailService from '../../services/EmailService.mjs'
 
 export default (context) => {
   const router = express.Router({ mergeParams: true })
@@ -373,6 +375,206 @@ export default (context) => {
     } catch (error) {
       console.error(error)
       res.status(500).send('Internal server error')
+    }
+  })
+
+  /**
+   * @openapi
+   * /auth/forgot-password:
+   *   post:
+   *     tags:
+   *       - Authentication
+   *     summary: Request password reset
+   *     description: Send a password reset email to the user's email address
+   *     requestBody:
+   *       required: true
+   *       content:
+   *         application/json:
+   *           schema:
+   *             type: object
+   *             required:
+   *               - email
+   *             properties:
+   *               email:
+   *                 type: string
+   *                 format: email
+   *                 example: user@example.com
+   *     responses:
+   *       200:
+   *         description: Password reset email sent (always returns 200 for security)
+   *         content:
+   *           application/json:
+   *             schema:
+   *               type: object
+   *               properties:
+   *                 message:
+   *                   type: string
+   *       400:
+   *         description: Missing email
+   *       500:
+   *         description: Internal server error
+   */
+  router.post('/forgot-password', async (req, res) => {
+    try {
+      const { email } = req.body
+
+      if (!email) {
+        return res.status(400).json({ message: 'Email is required' })
+      }
+
+      const emailValidation = validateEmail(email)
+      if (!emailValidation.valid) {
+        return res.status(400).json({ message: emailValidation.message })
+      }
+
+      // Create services
+      const passwordResetService = new PasswordResetService(context)
+      const emailService = new EmailService({ ...context, req, res })
+
+      try {
+        // Generate reset token
+        const { user, token } = await passwordResetService.createResetToken(email)
+
+        // Send password reset email
+        await emailService.sendPasswordResetEmail(user, token)
+      } catch (error) {
+        // Don't reveal if user exists or not
+        console.error('Password reset error:', error)
+      }
+
+      // Always return success for security (don't reveal if email exists)
+      res.status(200).json({
+        message: 'If this email exists in our system, a password reset link will be sent.'
+      })
+    } catch (error) {
+      console.error(error)
+      res.status(500).json({ message: 'Internal server error' })
+    }
+  })
+
+  /**
+   * @openapi
+   * /auth/reset-password:
+   *   post:
+   *     tags:
+   *       - Authentication
+   *     summary: Reset password
+   *     description: Reset user password using the token from email
+   *     requestBody:
+   *       required: true
+   *       content:
+   *         application/json:
+   *           schema:
+   *             type: object
+   *             required:
+   *               - token
+   *               - password
+   *             properties:
+   *               token:
+   *                 type: string
+   *                 description: Password reset token from email
+   *               password:
+   *                 type: string
+   *                 format: password
+   *                 example: newSecurePassword123
+   *     responses:
+   *       200:
+   *         description: Password reset successful
+   *         content:
+   *           application/json:
+   *             schema:
+   *               type: object
+   *               properties:
+   *                 message:
+   *                   type: string
+   *       400:
+   *         description: Missing fields or invalid password
+   *       401:
+   *         description: Invalid or expired token
+   *       500:
+   *         description: Internal server error
+   */
+  router.post('/reset-password', async (req, res) => {
+    try {
+      const { token, password } = req.body
+
+      if (!token || !password) {
+        return res.status(400).json({ message: 'Token and password are required' })
+      }
+
+      const passwordValidation = validatePassword(password)
+      if (!passwordValidation.valid) {
+        return res.status(400).json({ message: passwordValidation.message })
+      }
+
+      const passwordResetService = new PasswordResetService(context)
+
+      try {
+        await passwordResetService.resetPassword(token, password)
+        res.status(200).json({ message: 'Password has been reset successfully' })
+      } catch (error) {
+        return res.status(401).json({ message: error.message })
+      }
+    } catch (error) {
+      console.error(error)
+      res.status(500).json({ message: 'Internal server error' })
+    }
+  })
+
+  /**
+   * @openapi
+   * /auth/validate-reset-token:
+   *   post:
+   *     tags:
+   *       - Authentication
+   *     summary: Validate password reset token
+   *     description: Check if a password reset token is valid
+   *     requestBody:
+   *       required: true
+   *       content:
+   *         application/json:
+   *           schema:
+   *             type: object
+   *             required:
+   *               - token
+   *             properties:
+   *               token:
+   *                 type: string
+   *                 description: Password reset token to validate
+   *     responses:
+   *       200:
+   *         description: Token is valid
+   *         content:
+   *           application/json:
+   *             schema:
+   *               type: object
+   *               properties:
+   *                 valid:
+   *                   type: boolean
+   *       401:
+   *         description: Invalid or expired token
+   *       500:
+   *         description: Internal server error
+   */
+  router.post('/validate-reset-token', async (req, res) => {
+    try {
+      const { token } = req.body
+
+      if (!token) {
+        return res.status(401).json({ valid: false, message: 'Token is required' })
+      }
+
+      const passwordResetService = new PasswordResetService(context)
+
+      try {
+        await passwordResetService.validateResetToken(token)
+        res.status(200).json({ valid: true })
+      } catch (error) {
+        return res.status(401).json({ valid: false, message: error.message })
+      }
+    } catch (error) {
+      console.error(error)
+      res.status(500).json({ message: 'Internal server error' })
     }
   })
 
