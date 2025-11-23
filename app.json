@@ -53,6 +53,11 @@
       "description": "CORS allowed origins (comma-separated URLs)",
       "value": "*",
       "required": false
+    },
+    "TABLE_PREFIX": {
+      "description": "Database table prefix",
+      "value": "hd_",
+      "required": true
     }
   },
   "formation": {
@@ -62,6 +67,6 @@
     }
   },
   "scripts": {
-    "postdeploy": "npm run migrate:latest"
+    "postdeploy": "npm run migrate && npm run seed"
   }
 }

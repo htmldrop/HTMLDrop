@@ -9,7 +9,7 @@ services:
       branch: main
       deploy_on_push: true
     build_command: npm install
-    run_command: npm start
+    run_command: npm run migrate && npm run seed && npm start
     instance_count: 1
     instance_size_slug: basic-xxs
     http_port: 3000
@@ -34,6 +34,8 @@ services:
         value: ${db.PASSWORD}
       - key: DB_NAME
         value: ${db.DATABASE}
+      - key: TABLE_PREFIX
+        value: hd_
       - key: JWT_SECRET
         type: SECRET
         value: CHANGE_THIS_TO_RANDOM_SECRET

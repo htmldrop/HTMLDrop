@@ -10,24 +10,48 @@ if (!process.env.TABLE_PREFIX) {
   process.env.TABLE_PREFIX = 'hd_'
 }
 
+// Parse DB_CONNECTION if it exists
+let connection
+if (process.env.DB_CONNECTION) {
+  try {
+    connection = JSON.parse(process.env.DB_CONNECTION)
+  } catch (e) {
+    connection = process.env.DB_CONNECTION
+  }
+}
+
+const baseConfig = {
+  migrations: {
+    directory: path.join(__dirname, 'database/migrations'),
+    loadExtensions: ['.mjs'],
+    tableName: `${process.env.TABLE_PREFIX}migrations`,
+    lockTableName: `${process.env.TABLE_PREFIX}migrations_lock`
+  },
+  seeds: {
+    directory: path.join(__dirname, 'database/seeds'),
+    loadExtensions: ['.mjs']
+  }
+}
+
 export default {
   development: {
     client: 'better-sqlite3',
     connection: {
-      // Path to the database file relative to the project root
       filename: path.resolve(__dirname, '..', 'hd-content', 'config', 'htmldrop.db')
     },
     useNullAsDefault: true,
-    migrations: {
-      // Path to the migrations folder relative to this knexfile
-      directory: path.join(__dirname, 'database/migrations'),
-      loadExtensions: ['.mjs'],
-      tableName: `${process.env.TABLE_PREFIX  }migrations`,
-      lockTableName: `${process.env.TABLE_PREFIX  }migrations_lock`
+    ...baseConfig
+  },
+  production: {
+    client: process.env.DB_CLIENT || 'mysql2',
+    connection: connection || {
+      host: process.env.DB_HOST,
+      port: process.env.DB_PORT || 3306,
+      user: process.env.DB_USER,
+      password: process.env.DB_PASSWORD,
+      database: process.env.DB_NAME
     },
-    seeds: {
-      directory: path.join(__dirname, 'database/seeds'),
-      loadExtensions: ['.mjs']
-    }
+    useNullAsDefault: true,
+    ...baseConfig
   }
 }

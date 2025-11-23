@@ -148,12 +148,9 @@ Deploy HTMLDrop to your favorite hosting platform with one click:
   <a href="https://fly.io/launch">
     <img src="https://fly.io/static/images/brand/brandmark.svg" alt="Deploy on Fly.io" height="32">
   </a>
-  <a href="https://vercel.com/new/clone?repository-url=https://github.com/htmldrop/htmldrop">
-    <img src="https://vercel.com/button" alt="Deploy with Vercel" height="32">
-  </a>
 </p>
 
-**Note:** HTMLDrop requires a persistent Node.js server and database. Railway, Render, Heroku, DigitalOcean, and Fly.io are recommended for full-stack deployment. Vercel is suitable only if using external database and storage services.
+**Note:** HTMLDrop requires a persistent Node.js server and a database. Railway, Render, Heroku, DigitalOcean, and Fly.io are recommended platforms for full-stack deployment.
 
 ### Docker Deploy
 

@@ -6,10 +6,11 @@ primary_region = "ord"
 
 [env]
   NODE_ENV = "production"
-  PORT = "8080"
+  PORT = "3000"
+  TABLE_PREFIX = "hd_"
 
 [http_service]
-  internal_port = 8080
+  internal_port = 3000
   force_https = true
   auto_stop_machines = true
   auto_start_machines = true
@@ -18,7 +19,7 @@ primary_region = "ord"
 
 [[services]]
   protocol = "tcp"
-  internal_port = 8080
+  internal_port = 3000
 
   [[services.ports]]
     port = 80
