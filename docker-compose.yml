@@ -5,32 +5,23 @@ services:
   app:
     image: node:20-alpine
     working_dir: /app
+    command: sh -c "apk add --no-cache python3 make g++ && npm install && npm start"
+    volumes:
+      - .:/app
     ports:
       - "80:3000"
     environment:
       NODE_ENV: production
       PORT: 3000
       DB_CLIENT: mysql2
-      DB_HOST: mysql
-      DB_PORT: 3306
-      DB_USER: htmldrop
-      DB_PASSWORD: htmldrop_password
-      DB_NAME: htmldrop
+      DB_CONNECTION: '{"host":"mysql","port":3306,"user":"htmldrop","password":"htmldrop_password","database":"htmldrop"}'
+      TABLE_PREFIX: hd_
       JWT_SECRET: ${JWT_SECRET:-}
       JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:-}
       SESSION_SECRET: ${SESSION_SECRET:-}
       CORS_ORIGIN: ${CORS_ORIGIN:-*}
       REDIS_URL: redis://redis:6379
-    volumes:
-      - .:/app
-      - /app/node_modules
-    networks:
-      - htmldrop-network
-    command: sh -c "npm install && npm start"
-    deploy:
-      replicas: 1
-      restart_policy:
-        condition: on-failure
+    restart: always
 
   # MySQL Database
   mysql:
@@ -44,45 +35,14 @@ services:
       - "3306:3306"
     volumes:
       - mysql-data:/var/lib/mysql
-    command: --default-authentication-plugin=mysql_native_password
-    healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "htmldrop", "-phtmldrop_password"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-    networks:
-      - htmldrop-network
-    deploy:
-      replicas: 1
-      restart_policy:
-        condition: on-failure
+    restart: always
 
   # Redis Cache (Optional)
   redis:
     image: redis:7-alpine
     ports:
       - "6379:6379"
-    volumes:
-      - redis-data:/data
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-    networks:
-      - htmldrop-network
-    deploy:
-      replicas: 1
-      restart_policy:
-        condition: on-failure
+    restart: always
 
 volumes:
   mysql-data:
-    driver: local
-  redis-data:
-    driver: local
-
-networks:
-  htmldrop-network:
-    driver: overlay
-    attachable: true
