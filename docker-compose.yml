@@ -4,8 +4,6 @@ services:
   # HTMLDrop CMS Application
   app:
     image: node:20-alpine
-    container_name: htmldrop-cms
-    restart: unless-stopped
     working_dir: /app
     ports:
       - "80:3000"
@@ -23,21 +21,20 @@ services:
       SESSION_SECRET: ${SESSION_SECRET:-}
       CORS_ORIGIN: ${CORS_ORIGIN:-*}
       REDIS_URL: redis://redis:6379
-    depends_on:
-      - mysql
-      - redis
     volumes:
       - .:/app
       - /app/node_modules
     networks:
       - htmldrop-network
     command: sh -c "npm install && npm start"
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure
 
   # MySQL Database
   mysql:
     image: mysql:8.0
-    container_name: htmldrop-mysql
-    restart: unless-stopped
     environment:
       MYSQL_ROOT_PASSWORD: root_password
       MYSQL_DATABASE: htmldrop
@@ -55,12 +52,14 @@ services:
       retries: 5
     networks:
       - htmldrop-network
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure
 
   # Redis Cache (Optional)
   redis:
     image: redis:7-alpine
-    container_name: htmldrop-redis
-    restart: unless-stopped
     ports:
       - "6379:6379"
     volumes:
@@ -72,6 +71,10 @@ services:
       retries: 5
     networks:
       - htmldrop-network
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure
 
 volumes:
   mysql-data:
@@ -81,4 +84,5 @@ volumes:
 
 networks:
   htmldrop-network:
-    driver: bridge
+    driver: overlay
+    attachable: true
