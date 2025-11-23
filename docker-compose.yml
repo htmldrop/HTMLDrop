@@ -8,7 +8,7 @@ services:
     restart: unless-stopped
     working_dir: /app
     ports:
-      - "3000:3000"
+      - "80:3000"
     environment:
       NODE_ENV: production
       PORT: 3000
@@ -18,16 +18,14 @@ services:
       DB_USER: htmldrop
       DB_PASSWORD: htmldrop_password
       DB_NAME: htmldrop
-      JWT_SECRET: ${JWT_SECRET:-change-this-secret-in-production}
-      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:-change-this-refresh-secret-in-production}
-      SESSION_SECRET: ${SESSION_SECRET:-change-this-session-secret-in-production}
+      JWT_SECRET: ${JWT_SECRET:-}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:-}
+      SESSION_SECRET: ${SESSION_SECRET:-}
       CORS_ORIGIN: ${CORS_ORIGIN:-*}
       REDIS_URL: redis://redis:6379
     depends_on:
-      mysql:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
+      - mysql
+      - redis
     volumes:
       - .:/app
       - /app/node_modules

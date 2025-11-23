@@ -15,8 +15,16 @@ import parseVue from './utils/parseVue.mjs'
 import UserGuard from './utils/UserGuard.mjs'
 import translate from './utils/translation.mjs'
 import createWsAuthMiddleware from './utils/wsAuthMiddleware.mjs'
+import { initSecrets, ensureSecrets } from './utils/secrets.mjs'
 
 dotenv.config({ quiet: !cluster.isPrimary })
+
+// Initialize secrets (primary process generates and saves to .env)
+if (cluster.isPrimary) {
+  initSecrets()
+} else {
+  ensureSecrets()
+}
 
 // --- Knex initialization function ---
 const initializeKnex = async () => {
