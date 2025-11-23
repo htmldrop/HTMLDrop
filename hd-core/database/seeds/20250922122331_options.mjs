@@ -2,13 +2,12 @@ export const seed = async (knex) => {
   const prefix = process.env.TABLE_PREFIX
   const tableName = `${prefix  }options`
   const seeds = [
-    { name: 'theme', value: 'hello-coral', autoload: true },
+    { name: 'theme', value: '', autoload: true },
     {
       name: 'active_plugins',
       value: JSON.stringify(['coralpen']),
       autoload: true
-    },
-    { name: '2fa', value: 'false', autoload: true }
+    }
   ]
 
   for (const seed of seeds) {
