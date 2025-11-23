@@ -58,6 +58,16 @@
       "description": "Database table prefix",
       "value": "hd_",
       "required": true
+    },
+    "JWT_EXPIRES_IN": {
+      "description": "JWT access token expiration time",
+      "value": "1h",
+      "required": false
+    },
+    "JWT_REFRESH_EXPIRES_IN": {
+      "description": "JWT refresh token expiration time",
+      "value": "7d",
+      "required": false
     }
   },
   "formation": {

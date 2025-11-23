@@ -45,6 +45,10 @@ services:
       - key: SESSION_SECRET
         type: SECRET
         value: CHANGE_THIS_TO_RANDOM_SECRET
+      - key: JWT_EXPIRES_IN
+        value: 1h
+      - key: JWT_REFRESH_EXPIRES_IN
+        value: 7d
 
 databases:
   - name: db
