@@ -223,10 +223,10 @@ export default {
         // Show success message
         alert(this.translate('Update started successfully! The system will restart in a few seconds...'))
 
-        // Refresh after 5 seconds to show the restarting state
+        // Refresh after 15 seconds to show the restarting state
         setTimeout(() => {
           window.location.reload()
-        }, 5000)
+        }, 15000)
       } catch (err) {
         console.error('Failed to perform update:', err)
         this.error = err.message
