@@ -323,4 +323,35 @@ export default class BadgeCountService {
       return 0
     }
   }
+
+  /**
+   * Clear all badge count caches (forces refresh on next check)
+   * Useful after CMS updates or plugin/theme changes
+   */
+  async clearCaches() {
+    try {
+      await Promise.all([
+        this.knex(this.table('options')).where('name', 'badge_count_plugins_cache').del(),
+        this.knex(this.table('options')).where('name', 'badge_count_themes_cache').del(),
+        this.knex(this.table('options')).where('name', 'badge_count_cms_cache').del()
+      ])
+      console.log('[BadgeCount] All caches cleared')
+    } catch (error) {
+      console.error('Failed to clear badge count caches:', error)
+    }
+  }
+
+  /**
+   * Clear specific badge count cache
+   * @param {string} type - Cache type: 'plugins', 'themes', or 'cms'
+   */
+  async clearCache(type) {
+    try {
+      const cacheName = `badge_count_${type}_cache`
+      await this.knex(this.table('options')).where('name', cacheName).del()
+      console.log(`[BadgeCount] ${type} cache cleared`)
+    } catch (error) {
+      console.error(`Failed to clear ${type} badge count cache:`, error)
+    }
+  }
 }

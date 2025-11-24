@@ -2,6 +2,7 @@ import path from 'path'
 import fs from 'fs'
 import crypto from 'crypto'
 import express from 'express'
+import PluginLifecycleService from '../services/PluginLifecycleService.mjs'
 
 // Helper: compute folder hash (ignores node_modules)
 const getFolderHash = async (folderPath) => {
@@ -98,6 +99,36 @@ export default class RegisterPlugins {
       } catch (err) {
         console.error(`Worker ${process.pid} failed to load plugin "${pluginSlug}":`, err)
         failedPlugins.push(pluginSlug)
+      }
+    }
+
+    // Call activation lifecycle hooks on first load (triggers badge counts, scheduled tasks, etc.)
+    // Only execute on worker 1 to avoid duplicate lifecycle hook calls across workers
+    if (isFirstLoad && loadedPlugins.length > 0) {
+      const cluster = await import('cluster')
+      const isWorker1 = cluster.default.worker?.id === 1
+
+      if (isWorker1) {
+        const lifecycleService = new PluginLifecycleService(this.context)
+
+        for (const pluginSlug of loadedPlugins) {
+          try {
+            // Call onActivate to trigger lifecycle hooks
+            await lifecycleService.callLifecycleHook(pluginSlug, 'onActivate', {
+              pluginSlug,
+              timestamp: new Date().toISOString(),
+              isStartup: true
+            })
+          } catch (err) {
+            // Don't fail server startup if lifecycle hook fails
+            console.warn(`Failed to call onActivate for plugin "${pluginSlug}" on startup:`, err.message)
+          }
+        }
+      }
+
+      // Notify scheduler that plugins are initialized (all workers)
+      if (this.context.onPluginsInitialized) {
+        this.context.onPluginsInitialized()
       }
     }
 

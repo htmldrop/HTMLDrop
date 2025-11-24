@@ -436,6 +436,15 @@ class UpdateService {
       updateCache.data = null
       updateCache.timestamp = null
 
+      // Clear CMS badge count cache so it reflects no updates available
+      try {
+        const BadgeCountService = (await import('./BadgeCountService.mjs')).default
+        const badgeCountService = new BadgeCountService(this.context)
+        await badgeCountService.clearCache('cms')
+      } catch (error) {
+        console.warn('Failed to clear CMS badge count cache:', error.message)
+      }
+
       await job.complete({
         success: true,
         message: `CMS updated successfully to version ${newVersion}`,

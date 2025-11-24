@@ -2,6 +2,7 @@ import path from 'path'
 import fs from 'fs'
 import crypto from 'crypto'
 import express from 'express'
+import ThemeLifecycleService from '../services/ThemeLifecycleService.mjs'
 
 // Helper: compute folder hash (ignores node_modules)
 const getFolderHash = async (folderPath) => {
@@ -21,6 +22,9 @@ const getFolderHash = async (folderPath) => {
 
   return crypto.createHash('md5').update(mtimes.join('|')).digest('hex')
 }
+
+// Track if theme activation hooks have been called on first load
+let themeActivationCalled = false
 
 export default class RegisterThemes {
   constructor(req, res, next) {
@@ -53,6 +57,30 @@ export default class RegisterThemes {
                 { req: this.req, res: this.res, next: this.next, router }
               )
             )?.init()
+
+            // Call activation lifecycle hooks on first load (triggers badge counts, scheduled tasks, etc.)
+            // Only execute on worker 1 to avoid duplicate lifecycle hook calls across workers
+            if (!themeActivationCalled && options.theme) {
+              const cluster = await import('cluster')
+              const isWorker1 = cluster.default.worker?.id === 1
+
+              if (isWorker1) {
+                themeActivationCalled = true
+                const lifecycleService = new ThemeLifecycleService(this.context)
+
+                try {
+                  // Call onActivate to trigger lifecycle hooks
+                  await lifecycleService.callLifecycleHook(options.theme, 'onActivate', {
+                    themeSlug: options.theme,
+                    timestamp: new Date().toISOString(),
+                    isStartup: true
+                  })
+                } catch (err) {
+                  // Don't fail server startup if lifecycle hook fails
+                  console.warn(`Failed to call onActivate for theme "${options.theme}" on startup:`, err.message)
+                }
+              }
+            }
           }
         } catch (err) {
           console.error(`Failed to load provider ${themeIndex}:`, err)

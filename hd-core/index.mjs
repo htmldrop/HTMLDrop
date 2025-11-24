@@ -277,6 +277,19 @@ if (cluster.isPrimary) {
       }, 'refresh_badge_counts')
       .everyMinute()
 
+    // Run initial badge count update on worker 1 (after startup delay)
+    if (cluster.worker.id === 1) {
+      setTimeout(async () => {
+        try {
+          const badgeCountService = new BadgeCountService(context)
+          await badgeCountService.updateBadgeCounts()
+          console.log('[Startup] Initial badge count update complete')
+        } catch (error) {
+          console.error('[Startup] Failed to update badge counts:', error)
+        }
+      }, 3000) // Wait 3 seconds for server to stabilize
+    }
+
     // Helper to mark plugins as initialized and start scheduler if not already started
     context.onPluginsInitialized = () => {
       pluginsInitialized = true
