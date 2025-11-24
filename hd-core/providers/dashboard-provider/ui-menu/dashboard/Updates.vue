@@ -32,7 +32,7 @@
       </div>
 
       <div v-if="updateStatus.info?.description" class="update-description">
-        <h4>{{ translate('What\'s New') }}</h4>
+        <h4>{{ translate("What's New") }}</h4>
         <p>{{ updateStatus.info.description }}</p>
       </div>
 
@@ -65,7 +65,7 @@
           <polyline points="22 4 12 14.01 9 11.01"/>
         </svg>
         <div>
-          <h2>{{ translate('You\'re Up to Date!') }}</h2>
+          <h2>{{ translate("You're Up to Date!") }}</h2>
           <p class="version-info">
             {{ translate('Current version') }}: <strong>v{{ updateStatus?.current }}</strong>
           </p>
