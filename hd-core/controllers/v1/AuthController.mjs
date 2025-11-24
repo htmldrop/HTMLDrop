@@ -435,8 +435,11 @@ export default (context) => {
         // Generate reset token
         const { user, token } = await passwordResetService.createResetToken(email)
 
-        // Send password reset email
-        await emailService.sendPasswordResetEmail(user, token)
+        // Get origin from request headers
+        const origin = req.get('origin') || req.get('referer')?.split('/').slice(0, 3).join('/')
+
+        // Send password reset email with origin
+        await emailService.sendPasswordResetEmail(user, token, 60, origin)
       } catch (error) {
         // Don't reveal if user exists or not
         console.error('Password reset error:', error)

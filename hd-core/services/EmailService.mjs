@@ -100,14 +100,16 @@ export default class EmailService {
    * @param {string} user.email - User email
    * @param {string} resetToken - Password reset token
    * @param {number} expiryMinutes - Token expiry time in minutes
+   * @param {string} origin - Optional origin URL from request
    * @returns {Promise<Object>} Send result
    */
-  async sendPasswordResetEmail(user, resetToken, expiryMinutes = 60) {
+  async sendPasswordResetEmail(user, resetToken, expiryMinutes = 60, origin = null) {
     const { knex, table } = this.context
     const siteUrl = await knex(table('options')).where('name', 'site_url').first()
     const siteName = await knex(table('options')).where('name', 'site_name').first()
 
-    const baseUrl = siteUrl?.value || 'http://localhost:3000'
+    // Priority: 1) origin from request, 2) site_url from options, 3) localhost fallback
+    const baseUrl = origin || siteUrl?.value || 'http://localhost:3000'
     const resetUrl = `${baseUrl}/admin/reset-password?token=${resetToken}`
 
     const emailContent = passwordResetEmail({

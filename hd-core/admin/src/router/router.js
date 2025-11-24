@@ -73,6 +73,11 @@ const router = createRouter({
       component: () => import('@/views/Login.vue')
     },
     {
+      path: '/reset-password',
+      name: 'ResetPassword',
+      component: () => import('@/views/ResetPassword.vue')
+    },
+    {
       path: '/setup',
       redirect: '/setup/database',
       children: [
@@ -153,12 +158,12 @@ router.beforeEach(async (to, from) => {
     return '/'
   }
 
-  // Redirect to login if not authenticated
-  if (healthy && !tokens && !to.path.startsWith('/login')) {
+  // Redirect to login if not authenticated (except for reset-password)
+  if (healthy && !tokens && !to.path.startsWith('/login') && !to.path.startsWith('/reset-password')) {
     return '/login'
   }
 
-  // Redirect to dashboard if authenticated
+  // Redirect to dashboard if authenticated and trying to access login
   if (healthy && tokens && to.path.startsWith('/login')) {
     return '/'
   }
