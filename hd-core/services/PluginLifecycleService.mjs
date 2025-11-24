@@ -7,6 +7,7 @@
 import fs from 'fs'
 import path from 'path'
 import PluginMigrationService from './PluginMigrationService.mjs'
+import BadgeCountService from './BadgeCountService.mjs'
 
 // NPM logo SVG
 const NPM_LOGO_SVG = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 780 250"><path fill="#CB3837" d="M240,250h100v-50h100V0H240V250z M340,50h50v100h-50V50z M480,0v200h100V50h50v150h50V50h50v150h50V0H480z M0,200h100V50h50v150h50V0H0V200z"/></svg>'
@@ -404,6 +405,9 @@ class PluginLifecycleService {
         status: 'active'
       })
 
+      // Refresh badge counts (plugin updates may have changed)
+      await this.refreshBadgeCounts()
+
       console.log(`Plugin ${pluginSlug} activated successfully`)
     } catch (error) {
       console.error(`Activation failed for plugin ${pluginSlug}:`, error)
@@ -444,6 +448,9 @@ class PluginLifecycleService {
         deactivated_at: new Date().toISOString(),
         status: 'inactive'
       })
+
+      // Refresh badge counts (plugin updates may have changed)
+      await this.refreshBadgeCounts()
 
       console.log(`Plugin ${pluginSlug} deactivated successfully`)
     } catch (error) {
@@ -544,6 +551,9 @@ class PluginLifecycleService {
         // Cleanup old backups
         await this.cleanupBackups(pluginSlug)
 
+        // Refresh badge counts (upgrade completed, may reduce update count)
+        await this.refreshBadgeCounts()
+
         console.log(`Plugin ${pluginSlug} upgraded successfully`)
       } catch (error) {
         // Restore from backup on failure
@@ -585,6 +595,9 @@ class PluginLifecycleService {
         version: newVersion,
         previous_version: oldVersion
       })
+
+      // Refresh badge counts (downgrade completed, may affect update count)
+      await this.refreshBadgeCounts()
 
       console.log(`Plugin ${pluginSlug} downgraded successfully`)
     } catch (error) {
@@ -710,6 +723,22 @@ class PluginLifecycleService {
     for (const backup of toDelete) {
       await fs.promises.rm(backup.path, { recursive: true, force: true })
       console.log(`Deleted old backup: ${backup.name}`)
+    }
+  }
+
+  /**
+   * Refresh badge counts after plugin lifecycle changes
+   * This triggers a background update of the badge counts cache
+   * @returns {Promise<void>}
+   */
+  async refreshBadgeCounts() {
+    try {
+      const badgeCountService = new BadgeCountService(this.context)
+      await badgeCountService.updateBadgeCounts()
+      console.log('Badge counts refreshed after plugin lifecycle event')
+    } catch (error) {
+      // Don't fail the lifecycle event if badge count refresh fails
+      console.error('Failed to refresh badge counts:', error)
     }
   }
 }

@@ -18,8 +18,6 @@ import path from 'path'
 
 // Helper: Get badge counts from database cache (shared across workers)
 const getBadgeCounts = async ({ knex, table }) => {
-  const CACHE_TTL = 1 * 60 * 1000 // 1 minute
-
   try {
     // Try to get cached values from options table
     const [pluginCache, themeCache, cmsCache] = await Promise.all([
@@ -28,42 +26,35 @@ const getBadgeCounts = async ({ knex, table }) => {
       knex(table('options')).where('name', 'badge_count_cms_cache').first()
     ])
 
-    const now = Date.now()
     let pluginsBadge = 0
     let themesBadge = 0
     let cmsBadge = 0
 
-    // Use cached plugin count if valid
+    // Use cached plugin count (show stale data rather than 0)
     if (pluginCache?.value) {
       try {
         const cached = JSON.parse(pluginCache.value)
-        if (cached.timestamp && now - cached.timestamp < CACHE_TTL) {
-          pluginsBadge = cached.count || 0
-        }
+        pluginsBadge = cached.count || 0
       } catch (err) {
         // Invalid cache, will use 0
       }
     }
 
-    // Use cached theme count if valid
+    // Use cached theme count (show stale data rather than 0)
     if (themeCache?.value) {
       try {
         const cached = JSON.parse(themeCache.value)
-        if (cached.timestamp && now - cached.timestamp < CACHE_TTL) {
-          themesBadge = cached.count || 0
-        }
+        themesBadge = cached.count || 0
       } catch (err) {
         // Invalid cache, will use 0
       }
     }
 
-    // Use cached CMS update status if valid
+    // Use cached CMS update status (show stale data rather than 0)
     if (cmsCache?.value) {
       try {
         const cached = JSON.parse(cmsCache.value)
-        if (cached.timestamp && now - cached.timestamp < CACHE_TTL) {
-          cmsBadge = cached.available ? 1 : 0
-        }
+        cmsBadge = cached.available ? 1 : 0
       } catch (err) {
         // Invalid cache, will use 0
       }

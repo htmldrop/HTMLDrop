@@ -6,6 +6,7 @@
 
 import fs from 'fs'
 import path from 'path'
+import BadgeCountService from './BadgeCountService.mjs'
 
 // NPM logo SVG
 const NPM_LOGO_SVG = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 780 250"><path fill="#CB3837" d="M240,250h100v-50h100V0H240V250z M340,50h50v100h-50V50z M480,0v200h100V50h50v150h50V50h50v150h50V0H480z M0,200h100V50h50v150h50V0H0V200z"/></svg>'
@@ -389,6 +390,9 @@ class ThemeLifecycleService {
         status: 'active'
       })
 
+      // Refresh badge counts (theme updates may have changed)
+      await this.refreshBadgeCounts()
+
       console.log(`Theme ${themeSlug} activated successfully`)
     } catch (error) {
       console.error(`Activation failed for theme ${themeSlug}:`, error)
@@ -416,6 +420,9 @@ class ThemeLifecycleService {
         deactivated_at: new Date().toISOString(),
         status: 'inactive'
       })
+
+      // Refresh badge counts (theme updates may have changed)
+      await this.refreshBadgeCounts()
 
       console.log(`Theme ${themeSlug} deactivated successfully`)
     } catch (error) {
@@ -485,6 +492,9 @@ class ThemeLifecycleService {
         previous_version: oldVersion
       })
 
+      // Refresh badge counts (upgrade completed, may reduce update count)
+      await this.refreshBadgeCounts()
+
       console.log(`Theme ${themeSlug} upgraded successfully`)
     } catch (error) {
       console.error(`Upgrade failed for theme ${themeSlug}:`, error)
@@ -520,6 +530,9 @@ class ThemeLifecycleService {
         version: newVersion,
         previous_version: oldVersion
       })
+
+      // Refresh badge counts (downgrade completed, may affect update count)
+      await this.refreshBadgeCounts()
 
       console.log(`Theme ${themeSlug} downgraded successfully`)
     } catch (error) {
@@ -694,6 +707,22 @@ class ThemeLifecycleService {
       valid: errors.length === 0,
       errors,
       warnings
+    }
+  }
+
+  /**
+   * Refresh badge counts after theme lifecycle changes
+   * This triggers a background update of the badge counts cache
+   * @returns {Promise<void>}
+   */
+  async refreshBadgeCounts() {
+    try {
+      const badgeCountService = new BadgeCountService(this.context)
+      await badgeCountService.updateBadgeCounts()
+      console.log('Badge counts refreshed after theme lifecycle event')
+    } catch (error) {
+      // Don't fail the lifecycle event if badge count refresh fails
+      console.error('Failed to refresh badge counts:', error)
     }
   }
 }
