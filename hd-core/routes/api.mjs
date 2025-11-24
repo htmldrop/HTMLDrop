@@ -58,9 +58,9 @@ export default (context) => {
     SetupAdminController(context)
   )
 
-  // Unprotected routes
-  router.use('/v1/auth', AuthController(context))
-  router.use('/v1/oauth', OAuthController(context))
+  // Unprotected routes (no JWT, but need registries for email, etc.)
+  router.use('/v1/auth', registryMiddleware(context), AuthController(context))
+  router.use('/v1/oauth', registryMiddleware(context), OAuthController(context))
   router.use('/v1/translations', TranslateController(context))
 
   // Protected routes

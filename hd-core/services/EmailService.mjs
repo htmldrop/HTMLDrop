@@ -14,7 +14,11 @@ export default class EmailService {
   async initTransporter() {
     // Get the email providers registry from the request context
     // This will be available through the hooks system
-    const emailProviders = this.context.req?.hooks?.emailProviders || this.context.emailProviders
+    const emailProviders =
+      this.context.req?.hooks?.emailProviders ||
+      this.context.hooks?.emailProviders ||
+      this.context.registries?.emailProviders ||
+      this.context.emailProviders
 
     if (!emailProviders) {
       throw new Error('Email providers registry not available. Please ensure the registry system is initialized.')
