@@ -112,6 +112,12 @@ SMTP_USER=noreply@example.com
 SMTP_PASSWORD=your_smtp_password
 SMTP_FROM=noreply@example.com
 
+# GitHub Token (optional - for CMS update checks)
+# Increases API rate limit from 60 to 5000 requests/hour
+# Can also be set in database options table as 'github_token' (takes priority)
+# Create at: https://github.com/settings/tokens (needs 'public_repo' scope)
+GITHUB_TOKEN=ghp_your_token_here
+
 # OAuth (optional)
 OAUTH_GOOGLE_CLIENT_ID=
 OAUTH_GOOGLE_CLIENT_SECRET=

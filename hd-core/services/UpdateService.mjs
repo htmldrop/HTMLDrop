@@ -10,11 +10,55 @@ import fs from 'fs'
 import path from 'path'
 import semver from 'semver'
 
+// Static cache for update checks (shared across all instances)
+const updateCache = {
+  data: null,
+  timestamp: null,
+  ttl: 5 * 60 * 1000 // 5 minutes in milliseconds
+}
+
 class UpdateService {
   constructor(context) {
     this.context = context
     this.REPO_DIR = path.resolve('.')
     this.GITHUB_API = 'https://api.github.com'
+  }
+
+  /**
+   * Get GitHub token from options table or environment
+   * @returns {string|null} GitHub token
+   */
+  getGitHubToken() {
+    // Priority 1: Check options table (database)
+    if (this.context.options?.github_token) {
+      return this.context.options.github_token
+    }
+
+    // Priority 2: Check environment variable
+    if (process.env.GITHUB_TOKEN) {
+      return process.env.GITHUB_TOKEN
+    }
+
+    return null
+  }
+
+  /**
+   * Get GitHub API headers with optional authentication
+   * @returns {Object} Headers object
+   */
+  getGitHubHeaders() {
+    const headers = {
+      'Accept': 'application/vnd.github.v3+json',
+      'User-Agent': 'HTMLDrop-CMS'
+    }
+
+    // Add GitHub token if available (increases rate limit from 60 to 5000/hour)
+    const token = this.getGitHubToken()
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`
+    }
+
+    return headers
   }
 
   /**
@@ -73,10 +117,7 @@ class UpdateService {
       const url = `${this.GITHUB_API}/repos/${owner}/${repo}/releases/latest`
 
       const response = await fetch(url, {
-        headers: {
-          'Accept': 'application/vnd.github.v3+json',
-          'User-Agent': 'HTMLDrop-CMS'
-        }
+        headers: this.getGitHubHeaders()
       })
 
       if (!response.ok) {
@@ -110,10 +151,7 @@ class UpdateService {
       const url = `${this.GITHUB_API}/repos/${owner}/${repo}/commits/main`
 
       const response = await fetch(url, {
-        headers: {
-          'Accept': 'application/vnd.github.v3+json',
-          'User-Agent': 'HTMLDrop-CMS'
-        }
+        headers: this.getGitHubHeaders()
       })
 
       if (!response.ok) {
@@ -144,6 +182,12 @@ class UpdateService {
    * @returns {Promise<Object>} Update status {available, current, latest, info}
    */
   async checkForUpdates() {
+    // Check if we have cached data that's still valid
+    const now = Date.now()
+    if (updateCache.data && updateCache.timestamp && (now - updateCache.timestamp) < updateCache.ttl) {
+      return updateCache.data
+    }
+
     try {
       const currentVersion = await this.getCurrentVersion()
       const latestInfo = await this.getLatestVersion()
@@ -159,28 +203,46 @@ class UpdateService {
         available = semver.gt(latestInfo.version, currentVersion)
       }
 
-      return {
+      const result = {
         available,
         current: currentVersion,
         latest: latestInfo.version,
         info: latestInfo
       }
+
+      // Cache the result
+      updateCache.data = result
+      updateCache.timestamp = now
+
+      return result
     } catch (error) {
       console.error('Failed to check for updates:', error.message)
       try {
-        return {
+        const result = {
           available: false,
           current: await this.getCurrentVersion(),
           latest: 'unknown',
           error: error.message
         }
+
+        // Cache the error result too (but for a shorter time)
+        updateCache.data = result
+        updateCache.timestamp = now
+
+        return result
       } catch (versionError) {
-        return {
+        const result = {
           available: false,
           current: '0.0.0',
           latest: 'unknown',
           error: error.message
         }
+
+        // Cache the error result
+        updateCache.data = result
+        updateCache.timestamp = now
+
+        return result
       }
     }
   }
