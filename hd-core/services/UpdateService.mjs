@@ -364,17 +364,54 @@ class UpdateService {
 
       await job.updateProgress(60, { status: 'Merging changes...' })
 
-      // Pull (merge)
-      await git.merge({
-        fs,
-        dir: this.REPO_DIR,
-        ours: branch,
-        theirs: `origin/${branch}`,
-        author: {
-          name: 'HTMLDrop System',
-          email: 'system@htmldrop.com'
+      // Pull (merge) - use fast-forward strategy to avoid conflicts
+      try {
+        await git.merge({
+          fs,
+          dir: this.REPO_DIR,
+          ours: branch,
+          theirs: `origin/${branch}`,
+          fastForward: true,
+          author: {
+            name: 'HTMLDrop System',
+            email: 'system@htmldrop.com'
+          }
+        })
+      } catch (mergeError) {
+        // If merge fails, try to reset everything and merge again
+        if (mergeError.message?.includes('conflict') || mergeError.message?.includes('Merge')) {
+          await job.updateProgress(65, { status: 'Resolving conflicts by resetting to remote...' })
+
+          // Hard reset to remote branch
+          await git.fetch({
+            fs,
+            http,
+            dir: this.REPO_DIR,
+            url: remoteUrl,
+            ref: branch,
+            singleBranch: true
+          })
+
+          // Force checkout to remote branch
+          await git.checkout({
+            fs,
+            dir: this.REPO_DIR,
+            ref: `origin/${branch}`,
+            force: true
+          })
+
+          // Update local branch to point to remote
+          await git.branch({
+            fs,
+            dir: this.REPO_DIR,
+            ref: branch,
+            checkout: true,
+            force: true
+          })
+        } else {
+          throw mergeError
         }
-      })
+      }
 
       await job.updateProgress(70, { status: 'Installing dependencies...' })
 
