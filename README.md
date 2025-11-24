@@ -480,7 +480,7 @@ Special thanks to all our contributors and the open-source community!
 
 ---
 
-## 📈 Stats
+## 📈 Statistics
 
 ![GitHub stars](https://img.shields.io/github/stars/htmldrop/htmldrop?style=social)
 ![GitHub forks](https://img.shields.io/github/forks/htmldrop/htmldrop?style=social)
