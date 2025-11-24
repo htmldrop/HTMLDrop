@@ -6,6 +6,7 @@
 
 import express from 'express'
 import UpdateService from '../../services/UpdateService.mjs'
+import BadgeCountService from '../../services/BadgeCountService.mjs'
 
 export default (context) => {
   const router = express.Router()
@@ -92,6 +93,15 @@ export default (context) => {
       const { branch = 'main' } = req.body
 
       const result = await updateService.pullUpdate({ branch })
+
+      // Refresh badge counts after successful update (force update to clear CMS badge)
+      try {
+        const badgeCountService = new BadgeCountService(req.context)
+        await badgeCountService.updateBadgeCounts(true)
+        console.log('Badge counts refreshed after CMS update')
+      } catch (error) {
+        console.error('Failed to refresh badge counts after CMS update:', error)
+      }
 
       // Schedule server restart after response is sent
       res.json({
