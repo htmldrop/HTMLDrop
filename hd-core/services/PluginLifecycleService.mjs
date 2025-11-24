@@ -8,6 +8,9 @@ import fs from 'fs'
 import path from 'path'
 import PluginMigrationService from './PluginMigrationService.mjs'
 
+// NPM logo SVG
+const NPM_LOGO_SVG = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 780 250"><path fill="#CB3837" d="M240,250h100v-50h100V0H240V250z M340,50h50v100h-50V50z M480,0v200h100V50h50v150h50V50h50v150h50V0H480z M0,200h100V50h50v150h50V0H0V200z"/></svg>'
+
 class PluginLifecycleService {
   constructor(context) {
     this.context = context
@@ -122,6 +125,163 @@ class PluginLifecycleService {
   }
 
   /**
+   * Run npm install for a plugin with job tracking
+   * @param {string} pluginSlug - The plugin slug
+   * @param {string} action - Action name (install, upgrade, downgrade)
+   * @returns {Promise<void>}
+   */
+  async runNpmInstall(pluginSlug, action = 'install') {
+    const pluginPath = path.join(this.PLUGINS_BASE, pluginSlug)
+    const packageJsonPath = path.join(pluginPath, 'package.json')
+
+    // Check if package.json exists
+    if (!fs.existsSync(packageJsonPath)) {
+      console.log(`No package.json found for plugin ${pluginSlug}, skipping npm install`)
+      return
+    }
+
+    // Check if there are dependencies to install
+    try {
+      const packageJson = JSON.parse(await fs.promises.readFile(packageJsonPath, 'utf8'))
+      const hasDeps = packageJson.dependencies && Object.keys(packageJson.dependencies).length > 0
+      const hasDevDeps = packageJson.devDependencies && Object.keys(packageJson.devDependencies).length > 0
+
+      if (!hasDeps && !hasDevDeps) {
+        console.log(`No dependencies found for plugin ${pluginSlug}, skipping npm install`)
+        return
+      }
+    } catch (error) {
+      console.error(`Failed to read package.json for ${pluginSlug}:`, error)
+      return
+    }
+
+    // Create a job for tracking
+    const jobs = this.context.registries?.jobs
+    if (!jobs) {
+      console.warn('Jobs registry not available, running npm install without tracking')
+      await this._runNpmInstallDirect(pluginPath)
+      return
+    }
+
+    const job = await jobs.createJob({
+      name: `Installing dependencies for ${pluginSlug}`,
+      description: `Running npm install for plugin ${pluginSlug} (${action})`,
+      type: 'npm_install',
+      iconSvg: NPM_LOGO_SVG,
+      metadata: {
+        pluginSlug,
+        action,
+        type: 'plugin'
+      },
+      source: pluginSlug,
+      showNotification: true
+    })
+
+    try {
+      await job.start()
+      await job.updateProgress(10, { status: 'Starting installation...' })
+
+      // Run npm install with job progress tracking
+      await this._runNpmInstallDirect(pluginPath, job)
+
+      await job.updateProgress(100, { status: 'Installation complete!' })
+      await job.complete({
+        success: true,
+        message: `Dependencies installed successfully for ${pluginSlug}`
+      })
+    } catch (error) {
+      await job.fail(error.message)
+      throw error
+    }
+  }
+
+  /**
+   * Run npm install directly (without job tracking)
+   * @private
+   */
+  async _runNpmInstallDirect(pluginPath, job = null) {
+    console.log(`Running npm install in ${pluginPath}`)
+
+    try {
+      const { spawn } = await import('child_process')
+
+      return new Promise((resolve, reject) => {
+        const npmProcess = spawn('npm', ['install', '--production'], {
+          cwd: pluginPath,
+          env: { ...process.env },
+          shell: true
+        })
+
+        let stdout = ''
+        let stderr = ''
+        let currentStep = 'Initializing...'
+        let progress = 10
+
+        npmProcess.stdout.on('data', async (data) => {
+          const output = data.toString()
+          stdout += output
+          console.log(output)
+
+          // Parse npm output for progress
+          if (output.includes('npm WARN') || output.includes('npm notice')) {
+            // Warnings don't count as progress
+            return
+          }
+
+          if (output.includes('idealTree') || output.includes('Resolving')) {
+            currentStep = 'Resolving dependencies...'
+            progress = 25
+          } else if (output.includes('reify') || output.includes('Downloading')) {
+            currentStep = 'Downloading packages...'
+            progress = 40
+          } else if (output.includes('extract') || output.includes('Extracting')) {
+            currentStep = 'Extracting packages...'
+            progress = 60
+          } else if (output.includes('build') || output.includes('Building')) {
+            currentStep = 'Building dependencies...'
+            progress = 75
+          } else if (output.includes('added') || output.includes('packages')) {
+            currentStep = 'Finalizing installation...'
+            progress = 90
+          }
+
+          if (job && currentStep) {
+            await job.updateProgress(progress, { status: currentStep }).catch(() => {})
+          }
+        })
+
+        npmProcess.stderr.on('data', (data) => {
+          const output = data.toString()
+          stderr += output
+          // npm outputs progress to stderr, so we still parse it
+          if (!output.includes('npm ERR!')) {
+            console.error(output)
+          }
+        })
+
+        npmProcess.on('close', (code) => {
+          if (code !== 0) {
+            const errorMsg = stderr || stdout || 'npm install failed'
+            console.error(`npm install failed with code ${code}: ${errorMsg}`)
+            reject(new Error(`Failed to install dependencies: ${errorMsg}`))
+          } else {
+            console.log(`npm install completed for ${pluginPath}`)
+            resolve()
+          }
+        })
+
+        npmProcess.on('error', (error) => {
+          console.error(`npm install process error:`, error)
+          reject(new Error(`Failed to start npm install: ${error.message}`))
+        })
+      })
+    } catch (error) {
+      console.error(`npm install failed for ${pluginPath}:`, error)
+      throw new Error(`Failed to install dependencies: ${error.message}`)
+    }
+  }
+
+  /**
    * Call a lifecycle hook on a plugin
    * @param {string} pluginSlug - The plugin slug
    * @param {string} hookName - The lifecycle hook name (onInstall, onActivate, etc.)
@@ -187,7 +347,10 @@ class PluginLifecycleService {
     console.log(`Running onInstall for plugin: ${pluginSlug}`)
 
     try {
-      // Run plugin migrations first
+      // Run npm install first to ensure dependencies are available
+      await this.runNpmInstall(pluginSlug, 'install')
+
+      // Run plugin migrations
       const hasMigrations = await this.migrationService.hasPluginMigrations(pluginSlug)
       if (hasMigrations) {
         console.log(`Running migrations for plugin: ${pluginSlug}`)
@@ -348,6 +511,9 @@ class PluginLifecycleService {
       const backupPath = await this.createBackup(pluginSlug)
 
       try {
+        // Run npm install to update dependencies
+        await this.runNpmInstall(pluginSlug, 'upgrade')
+
         // Run any new migrations
         const hasMigrations = await this.migrationService.hasPluginMigrations(pluginSlug)
         if (hasMigrations) {
@@ -403,6 +569,9 @@ class PluginLifecycleService {
     console.log(`Running onDowngrade for plugin: ${pluginSlug} (${oldVersion} -> ${newVersion})`)
 
     try {
+      // Run npm install to restore previous dependencies
+      await this.runNpmInstall(pluginSlug, 'downgrade')
+
       await this.callLifecycleHook(pluginSlug, 'onDowngrade', {
         pluginSlug,
         oldVersion,
