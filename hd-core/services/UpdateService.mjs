@@ -432,6 +432,10 @@ class UpdateService {
 
       const newVersion = await this.getCurrentVersion()
 
+      // Invalidate update cache so next check shows correct version
+      updateCache.data = null
+      updateCache.timestamp = null
+
       await job.complete({
         success: true,
         message: `CMS updated successfully to version ${newVersion}`,
