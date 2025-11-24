@@ -163,8 +163,29 @@ class UpdateService {
 
       const commit = await response.json()
 
+      // Try to get version from package.json in the latest commit
+      let version = 'latest'
+      try {
+        const packageJsonUrl = `${this.GITHUB_API}/repos/${owner}/${repo}/contents/package.json?ref=main`
+        const packageResponse = await fetch(packageJsonUrl, {
+          headers: this.getGitHubHeaders()
+        })
+
+        if (packageResponse.ok) {
+          const packageData = await packageResponse.json()
+          // GitHub API returns base64 encoded content
+          const packageJson = JSON.parse(Buffer.from(packageData.content, 'base64').toString('utf8'))
+          if (packageJson.version) {
+            version = packageJson.version
+          }
+        }
+      } catch (err) {
+        // If we can't get package.json version, fall back to 'latest'
+        console.warn('Could not fetch version from package.json, using "latest":', err.message)
+      }
+
       return {
-        version: 'latest',
+        version,
         sha: commit.sha,
         url: commit.html_url,
         publishedAt: commit.commit.author.date,
