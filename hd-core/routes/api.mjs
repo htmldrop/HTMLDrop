@@ -72,7 +72,7 @@ export default (context) => {
   router.use('/v1/themes', jwtMiddleware(context), registryMiddleware(context), ThemesController(context))
   router.use('/v1/jobs', jwtMiddleware(context), registryMiddleware(context), JobsController(context))
   router.use('/v1/updates', jwtMiddleware(context), registryMiddleware(context), UpdateController(context))
-  router.use('/v1/badge-counts', jwtMiddleware(context), BadgeCountController(context))
+  router.use('/v1/badge-counts', jwtMiddleware(context), registryMiddleware(context), BadgeCountController(context))
   router.use('/v1/post-types', jwtMiddleware(context), registryMiddleware(context), PostTypesController(context))
   router.use(
     '/v1/:postType/taxonomies',

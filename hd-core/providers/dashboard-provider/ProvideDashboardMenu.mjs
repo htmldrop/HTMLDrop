@@ -76,12 +76,18 @@ export default async ({ req, res, next }) => {
   let updatesBadge = 0
   let pluginsBadge = 0
   let themesBadge = 0
+  let cmsBadge = 0
+  let totalUpdatesBadge = 0
 
   try {
     const badges = await getBadgeCounts({ knex, table })
     pluginsBadge = badges.pluginsBadge
     themesBadge = badges.themesBadge
-    updatesBadge = badges.cmsBadge
+    cmsBadge = badges.cmsBadge
+    updatesBadge = cmsBadge // CMS updates only for Updates submenu
+
+    // Total badge for Dashboard parent (sum of all updates)
+    totalUpdatesBadge = pluginsBadge + themesBadge + cmsBadge
   } catch (error) {
     console.error('Failed to get badge counts:', error)
   }
@@ -89,7 +95,7 @@ export default async ({ req, res, next }) => {
   const adminPages = [
     {
       capabilities: { manage_dashboard: 'manage_dashboard' },
-      badge: 0,
+      badge: totalUpdatesBadge,
       position: 1000,
       file: 'Dashboard.vue',
       slug: 'dashboard',
@@ -166,7 +172,7 @@ export default async ({ req, res, next }) => {
     },
     {
       capabilities: { manage_dashboard: 'manage_dashboard' },
-      badge: updatesBadge,
+      badge: totalUpdatesBadge,
       position: 1100,
       file: 'Updates.vue',
       parent_slug: 'dashboard',

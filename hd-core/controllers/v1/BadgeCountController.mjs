@@ -12,7 +12,7 @@ export default (context) => {
   router.post('/refresh', async (req, res) => {
     try {
       // Check capability
-      const hasCapability = await req.guard.can('manage_dashboard')
+      const hasCapability = await req.guard.user({ canOneOf: ['manage_dashboard'], userId: req?.user?.id })
       if (!hasCapability) {
         return res.status(403).json({
           success: false,
@@ -44,7 +44,7 @@ export default (context) => {
   router.get('/', async (req, res) => {
     try {
       // Check capability
-      const hasCapability = await req.guard.can('manage_dashboard')
+      const hasCapability = await req.guard.user({ canOneOf: ['manage_dashboard'], userId: req?.user?.id })
       if (!hasCapability) {
         return res.status(403).json({
           success: false,
