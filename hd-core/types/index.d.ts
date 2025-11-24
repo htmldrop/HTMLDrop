@@ -38,6 +38,9 @@ declare global {
       /** Authorization guard for capability checks */
       guard: Guard
 
+      /** Task scheduler for running scheduled jobs (Laravel-style) */
+      scheduler: SchedulerService
+
       /**
        * Get prefixed table name for database queries
        * @param name - Table name (e.g., 'posts', 'users')
@@ -780,8 +783,236 @@ declare global {
       ERROR_CODES: Record<string, string>
       ERROR_MESSAGES: Record<string, string>
     }
+
+    // ========================================================================
+    // Scheduler Service
+    // ========================================================================
+
+    /**
+     * Laravel-style task scheduler for running scheduled jobs
+     *
+     * @example
+     * // Schedule a task to run every 2 minutes
+     * scheduler
+     *   .call(async () => {
+     *     console.log('Running scheduled task')
+     *   }, 'my_task')
+     *   .everyTwoMinutes()
+     *
+     * // Schedule a daily task at specific time
+     * scheduler
+     *   .call(async () => {
+     *     console.log('Running daily cleanup')
+     *   }, 'daily_cleanup')
+     *   .dailyAt('02:00')
+     *
+     * // Start all scheduled tasks (done automatically by scheduler provider)
+     * scheduler.startAll()
+     */
+    interface SchedulerService {
+      /**
+       * INTERNAL: Set the current owner (plugin/theme slug) for subsequently registered tasks
+       * This is called automatically by plugin/theme lifecycle system
+       * DO NOT call this directly from plugins/themes - it's managed automatically
+       * @param owner - Plugin or theme slug
+       * @internal
+       */
+      _setOwner(owner: string): void
+
+      /**
+       * INTERNAL: Clear the current owner
+       * This is called automatically by plugin/theme lifecycle system
+       * DO NOT call this directly from plugins/themes - it's managed automatically
+       * @internal
+       */
+      _clearOwner(): void
+
+      /**
+       * Schedule a callback function to run on a schedule
+       * Owner is automatically set based on which plugin/theme is registering the task
+       * @param callback - The function to execute
+       * @param name - Optional unique name for the task
+       * @returns A ScheduledTask that can be configured with timing methods
+       * @example
+       * scheduler.call(async () => {
+       *   console.log('Task running')
+       * }, 'my_task').everyFiveMinutes()
+       */
+      call(callback: () => Promise<void> | void, name?: string): ScheduledTask
+
+      /**
+       * Start all registered scheduled tasks
+       * Only executes on worker 1, other workers will register but not execute
+       */
+      startAll(): void
+
+      /**
+       * Stop all scheduled tasks
+       */
+      stopAll(): void
+
+      /**
+       * Stop and remove all tasks owned by a specific plugin or theme
+       * This is called automatically when a plugin/theme is deactivated or uninstalled
+       * @param owner - Plugin or theme slug
+       * @example
+       * await scheduler.teardownTasksByOwner('my-plugin')
+       */
+      teardownTasksByOwner(owner: string): Promise<void>
+
+      /**
+       * Get all registered tasks
+       * @returns Array of task metadata
+       */
+      getTasks(): Array<{
+        name: string
+        owner: string | null
+        schedule: string
+        withoutOverlapping: boolean
+      }>
+
+      /**
+       * Get tasks owned by a specific plugin or theme
+       * @param owner - Plugin or theme slug
+       * @returns Array of task metadata for the specified owner
+       * @example
+       * const tasks = scheduler.getTasksByOwner('my-plugin')
+       */
+      getTasksByOwner(owner: string): Array<{
+        name: string
+        owner: string | null
+        schedule: string
+        withoutOverlapping: boolean
+      }>
+    }
+
+    /**
+     * A scheduled task with fluent configuration methods
+     */
+    interface ScheduledTask {
+      /**
+       * Set a custom cron expression
+       * @param expression - Cron expression (e.g., '0 0 * * *')
+       * @returns The task instance for method chaining
+       * @example
+       * task.cron('0 0 * * *') // Run daily at midnight
+       */
+      cron(expression: string): ScheduledTask
+
+      /**
+       * Run every minute
+       * @returns The task instance for method chaining
+       */
+      everyMinute(): ScheduledTask
+
+      /**
+       * Run every N minutes
+       * @param n - Number of minutes between runs
+       * @returns The task instance for method chaining
+       * @example
+       * task.everyNMinutes(15) // Run every 15 minutes
+       */
+      everyNMinutes(n: number): ScheduledTask
+
+      /**
+       * Run every 2 minutes
+       * @returns The task instance for method chaining
+       */
+      everyTwoMinutes(): ScheduledTask
+
+      /**
+       * Run every 5 minutes
+       * @returns The task instance for method chaining
+       */
+      everyFiveMinutes(): ScheduledTask
+
+      /**
+       * Run every 10 minutes
+       * @returns The task instance for method chaining
+       */
+      everyTenMinutes(): ScheduledTask
+
+      /**
+       * Run every 15 minutes
+       * @returns The task instance for method chaining
+       */
+      everyFifteenMinutes(): ScheduledTask
+
+      /**
+       * Run every 30 minutes
+       * @returns The task instance for method chaining
+       */
+      everyThirtyMinutes(): ScheduledTask
+
+      /**
+       * Run hourly at the start of the hour
+       * @returns The task instance for method chaining
+       */
+      hourly(): ScheduledTask
+
+      /**
+       * Run hourly at a specific minute
+       * @param minute - Minute of the hour (0-59)
+       * @returns The task instance for method chaining
+       * @example
+       * task.hourlyAt(30) // Run at 30 minutes past every hour
+       */
+      hourlyAt(minute: number): ScheduledTask
+
+      /**
+       * Run daily at midnight
+       * @returns The task instance for method chaining
+       */
+      daily(): ScheduledTask
+
+      /**
+       * Run daily at a specific time (24-hour format)
+       * @param time - Time in HH:MM format (e.g., '14:30')
+       * @returns The task instance for method chaining
+       * @example
+       * task.dailyAt('02:00') // Run daily at 2 AM
+       */
+      dailyAt(time: string): ScheduledTask
+
+      /**
+       * Run weekly on Sunday at midnight
+       * @returns The task instance for method chaining
+       */
+      weekly(): ScheduledTask
+
+      /**
+       * Run monthly on the first day at midnight
+       * @returns The task instance for method chaining
+       */
+      monthly(): ScheduledTask
+
+      /**
+       * Allow overlapping executions (default is to prevent overlaps)
+       * @returns The task instance for method chaining
+       */
+      allowOverlapping(): ScheduledTask
+
+      /**
+       * Set a custom name for this task
+       * @param name - Task name
+       * @returns The task instance for method chaining
+       */
+      named(name: string): ScheduledTask
+
+      /**
+       * Start the scheduled task (called automatically by startAll)
+       */
+      start(): void
+
+      /**
+       * Stop the scheduled task
+       */
+      stop(): void
+    }
   }
 }
 
-export = HTMLDrop
-export as namespace HTMLDrop
+export {}
+declare global {
+  namespace HTMLDrop {}
+}

@@ -70,6 +70,7 @@ HTMLDrop is a **modern, open-source CMS** designed to bring the flexibility and 
 - **🔗 Relationships** - Post relationships and taxonomies
 - **📜 Revisions** - Content history and rollback
 - **🌐 WebSockets** - Real-time features support
+- **⏰ Task Scheduler** - Laravel-style cron job scheduling for plugins/themes
 
 ### Performance & Scalability
 
@@ -277,6 +278,14 @@ export default async ({ req, res, next, router }) => {
       router.get('/my-plugin/api', (req, res) => {
         res.json({ message: 'Hello from plugin!' })
       })
+
+      // Schedule a background task
+      const { scheduler } = req.context
+      scheduler
+        .call(async () => {
+          console.log('Running scheduled cleanup')
+        }, 'my_plugin_cleanup')
+        .daily()
     }
   }
 }

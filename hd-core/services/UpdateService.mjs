@@ -424,7 +424,7 @@ class UpdateService {
     const { spawn } = await import('child_process')
 
     return new Promise((resolve, reject) => {
-      const process = spawn(command, args, {
+      const childProcess = spawn(command, args, {
         cwd: this.REPO_DIR,
         env: { ...process.env },
         shell: true
@@ -433,17 +433,17 @@ class UpdateService {
       let stdout = ''
       let stderr = ''
 
-      process.stdout.on('data', (data) => {
+      childProcess.stdout.on('data', (data) => {
         stdout += data.toString()
         console.log(data.toString())
       })
 
-      process.stderr.on('data', (data) => {
+      childProcess.stderr.on('data', (data) => {
         stderr += data.toString()
         console.error(data.toString())
       })
 
-      process.on('close', (code) => {
+      childProcess.on('close', (code) => {
         if (code !== 0) {
           reject(new Error(`${errorMessage}: ${stderr || stdout}`))
         } else {

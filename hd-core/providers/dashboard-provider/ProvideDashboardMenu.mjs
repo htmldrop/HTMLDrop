@@ -1,21 +1,98 @@
 import path from 'path'
-import UpdateService from '../../services/UpdateService.mjs'
+
+/**
+ * Badge Count Architecture:
+ *
+ * This provider runs on EVERY API request through registryMiddleware, so we ONLY read
+ * from a lightweight database cache. The actual counting happens separately:
+ *
+ * 1. Badge counts are stored in the `options` table as JSON with timestamp
+ * 2. All workers share the same database cache (no per-worker duplication)
+ * 3. Actual counting happens via:
+ *    - Scheduled task (every 2 minutes) for plugins/themes/cms updates
+ *    - POST /api/v1/badge-counts/refresh (manual trigger)
+ *    - Respects 2-minute cache TTL automatically
+ *
+ * This ensures minimal overhead on every request while keeping badge counts fresh.
+ */
+
+// Helper: Get badge counts from database cache (shared across workers)
+const getBadgeCounts = async ({ knex, table }) => {
+  const CACHE_TTL = 1 * 60 * 1000 // 1 minute
+
+  try {
+    // Try to get cached values from options table
+    const [pluginCache, themeCache, cmsCache] = await Promise.all([
+      knex(table('options')).where('name', 'badge_count_plugins_cache').first(),
+      knex(table('options')).where('name', 'badge_count_themes_cache').first(),
+      knex(table('options')).where('name', 'badge_count_cms_cache').first()
+    ])
+
+    const now = Date.now()
+    let pluginsBadge = 0
+    let themesBadge = 0
+    let cmsBadge = 0
+
+    // Use cached plugin count if valid
+    if (pluginCache?.value) {
+      try {
+        const cached = JSON.parse(pluginCache.value)
+        if (cached.timestamp && now - cached.timestamp < CACHE_TTL) {
+          pluginsBadge = cached.count || 0
+        }
+      } catch (err) {
+        // Invalid cache, will use 0
+      }
+    }
+
+    // Use cached theme count if valid
+    if (themeCache?.value) {
+      try {
+        const cached = JSON.parse(themeCache.value)
+        if (cached.timestamp && now - cached.timestamp < CACHE_TTL) {
+          themesBadge = cached.count || 0
+        }
+      } catch (err) {
+        // Invalid cache, will use 0
+      }
+    }
+
+    // Use cached CMS update status if valid
+    if (cmsCache?.value) {
+      try {
+        const cached = JSON.parse(cmsCache.value)
+        if (cached.timestamp && now - cached.timestamp < CACHE_TTL) {
+          cmsBadge = cached.available ? 1 : 0
+        }
+      } catch (err) {
+        // Invalid cache, will use 0
+      }
+    }
+
+    return { pluginsBadge, themesBadge, cmsBadge }
+  } catch (error) {
+    console.error('Failed to get badge counts from cache:', error)
+    return { pluginsBadge: 0, themesBadge: 0, cmsBadge: 0 }
+  }
+}
 
 export default async ({ req, res, next }) => {
   const { addMenuPage, addSubMenuPage } = req.hooks
-  const { translate, parseVue } = req.context
+  const { translate, parseVue, knex, table } = req.context
   const locale = req?.user?.locale || 'en_US'
 
-  // Check for available updates
+  // Get badge counts from shared database cache (lightweight, shared across workers)
   let updatesBadge = 0
+  let pluginsBadge = 0
+  let themesBadge = 0
+
   try {
-    const updateService = new UpdateService(req.context)
-    const updateStatus = await updateService.checkForUpdates()
-    if (updateStatus.available) {
-      updatesBadge = 1
-    }
+    const badges = await getBadgeCounts({ knex, table })
+    pluginsBadge = badges.pluginsBadge
+    themesBadge = badges.themesBadge
+    updatesBadge = badges.cmsBadge
   } catch (error) {
-    console.error('Failed to check for updates in menu:', error)
+    console.error('Failed to get badge counts:', error)
   }
 
   const adminPages = [
@@ -31,7 +108,7 @@ export default async ({ req, res, next }) => {
     },
     {
       capabilities: { manage_dashboard: 'manage_dashboard' },
-      badge: 0,
+      badge: themesBadge,
       position: 7200,
       file: 'Themes.vue',
       slug: 'appearance',
@@ -41,7 +118,7 @@ export default async ({ req, res, next }) => {
     },
     {
       capabilities: { manage_dashboard: 'manage_dashboard' },
-      badge: 0,
+      badge: pluginsBadge,
       position: 7300,
       file: 'Plugins.vue',
       slug: 'plugins',

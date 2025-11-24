@@ -508,6 +508,72 @@ const posts = await withMetaMany(knex, table, postsArray)
 
 ---
 
+### 8. Task Scheduler (Laravel-style)
+
+**File:** [hd-core/services/SchedulerService.mjs](../../services/SchedulerService.mjs)
+
+**Laravel-inspired task scheduler** for running scheduled jobs:
+
+**Features:**
+- Fluent API for scheduling (`.everyMinute()`, `.daily()`, `.weekly()`, etc.)
+- Database locking for single-worker execution
+- Automatic lifecycle management for plugins/themes
+- Cross-worker synchronization
+- Immutable ownership tracking
+
+**Usage:**
+
+```javascript
+// In a plugin or theme
+export default async ({ req, res, next, router }) => {
+  const { scheduler } = req.context
+
+  return {
+    async init() {
+      // Schedule a task
+      scheduler
+        .call(async () => {
+          console.log('Running scheduled task')
+        }, 'my_plugin_task')
+        .everyFiveMinutes()
+
+      // Daily task at specific time
+      scheduler
+        .call(async () => {
+          // Cleanup logic
+        }, 'my_plugin_cleanup')
+        .dailyAt('02:00')
+    }
+  }
+}
+```
+
+**Scheduling Methods:**
+- `.everyMinute()`, `.everyTwoMinutes()`, `.everyFiveMinutes()`
+- `.everyTenMinutes()`, `.everyFifteenMinutes()`, `.everyThirtyMinutes()`
+- `.hourly()`, `.hourlyAt(minute)`
+- `.daily()`, `.dailyAt('HH:MM')`
+- `.weekly()`, `.monthly()`
+- `.cron('* * * * *')` - Custom cron expression
+
+**Lifecycle Management:**
+- Tasks are automatically assigned an **immutable owner** (plugin/theme slug)
+- When a plugin/theme is deactivated, all its tasks are automatically stopped and removed
+- No manual cleanup needed in `onDeactivate()` or `onUninstall()` hooks
+
+**Worker Execution:**
+- Tasks are registered on **all workers** (for metadata sync)
+- Tasks are **executed only on worker 1** (prevents duplication)
+- Database locking prevents overlapping executions
+
+**Storage:**
+- Task metadata stored in `options` table (key: `scheduler_task_{name}`)
+- Lock state stored in `options` table (key: `scheduler_lock_{name}`)
+
+See the [Scheduler Documentation](../development/SCHEDULER.md) for complete guide.
+
+---
+
 ## Database Schema
 
 ### Core Tables

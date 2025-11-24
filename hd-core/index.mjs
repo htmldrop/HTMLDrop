@@ -16,6 +16,7 @@ import UserGuard from './utils/UserGuard.mjs'
 import translate from './utils/translation.mjs'
 import createWsAuthMiddleware from './utils/wsAuthMiddleware.mjs'
 import { initSecrets, ensureSecrets } from './utils/secrets.mjs'
+import SchedulerService from './services/SchedulerService.mjs'
 
 dotenv.config({ quiet: !cluster.isPrimary })
 
@@ -108,9 +109,24 @@ if (cluster.isPrimary) {
   // Track worker responses for consolidated logging
   const workerResponses = new Map()
   const pluginLoadResponses = new Map()
+  const schedulerInitResponses = new Map()
 
   cluster.on('message', async (worker, message) => {
-    if (message.type === 'db_config_updated') {
+    if (message.type === 'scheduler_initialized') {
+      // Collect scheduler initialization responses
+      schedulerInitResponses.set(worker.id, message)
+
+      // When all workers have reported, log consolidated result
+      if (schedulerInitResponses.size === Object.keys(cluster.workers).length) {
+        const executionWorker = Array.from(schedulerInitResponses.values()).find(m => m.canExecute)
+
+        if (executionWorker) {
+          console.log(`✓ Scheduler initialized on ${schedulerInitResponses.size} worker node${schedulerInitResponses.size > 1 ? 's' : ''} (execution on worker ${executionWorker.workerId})`)
+        }
+
+        schedulerInitResponses.clear()
+      }
+    } else if (message.type === 'db_config_updated') {
       dotenv.config({ quiet: true, override: true })
       const knex = await initializeKnex()
       if (!knex) return
@@ -218,6 +234,7 @@ if (cluster.isPrimary) {
     knex: null,
     options: null,
     parseVue,
+    scheduler: null, // Will be initialized after knex
     formatDate(date = new Date()) {
       return date.toISOString().replace('Z', '').replace('T', ' ')
     },
@@ -241,6 +258,16 @@ if (cluster.isPrimary) {
   initializeKnex().then(async (knex) => {
     context.knex = knex
     context.options = await initializeOptions(context.knex, context.table)
+
+    // Initialize scheduler on all workers, but only worker 1 will execute tasks
+    context.scheduler = new SchedulerService(context, cluster.worker.id === 1)
+
+    // Send scheduler initialization message to primary for consolidated logging
+    process.send({
+      type: 'scheduler_initialized',
+      workerId: cluster.worker.id,
+      canExecute: cluster.worker.id === 1
+    })
   })
 
   // WebSocket authentication and connection handling

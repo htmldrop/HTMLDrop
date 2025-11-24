@@ -123,6 +123,48 @@ await registerTaxonomy({
 })
 ```
 
+### 7. Scheduling Tasks (Laravel-style Scheduler)
+
+Plugins can register scheduled tasks that run automatically:
+
+```javascript
+export default async ({ req, res, next, router }) => {
+  const { scheduler } = req.context
+
+  return {
+    async init() {
+      // Schedule a task to run every 5 minutes
+      scheduler
+        .call(async () => {
+          console.log('Running scheduled task')
+          // Your task logic here
+        }, 'my_plugin_task')
+        .everyFiveMinutes()
+
+      // Schedule daily cleanup at 2 AM
+      scheduler
+        .call(async () => {
+          // Cleanup logic
+        }, 'my_plugin_cleanup')
+        .dailyAt('02:00')
+    }
+  }
+}
+```
+
+**Available scheduling methods:**
+- `.everyMinute()`, `.everyTwoMinutes()`, `.everyFiveMinutes()`
+- `.everyTenMinutes()`, `.everyFifteenMinutes()`, `.everyThirtyMinutes()`
+- `.hourly()`, `.hourlyAt(minute)`, `.daily()`, `.dailyAt('HH:MM')`
+- `.weekly()`, `.monthly()`, `.cron('* * * * *')`
+
+**Important:**
+- Tasks are **automatically torn down** when your plugin is deactivated or uninstalled
+- No manual cleanup needed!
+- All tasks are tracked by owner (your plugin) and cleaned up automatically
+
+See the [Scheduler Documentation](../../hd-core/docs/development/SCHEDULER.md) for complete details.
+
 ## Activating Plugins
 
 1. **Via Admin Interface:**

@@ -19,6 +19,7 @@ import PluginsController from '../controllers/v1/PluginsController.mjs'
 import ThemesController from '../controllers/v1/ThemesController.mjs'
 import JobsController from '../controllers/v1/JobsController.mjs'
 import UpdateController from '../controllers/v1/UpdateController.mjs'
+import BadgeCountController from '../controllers/v1/BadgeCountController.mjs'
 import dbCheckMiddleware from '../middlewares/dbCheckMiddleware.mjs'
 import dbRequiredMiddleware from '../middlewares/dbRequiredMiddleware.mjs'
 import adminCheckMiddleware from '../middlewares/adminCheckMiddleware.mjs'
@@ -71,6 +72,7 @@ export default (context) => {
   router.use('/v1/themes', jwtMiddleware(context), registryMiddleware(context), ThemesController(context))
   router.use('/v1/jobs', jwtMiddleware(context), registryMiddleware(context), JobsController(context))
   router.use('/v1/updates', jwtMiddleware(context), registryMiddleware(context), UpdateController(context))
+  router.use('/v1/badge-counts', jwtMiddleware(context), BadgeCountController(context))
   router.use('/v1/post-types', jwtMiddleware(context), registryMiddleware(context), PostTypesController(context))
   router.use(
     '/v1/:postType/taxonomies',

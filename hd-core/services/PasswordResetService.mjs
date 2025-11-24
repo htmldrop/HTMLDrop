@@ -71,17 +71,40 @@ export default class PasswordResetService {
       throw new Error('Invalid or expired reset token')
     }
 
-    // Get all users with non-expired tokens
-    const now = this.context.formatDate()
+    // Get all users with reset tokens (we'll check expiry after bcrypt compare)
     const users = await knex(table('users'))
       .whereNotNull('reset_token')
-      .where('reset_token_expires_at', '>', now)
       .whereNull('deleted_at')
 
     // Check each user's hashed token
     for (const user of users) {
       const isValid = await bcrypt.compare(token, user.reset_token)
       if (isValid) {
+        // Check if token has expired (handle both ISO and formatted dates)
+        // The stored date might be in format "YYYY-MM-DD HH:MM:SS.mmm" (no timezone)
+        // or ISO format with Z. We need to parse it correctly.
+        let expiresAt
+        const storedDate = user.reset_token_expires_at
+
+        if (typeof storedDate === 'string' && !storedDate.includes('T') && !storedDate.includes('Z')) {
+          // Format is "YYYY-MM-DD HH:MM:SS.mmm" - add 'Z' to parse as UTC
+          expiresAt = new Date(storedDate.replace(' ', 'T') + 'Z')
+        } else {
+          // ISO format or already has timezone info
+          expiresAt = new Date(storedDate)
+        }
+
+        const now = new Date()
+
+        //  Check if date parsing failed
+        if (isNaN(expiresAt.getTime())) {
+          throw new Error('Invalid or expired reset token')
+        }
+
+        if (expiresAt < now) {
+          throw new Error('Invalid or expired reset token')
+        }
+
         return user
       }
     }
@@ -127,16 +150,44 @@ export default class PasswordResetService {
   async clearExpiredTokens() {
     const { knex, table } = this.context
 
-    const now = this.context.formatDate()
-    const result = await knex(table('users'))
-      .whereNotNull('reset_token')
-      .where('reset_token_expires_at', '<', now)
-      .update({
-        reset_token: null,
-        reset_token_expires_at: null,
-        updated_at: now
-      })
+    // Get all users with reset tokens
+    const users = await knex(table('users')).whereNotNull('reset_token')
 
-    return result
+    const now = new Date()
+    let clearedCount = 0
+
+    // Check each user's expiry and clear if expired
+    for (const user of users) {
+      // Parse date correctly (handle both ISO and formatted dates)
+      let expiresAt
+      const storedDate = user.reset_token_expires_at
+
+      if (typeof storedDate === 'string' && !storedDate.includes('T') && !storedDate.includes('Z')) {
+        // Format is "YYYY-MM-DD HH:MM:SS.mmm" - add 'Z' to parse as UTC
+        expiresAt = new Date(storedDate.replace(' ', 'T') + 'Z')
+      } else {
+        // ISO format or already has timezone info
+        expiresAt = new Date(storedDate)
+      }
+
+      // Skip if date parsing failed
+      if (isNaN(expiresAt.getTime())) {
+        continue
+      }
+
+      // Clear if expired
+      if (expiresAt < now) {
+        await knex(table('users'))
+          .where('id', user.id)
+          .update({
+            reset_token: null,
+            reset_token_expires_at: null,
+            updated_at: this.context.formatDate()
+          })
+        clearedCount++
+      }
+    }
+
+    return clearedCount
   }
 }

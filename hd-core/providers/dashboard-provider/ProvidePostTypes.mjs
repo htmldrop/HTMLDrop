@@ -11,7 +11,7 @@ export default async ({ req, res, next }) => {
       description: 'A blog post type',
       show_in_menu: true,
       icon: '<svg fill="currentColor" viewBox="0 0 24 24" version="1.2" baseProfile="tiny" xmlns="http://www.w3.org/2000/svg"><path d="M16.729 4.271a1 1 0 0 0-1.414-.004 1 1 0 0 0-.225.355c-.832 1.736-1.748 2.715-2.904 3.293C10.889 8.555 9.4 9 7 9a1.01 1.01 0 0 0-.923.617 1 1 0 0 0 .217 1.09l3.243 3.243L5 20l6.05-4.537 3.242 3.242a1 1 0 0 0 .326.217q.185.077.382.078c.197.001.26-.027.382-.078A1 1 0 0 0 16 18c0-2.4.444-3.889 1.083-5.166.577-1.156 1.556-2.072 3.293-2.904a1 1 0 0 0 .354-.225 1 1 0 0 0-.004-1.414z"/></svg>',
-      badge: 1,
+      badge: 0,
       position: 1100,
       capabilities: {
         edit_post: 'edit_post',
@@ -63,7 +63,7 @@ export default async ({ req, res, next }) => {
       description: 'Media files',
       show_in_menu: true,
       icon: '<svg xmlns="http://www.w3.org/2000/svg" fill="currentColor" viewBox="0 0 100 100" xml:space="preserve"><path d="M36 31h28c.8 0 1.3-.9.8-1.5l-3.3-5.1c-1-2-3.1-3.3-5.4-3.3H43.9c-2.3 0-4.4 1.3-5.4 3.3l-3.3 5.1c-.5.6 0 1.5.8 1.5m14 18c-4.4 0-8 3.6-8 8s3.6 8 8 8 8-3.6 8-8-3.6-8-8-8"/><path d="M74 37H26c-3.3 0-6 2.7-6 6v28c0 3.3 2.7 6 6 6h48c3.3 0 6-2.7 6-6V43c0-3.3-2.7-6-6-6M50 71c-7.7 0-14-6.3-14-14s6.3-14 14-14 14 6.3 14 14-6.3 14-14 14"/></svg>',
-      badge: 20,
+      badge: 0,
       position: 1300,
       capabilities: {
         edit_post: 'edit_attachment',

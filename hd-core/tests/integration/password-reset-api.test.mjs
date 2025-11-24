@@ -371,7 +371,8 @@ describe('Password Reset API Integration', () => {
       const hashedToken = await bcrypt.hash(resetToken, 10)
 
       await db('test_users').where('email', 'test@example.com').update({
-        reset_token: hashedToken
+        reset_token: hashedToken,
+        reset_token_expires_at: new Date(Date.now() + 60 * 60 * 1000).toISOString()
       })
 
       // Step 2: Validate token

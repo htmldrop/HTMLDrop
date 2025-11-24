@@ -41,7 +41,10 @@ describe('PasswordResetService', () => {
     // Create context
     context = {
       knex: db,
-      table: (name) => `test_${name}`
+      table: (name) => `test_${name}`,
+      formatDate(date = new Date()) {
+        return date.toISOString().replace('Z', '').replace('T', ' ')
+      }
     }
 
     passwordResetService = new PasswordResetService(context)
