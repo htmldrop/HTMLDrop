@@ -256,8 +256,6 @@ export default {
         }
 
         const data = await response.json()
-        console.log('[Updates.vue] Badge counts API response:', data)
-        console.log('[Updates.vue] Setting badgeCounts to:', { plugins: data.plugins, themes: data.themes, cms: data.cms })
         this.badgeCounts = data
       } catch (err) {
         console.error('[Updates.vue] Failed to fetch badge counts:', err)
