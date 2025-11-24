@@ -14,7 +14,17 @@ const generateSecret = () => crypto.randomBytes(32).toString('hex')
  * Should only be called from the primary cluster process
  */
 export const initSecrets = () => {
-  const envPath = path.resolve('.env')
+  // Use ENV_FILE_PATH if set (for Docker with persistent volume), otherwise use .env in current directory
+  const envPath = process.env.ENV_FILE_PATH ? path.resolve(process.env.ENV_FILE_PATH) : path.resolve('.env')
+
+  // Ensure directory exists for custom path
+  if (process.env.ENV_FILE_PATH) {
+    const dir = path.dirname(envPath)
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true })
+    }
+  }
+
   let envContent = ''
   let modified = false
 
@@ -52,8 +62,10 @@ export const initSecrets = () => {
   // Write back to .env file if modified
   if (modified) {
     fs.writeFileSync(envPath, envContent)
-    console.log('✅ Secrets saved to .env file')
-    console.log('⚠️  NOTE: Secrets will persist across restarts. Workers will inherit these from primary process.')
+    console.log(`✅ Secrets saved to ${envPath}`)
+    if (process.env.ENV_FILE_PATH) {
+      console.log('✅ Using persistent volume for secrets (Docker mode)')
+    }
   }
 }
 
