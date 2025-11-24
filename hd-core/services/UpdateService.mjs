@@ -122,7 +122,6 @@ class UpdateService {
 
       if (!response.ok) {
         // If no releases, try to get latest commit
-        console.log(`No releases found for ${owner}/${repo}, checking latest commit...`)
         return await this.getLatestCommit()
       }
 

@@ -38,13 +38,13 @@ export default function passwordResetEmail(data) {
       box-shadow: 0 2px 4px rgba(0,0,0,0.1);
     }
     .header {
-      text-align: center;
       margin-bottom: 30px;
     }
     .header h1 {
       color: #2c3e50;
       margin: 0;
-      font-size: 28px;
+      font-size: 24px;
+      font-weight: 600;
     }
     .content {
       margin-bottom: 30px;
@@ -52,30 +52,38 @@ export default function passwordResetEmail(data) {
     .button {
       display: inline-block;
       padding: 12px 24px;
-      background-color: #e74c3c;
+      background-color: #2c3e50;
       color: #ffffff;
       text-decoration: none;
-      border-radius: 4px;
+      border-radius: 6px;
       margin: 20px 0;
+      font-weight: 500;
+    }
+    .button:hover {
+      background-color: #34495e;
     }
     .warning {
-      background-color: #fff3cd;
-      border-left: 4px solid #ffc107;
-      padding: 12px;
+      background-color: #f8f9fa;
+      border-left: 3px solid #6c757d;
+      padding: 16px;
       margin: 20px 0;
     }
     .footer {
-      text-align: center;
       margin-top: 30px;
       padding-top: 20px;
-      border-top: 1px solid #eee;
-      color: #777;
-      font-size: 14px;
+      border-top: 1px solid #e9ecef;
+      color: #6c757d;
+      font-size: 13px;
     }
     .link-text {
       word-break: break-all;
-      color: #3498db;
-      font-size: 12px;
+      color: #495057;
+      font-size: 13px;
+      background-color: #f8f9fa;
+      padding: 8px 12px;
+      border-radius: 4px;
+      display: inline-block;
+      margin: 8px 0;
     }
   </style>
 </head>
@@ -88,19 +96,19 @@ export default function passwordResetEmail(data) {
       <p>Hello <strong>${username}</strong>,</p>
       <p>We received a request to reset the password for your ${siteName} account associated with <strong>${email}</strong>.</p>
       <p>Click the button below to reset your password:</p>
-      <p style="text-align: center;">
+      <p>
         <a href="${resetUrl}" class="button">Reset Password</a>
       </p>
       <p>Or copy and paste this link into your browser:</p>
-      <p class="link-text">${resetUrl}</p>
+      <div class="link-text">${resetUrl}</div>
       <div class="warning">
-        <p style="margin: 0;"><strong>⚠️ Security Notice:</strong></p>
-        <p style="margin: 5px 0 0 0;">This password reset link will expire in <strong>${expiryMinutes} minutes</strong>. If you didn't request this password reset, please ignore this email or contact support if you have concerns.</p>
+        <p style="margin: 0 0 8px 0;"><strong>Security Notice</strong></p>
+        <p style="margin: 0;">This password reset link will expire in <strong>${expiryMinutes} minutes</strong>. If you didn't request this password reset, please ignore this email or contact support if you have concerns.</p>
       </div>
     </div>
     <div class="footer">
-      <p>If you're having trouble clicking the button, copy and paste the URL above into your web browser.</p>
-      <p>&copy; ${new Date().getFullYear()} ${siteName}. All rights reserved.</p>
+      <p style="margin: 0 0 8px 0;">If you're having trouble clicking the button, copy and paste the URL above into your web browser.</p>
+      <p style="margin: 0;">&copy; ${new Date().getFullYear()} ${siteName}. All rights reserved.</p>
     </div>
   </div>
 </body>
