@@ -44,8 +44,8 @@ export default class PasswordResetService {
       .where('id', user.id)
       .update({
         reset_token: hashedToken,
-        reset_token_expires_at: expiresAt.toISOString(),
-        updated_at: new Date().toISOString()
+        reset_token_expires_at: this.context.formatDate(expiresAt),
+        updated_at: this.context.formatDate()
       })
 
     return {
@@ -72,7 +72,7 @@ export default class PasswordResetService {
     }
 
     // Get all users with non-expired tokens
-    const now = new Date().toISOString()
+    const now = this.context.formatDate()
     const users = await knex(table('users'))
       .whereNotNull('reset_token')
       .where('reset_token_expires_at', '>', now)
@@ -111,7 +111,7 @@ export default class PasswordResetService {
         password: hashedPassword,
         reset_token: null,
         reset_token_expires_at: null,
-        updated_at: new Date().toISOString()
+        updated_at: this.context.formatDate()
       })
 
     return {
@@ -127,7 +127,7 @@ export default class PasswordResetService {
   async clearExpiredTokens() {
     const { knex, table } = this.context
 
-    const now = new Date().toISOString()
+    const now = this.context.formatDate()
     const result = await knex(table('users'))
       .whereNotNull('reset_token')
       .where('reset_token_expires_at', '<', now)
