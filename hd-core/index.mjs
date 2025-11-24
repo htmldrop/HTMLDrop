@@ -90,6 +90,78 @@ if (cluster.isPrimary) {
     workers.push(worker)
   }
 
+  // Reusable function for zero-downtime worker reload
+  const reloadWorkers = () => {
+    console.log('🔄 Zero-downtime reload requested, replacing workers one by one...')
+
+    // Get current workers as array
+    const currentWorkers = Object.values(cluster.workers)
+    let replacedCount = 0
+
+    // Replace workers one at a time (PM2-style reload)
+    const replaceNextWorker = () => {
+      if (replacedCount >= currentWorkers.length) {
+        console.log('✓ All workers reloaded successfully')
+        return
+      }
+
+      const oldWorker = currentWorkers[replacedCount]
+      if (!oldWorker) {
+        replacedCount++
+        replaceNextWorker()
+        return
+      }
+
+      console.log(`  Replacing worker ${oldWorker.process.pid}...`)
+
+      // Fork new worker
+      const newWorker = cluster.fork()
+
+      // Wait for new worker to be ready (listening event)
+      newWorker.once('listening', () => {
+        console.log(`  ✓ New worker ${newWorker.process.pid} ready, disconnecting old worker ${oldWorker.process.pid}`)
+
+        // Update workers array
+        const oldIndex = workers.indexOf(oldWorker)
+        if (oldIndex !== -1) {
+          workers[oldIndex] = newWorker
+        }
+
+        // Gracefully disconnect old worker
+        oldWorker.disconnect()
+
+        // Wait a bit for old worker connections to drain, then move to next
+        setTimeout(() => {
+          replacedCount++
+          replaceNextWorker()
+        }, 500)
+      })
+
+      // Handle case where new worker fails to start
+      newWorker.once('exit', (code, signal) => {
+        if (!newWorker.isConnected()) {
+          console.error(`  ✗ New worker ${newWorker.process.pid} failed to start (code: ${code}, signal: ${signal})`)
+          // Don't kill old worker if new one failed
+          replacedCount++
+          replaceNextWorker()
+        }
+      })
+    }
+
+    // Start the replacement process
+    replaceNextWorker()
+  }
+
+  // Listen for restart requests from supervisor
+  if (process.send) {
+    process.on('message', (message) => {
+      if (message.type === 'restart_workers') {
+        console.log('[Primary] Supervisor requested worker reload')
+        reloadWorkers()
+      }
+    })
+  }
+
   // Simple IP-based sticky session
   const server = net.createServer({ pauseOnConnect: true }, (socket) => {
     const workerIndex = socket.remoteAddress
@@ -209,18 +281,30 @@ if (cluster.isPrimary) {
         }
       }
     } else if (message.type === 'restart_server') {
-      console.log('Restart requested by worker, shutting down all workers...')
+      // Worker requested zero-downtime reload
+      reloadWorkers()
+    } else if (message.type === 'full_restart') {
+      console.log('🔄 Full restart requested with primary process reload...')
 
-      // Disconnect all workers gracefully
-      for (const id in cluster.workers) {
-        cluster.workers[id].disconnect()
+      // If we have a supervisor, request supervisor-managed restart
+      if (process.send) {
+        console.log('[Primary] Requesting supervisor to restart entire process...')
+        process.send({ type: 'request_supervisor_restart' })
+      } else {
+        // No supervisor - fall back to direct restart (Docker will restart)
+        console.log('[Primary] No supervisor detected, performing direct restart...')
+
+        // Disconnect all workers gracefully
+        for (const id in cluster.workers) {
+          cluster.workers[id].disconnect()
+        }
+
+        // Give workers time to finish, then exit primary process
+        setTimeout(() => {
+          console.log('Primary process exiting for full restart...')
+          process.exit(0)
+        }, 3000)
       }
-
-      // Give workers time to finish, then exit primary process
-      setTimeout(() => {
-        console.log('Primary process exiting for restart...')
-        process.exit(0)
-      }, 3000)
     }
   })
 } else {

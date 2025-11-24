@@ -529,21 +529,41 @@ class UpdateService {
   }
 
   /**
-   * Restart the server
+   * Restart the server with zero-downtime reload (workers only, primary stays alive)
+   * Use fullRestart=true if primary process code changed
+   * @param {Object} options - Restart options
+   * @param {boolean} options.fullRestart - If true, restart entire process (including primary)
    * @returns {Promise<void>}
    */
-  async restartServer() {
-    console.log('Restarting server...')
+  async restartServer(options = {}) {
+    const { fullRestart = false } = options
 
-    // Notify all workers to gracefully shutdown
-    if (process.send) {
-      process.send({ type: 'restart_server' })
+    if (fullRestart) {
+      console.log('Requesting full server restart (including primary process)...')
+
+      // Notify primary process to exit gracefully
+      if (process.send) {
+        process.send({ type: 'full_restart' })
+      } else {
+        // If not in cluster mode, just exit (Docker will restart)
+        setTimeout(() => {
+          process.exit(0)
+        }, 2000)
+      }
+    } else {
+      console.log('Requesting zero-downtime server reload (workers only)...')
+
+      // Notify primary process to perform zero-downtime reload
+      if (process.send) {
+        process.send({ type: 'restart_server' })
+      } else {
+        // If not in cluster mode, just exit
+        console.warn('Not running in cluster mode, performing hard restart...')
+        setTimeout(() => {
+          process.exit(0)
+        }, 2000)
+      }
     }
-
-    // Give workers time to shutdown gracefully
-    setTimeout(() => {
-      process.exit(0)
-    }, 2000)
   }
 }
 

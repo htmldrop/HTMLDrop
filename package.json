@@ -22,8 +22,9 @@
   ],
   "scripts": {
     "bundle": "node hd-core/bundle.mjs",
-    "start": "node hd-core/index.mjs",
-    "prod": "node hd-core/index.mjs",
+    "start": "node hd-core/supervisor.mjs",
+    "start:direct": "node hd-core/index.mjs",
+    "prod": "node hd-core/supervisor.mjs",
     "dev": "nodemon --config hd-core/config/nodemon.json hd-core/index.mjs",
     "make:migration": "knex --knexfile ./hd-core/knexfile.mjs migrate:make",
     "migrate": "knex --knexfile ./hd-core/knexfile.mjs migrate:latest",

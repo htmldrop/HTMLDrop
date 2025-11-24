@@ -117,9 +117,9 @@ export default (context) => {
         data: result
       })
 
-      // Restart server after 3 seconds
+      // Full restart after 3 seconds (includes primary process since core code may have changed)
       setTimeout(async () => {
-        await updateService.restartServer()
+        await updateService.restartServer({ fullRestart: true })
       }, 3000)
     } catch (error) {
       console.error('Failed to pull update:', error)
