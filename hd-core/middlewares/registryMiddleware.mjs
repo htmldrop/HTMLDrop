@@ -19,8 +19,9 @@ export default (context) => async (req, res, next) => {
   // Initialize all providers
   await registry.init()
 
-  // Attach hooks to context for plugin access
+  // Attach hooks and registries to context for plugin access
   req.context.hooks = req.hooks
+  req.context.registries = registry.registries
 
   next()
 }

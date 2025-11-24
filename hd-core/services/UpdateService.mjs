@@ -81,6 +81,7 @@ class UpdateService {
 
       if (!response.ok) {
         // If no releases, try to get latest commit
+        console.log(`No releases found for ${owner}/${repo}, checking latest commit...`)
         return await this.getLatestCommit()
       }
 
@@ -93,7 +94,7 @@ class UpdateService {
         description: release.body || ''
       }
     } catch (error) {
-      console.error('Failed to get latest version:', error)
+      console.error('Failed to get latest version:', error.message)
       // Fallback to commit check
       return await this.getLatestCommit()
     }
@@ -116,7 +117,11 @@ class UpdateService {
       })
 
       if (!response.ok) {
-        throw new Error('Failed to fetch latest commit')
+        if (response.status === 404) {
+          throw new Error(`Repository ${owner}/${repo} not found on GitHub. Please check the repository URL in package.json.`)
+        }
+        const errorText = await response.text()
+        throw new Error(`GitHub API returned ${response.status}: ${errorText}`)
       }
 
       const commit = await response.json()
@@ -129,7 +134,7 @@ class UpdateService {
         description: commit.commit.message
       }
     } catch (error) {
-      console.error('Failed to get latest commit:', error)
+      console.error('Failed to get latest commit:', error.message)
       throw error
     }
   }
@@ -161,12 +166,21 @@ class UpdateService {
         info: latestInfo
       }
     } catch (error) {
-      console.error('Failed to check for updates:', error)
-      return {
-        available: false,
-        current: await this.getCurrentVersion(),
-        latest: 'unknown',
-        error: error.message
+      console.error('Failed to check for updates:', error.message)
+      try {
+        return {
+          available: false,
+          current: await this.getCurrentVersion(),
+          latest: 'unknown',
+          error: error.message
+        }
+      } catch (versionError) {
+        return {
+          available: false,
+          current: '0.0.0',
+          latest: 'unknown',
+          error: error.message
+        }
       }
     }
   }

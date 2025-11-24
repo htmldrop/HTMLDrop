@@ -43,6 +43,11 @@ export default class Registry {
       emailProviders: new RegisterEmailProviders(req.context)
     }
 
+    // Attach registry objects for direct access
+    for (const [name, registry] of Object.entries(this.registries)) {
+      this.req.hooks[name] = registry
+    }
+
     // Attach registry methods
     for (const registry of Object.values(this.registries)) {
       for (const key of Object.getOwnPropertyNames(Object.getPrototypeOf(registry))) {
