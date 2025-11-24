@@ -23,8 +23,8 @@ const getFolderHash = async (folderPath) => {
   return crypto.createHash('md5').update(mtimes.join('|')).digest('hex')
 }
 
-// Worker-level cache for initialized plugins
-const pluginCache = new Map()
+// Worker-level cache for imported plugin modules
+const pluginModuleCache = new Map()
 let lastActivePlugins = null
 let isFirstLoad = true
 
@@ -42,26 +42,16 @@ export default class RegisterPlugins {
     const activePlugins = options.active_plugins || []
     const activePluginsKey = JSON.stringify(activePlugins)
 
-    // If active plugins haven't changed and we have cached plugins, skip re-initialization
-    if (lastActivePlugins === activePluginsKey && pluginCache.size > 0) {
-      return
-    }
-
-    // Clear cache if active plugins changed
+    // Clear module cache if active plugins changed
     if (lastActivePlugins !== activePluginsKey) {
-      pluginCache.clear()
+      pluginModuleCache.clear()
+      lastActivePlugins = activePluginsKey
     }
 
-    lastActivePlugins = activePluginsKey
     const loadedPlugins = []
     const failedPlugins = []
 
     for (const pluginSlug of activePlugins) {
-      // Skip if already cached
-      if (pluginCache.has(pluginSlug)) {
-        continue
-      }
-
       try {
         const pluginFolder = path.resolve(`./hd-content/plugins/${pluginSlug}`)
         const pluginIndex = path.join(pluginFolder, 'index.mjs')
@@ -72,12 +62,35 @@ export default class RegisterPlugins {
           continue
         }
 
-        // Compute folder hash for cache-busting
-        const folderHash = await getFolderHash(pluginFolder)
+        // Check if we need to import/re-import the module
+        let pluginModule = pluginModuleCache.get(pluginSlug)
+        let needsImport = !pluginModule
 
-        // Dynamically import plugin
-        const mod = await import(`${pluginIndex}?t=${folderHash}`)
-        if (typeof mod.default === 'function') {
+        if (pluginModule) {
+          // Check if plugin folder changed (for hot reload)
+          const currentHash = await getFolderHash(pluginFolder)
+          if (currentHash !== pluginModule.hash) {
+            needsImport = true
+          }
+        }
+
+        // Import or re-import module if needed
+        if (needsImport) {
+          const folderHash = await getFolderHash(pluginFolder)
+          const mod = await import(`${pluginIndex}?t=${folderHash}`)
+
+          if (typeof mod.default === 'function') {
+            pluginModuleCache.set(pluginSlug, { module: mod.default, hash: folderHash })
+            pluginModule = pluginModuleCache.get(pluginSlug)
+            loadedPlugins.push(pluginSlug)
+          } else {
+            failedPlugins.push(pluginSlug)
+            continue
+          }
+        }
+
+        // ALWAYS call plugin.init() on every request (to register routes, hooks, etc.)
+        if (pluginModule?.module) {
           const router = express.Router()
 
           // Suppress console.log during plugin initialization to prevent duplicate logs
@@ -85,16 +98,13 @@ export default class RegisterPlugins {
           console.log = () => {}
 
           try {
-            const plugin = await mod.default({ req: this.req, res: this.res, next: this.next, router })
+            const plugin = await pluginModule.module({ req: this.req, res: this.res, next: this.next, router })
             if (plugin && typeof plugin.init === 'function') {
               await plugin.init()
             }
           } finally {
             console.log = originalLog
           }
-
-          pluginCache.set(pluginSlug, true)
-          loadedPlugins.push(pluginSlug)
         }
       } catch (err) {
         console.error(`Worker ${process.pid} failed to load plugin "${pluginSlug}":`, err)
@@ -132,9 +142,13 @@ export default class RegisterPlugins {
       }
     }
 
-    // Report back to primary process on first load
-    if (isFirstLoad && process.send && (loadedPlugins.length > 0 || failedPlugins.length > 0)) {
+    // Reset isFirstLoad flag after activation hooks have been called
+    if (isFirstLoad && loadedPlugins.length > 0) {
       isFirstLoad = false
+    }
+
+    // Report back to primary process on first load
+    if (process.send && (loadedPlugins.length > 0 || failedPlugins.length > 0)) {
       process.send({
         type: 'plugins_loaded',
         loaded: loadedPlugins,

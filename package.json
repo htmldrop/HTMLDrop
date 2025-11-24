@@ -1,6 +1,6 @@
 {
   "name": "htmldrop",
-  "version": "1.0.6",
+  "version": "1.0.7",
   "type": "module",
   "main": "hd-core/index.mjs",
   "types": "hd-core/types/index.d.ts",
