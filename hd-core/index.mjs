@@ -19,7 +19,9 @@ import { initSecrets, ensureSecrets } from './utils/secrets.mjs'
 import SchedulerService from './services/SchedulerService.mjs'
 import BadgeCountService from './services/BadgeCountService.mjs'
 
-dotenv.config({ quiet: !cluster.isPrimary })
+// Load .env from custom path if ENV_FILE_PATH is set, otherwise use default location
+const envPath = process.env.ENV_FILE_PATH || '.env'
+dotenv.config({ path: envPath, quiet: !cluster.isPrimary })
 
 // Initialize secrets (primary process generates and saves to .env)
 if (cluster.isPrimary) {

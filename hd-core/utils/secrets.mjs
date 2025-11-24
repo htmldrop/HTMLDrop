@@ -1,6 +1,7 @@
 import crypto from 'crypto'
 import fs from 'fs'
 import path from 'path'
+import dotenv from 'dotenv'
 
 /**
  * Generate a random secret
@@ -63,6 +64,11 @@ export const initSecrets = () => {
   if (modified) {
     fs.writeFileSync(envPath, envContent)
     console.log(`✅ Secrets saved to ${envPath}`)
+
+    // Reload the .env file to load the newly generated secrets into process.env
+    dotenv.config({ path: envPath, override: true })
+    console.log('✅ Secrets loaded into environment')
+
     if (process.env.ENV_FILE_PATH) {
       console.log('✅ Using persistent volume for secrets (Docker mode)')
     }
