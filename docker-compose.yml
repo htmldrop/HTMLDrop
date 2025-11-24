@@ -19,9 +19,9 @@ services:
       DB_CONNECTION: '{"host":"mysql","port":3306,"user":"htmldrop","password":"htmldrop_password","database":"htmldrop"}'
       TABLE_PREFIX: hd_
       ENV_FILE_PATH: /app/.env-persist/.env
-      JWT_SECRET: ${JWT_SECRET:-}
-      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:-}
-      SESSION_SECRET: ${SESSION_SECRET:-}
+      # JWT_SECRET: ${JWT_SECRET:-}
+      # JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:-}
+      # SESSION_SECRET: ${SESSION_SECRET:-}
       JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-1h}
       JWT_REFRESH_EXPIRES_IN: ${JWT_REFRESH_EXPIRES_IN:-7d}
       CORS_ORIGIN: ${CORS_ORIGIN:-*}

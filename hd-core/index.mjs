@@ -282,12 +282,13 @@ if (cluster.isPrimary) {
       setTimeout(async () => {
         try {
           const badgeCountService = new BadgeCountService(context)
-          await badgeCountService.updateBadgeCounts()
-          console.log('[Startup] Initial badge count update complete')
+          // Force update to bypass cache and fetch fresh data
+          await badgeCountService.updateBadgeCounts(true)
+          console.log('[Startup] Initial badge count update complete (forced)')
         } catch (error) {
           console.error('[Startup] Failed to update badge counts:', error)
         }
-      }, 3000) // Wait 3 seconds for server to stabilize
+      }, 5000) // Wait 5 seconds for server to fully stabilize
     }
 
     // Helper to mark plugins as initialized and start scheduler if not already started
