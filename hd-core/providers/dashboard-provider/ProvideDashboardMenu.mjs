@@ -1,9 +1,22 @@
 import path from 'path'
+import UpdateService from '../../services/UpdateService.mjs'
 
 export default async ({ req, res, next }) => {
   const { addMenuPage, addSubMenuPage } = req.hooks
   const { translate, parseVue } = req.context
   const locale = req?.user?.locale || 'en_US'
+
+  // Check for available updates
+  let updatesBadge = 0
+  try {
+    const updateService = new UpdateService(req.context)
+    const updateStatus = await updateService.checkForUpdates()
+    if (updateStatus.available) {
+      updatesBadge = 1
+    }
+  } catch (error) {
+    console.error('Failed to check for updates in menu:', error)
+  }
 
   const adminPages = [
     {
@@ -85,7 +98,7 @@ export default async ({ req, res, next }) => {
     },
     {
       capabilities: { manage_dashboard: 'manage_dashboard' },
-      badge: 10,
+      badge: updatesBadge,
       position: 1100,
       file: 'Updates.vue',
       parent_slug: 'dashboard',

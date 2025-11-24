@@ -189,6 +189,19 @@ if (cluster.isPrimary) {
           cluster.workers[id].send(message)
         }
       }
+    } else if (message.type === 'restart_server') {
+      console.log('Restart requested by worker, shutting down all workers...')
+
+      // Disconnect all workers gracefully
+      for (const id in cluster.workers) {
+        cluster.workers[id].disconnect()
+      }
+
+      // Give workers time to finish, then exit primary process
+      setTimeout(() => {
+        console.log('Primary process exiting for restart...')
+        process.exit(0)
+      }, 3000)
     }
   })
 } else {
