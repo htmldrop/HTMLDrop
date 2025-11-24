@@ -28,6 +28,14 @@ export default (context) => {
 
       const updateStatus = await updateService.checkForUpdates()
 
+      // Clear badge count cache to ensure it refreshes with latest update status
+      try {
+        const badgeCountService = new BadgeCountService(req.context)
+        await badgeCountService.clearCache('cms')
+      } catch (error) {
+        console.warn('Failed to clear CMS badge cache:', error)
+      }
+
       res.json({
         success: true,
         data: updateStatus
@@ -141,6 +149,14 @@ export default (context) => {
         updateService.checkForUpdates(),
         updateService.getLocalCommitSHA()
       ])
+
+      // Clear badge count cache to ensure it refreshes with latest update status
+      try {
+        const badgeCountService = new BadgeCountService(req.context)
+        await badgeCountService.clearCache('cms')
+      } catch (error) {
+        console.warn('Failed to clear CMS badge cache:', error)
+      }
 
       res.json({
         success: true,
