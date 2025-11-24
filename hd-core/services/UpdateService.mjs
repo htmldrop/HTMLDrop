@@ -326,12 +326,40 @@ class UpdateService {
 
       // Check for local changes
       const status = await git.statusMatrix({ fs, dir: this.REPO_DIR })
-      const hasChanges = status.some(([, head, workdir, stage]) =>
-        head !== workdir || head !== stage
-      )
+      const changedFiles = status
+        .filter(([, head, workdir, stage]) => head !== workdir || head !== stage)
+        .map(([filepath]) => filepath)
 
-      if (hasChanges) {
-        throw new Error('Local changes detected. Please commit or stash your changes before updating.')
+      if (changedFiles.length > 0) {
+        // Directories that are safe to have local changes (user content)
+        const safeDirectories = [
+          'hd-content/uploads',
+          'hd-content/themes',
+          'hd-content/plugins',
+          'hd-content/config'
+        ]
+
+        // Check if all changes are in safe directories
+        const unsafeChanges = changedFiles.filter(file =>
+          !safeDirectories.some(dir => file.startsWith(dir))
+        )
+
+        if (unsafeChanges.length > 0) {
+          // Reset local changes to allow update
+          await job.updateProgress(55, { status: 'Resetting local changes...' })
+
+          try {
+            // Reset to current HEAD (discard local changes)
+            await git.checkout({
+              fs,
+              dir: this.REPO_DIR,
+              ref: 'HEAD',
+              force: true
+            })
+          } catch (resetError) {
+            throw new Error(`Failed to reset local changes: ${resetError.message}`)
+          }
+        }
       }
 
       await job.updateProgress(60, { status: 'Merging changes...' })
