@@ -177,6 +177,11 @@ export default class Registry {
       }
     }
 
+    // Mark plugins as initialized and start scheduler (only once per worker)
+    if (this.req.context.onPluginsInitialized) {
+      this.req.context.onPluginsInitialized()
+    }
+
     // 🔥 fire the init action so plugins can hook in
     this.doAction('init', this)
   }

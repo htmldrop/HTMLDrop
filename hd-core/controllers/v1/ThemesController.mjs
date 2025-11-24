@@ -5,6 +5,7 @@ import express from 'express'
 import AdmZip from 'adm-zip'
 import { spawn } from 'child_process'
 import { validatePackageName, validateVersion, buildNpmInstallArgs } from '../../utils/npmValidator.mjs'
+import ThemeLifecycleService from '../../services/ThemeLifecycleService.mjs'
 
 const THEMES_BASE = path.resolve('./hd-content/themes')
 if (!fs.existsSync(THEMES_BASE)) fs.mkdirSync(THEMES_BASE, { recursive: true })
@@ -338,6 +339,10 @@ export default (context) => {
 
       await updateActiveTheme(slug)
 
+      // Call lifecycle hook and refresh badge counts
+      const lifecycleService = new ThemeLifecycleService(req.context)
+      await lifecycleService.onActivate(slug)
+
       res.json({ success: true, message: 'Theme activated' })
     } catch (err) {
       next(err)
@@ -378,8 +383,17 @@ export default (context) => {
       const hasAccess = await req.guard.user({ canOneOf: ['update', 'activate_themes'], userId: req?.user?.id })
       if (!hasAccess) return res.status(403).json({ error: 'Permission denied' })
 
+      // Get current active theme before deactivating
+      const currentTheme = await getActiveTheme()
+
       // Set theme to empty/null to deactivate
       await updateActiveTheme('')
+
+      // Call lifecycle hook and refresh badge counts if there was an active theme
+      if (currentTheme) {
+        const lifecycleService = new ThemeLifecycleService(req.context)
+        await lifecycleService.onDeactivate(currentTheme)
+      }
 
       res.json({ success: true, message: 'Theme deactivated' })
     } catch (err) {
@@ -941,6 +955,16 @@ export default (context) => {
 
         // Clean up temp directory
         await fs.promises.rm(tempDir, { recursive: true, force: true })
+
+        // Call lifecycle hook for version change
+        const lifecycleService = new ThemeLifecycleService(req.context)
+        const isUpgrade = version > currentVersion
+
+        if (isUpgrade) {
+          await lifecycleService.onUpgrade(slug, currentVersion, version)
+        } else {
+          await lifecycleService.onDowngrade(slug, currentVersion, version)
+        }
 
         // Reactivate if it was active
         if (wasActive) {

@@ -718,7 +718,8 @@ class ThemeLifecycleService {
   async refreshBadgeCounts() {
     try {
       const badgeCountService = new BadgeCountService(this.context)
-      await badgeCountService.updateBadgeCounts()
+      // Force update to bypass cache TTL check
+      await badgeCountService.updateBadgeCounts(true)
       console.log('Badge counts refreshed after theme lifecycle event')
     } catch (error) {
       // Don't fail the lifecycle event if badge count refresh fails

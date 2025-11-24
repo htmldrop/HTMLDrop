@@ -17,6 +17,7 @@ import translate from './utils/translation.mjs'
 import createWsAuthMiddleware from './utils/wsAuthMiddleware.mjs'
 import { initSecrets, ensureSecrets } from './utils/secrets.mjs'
 import SchedulerService from './services/SchedulerService.mjs'
+import BadgeCountService from './services/BadgeCountService.mjs'
 
 dotenv.config({ quiet: !cluster.isPrimary })
 
@@ -254,6 +255,10 @@ if (cluster.isPrimary) {
     translate
   }
 
+  // Track if scheduler has been started (once per worker)
+  let schedulerStarted = false
+  let pluginsInitialized = false
+
   // Initialize knex and attach dynamically
   initializeKnex().then(async (knex) => {
     context.knex = knex
@@ -261,6 +266,32 @@ if (cluster.isPrimary) {
 
     // Initialize scheduler on all workers, but only worker 1 will execute tasks
     context.scheduler = new SchedulerService(context, cluster.worker.id === 1)
+
+    // Register core scheduled tasks (only once at startup)
+    context.scheduler
+      .call(async () => {
+        const badgeCountService = new BadgeCountService(context)
+        await badgeCountService.updateBadgeCounts()
+      }, 'refresh_badge_counts')
+      .everyMinute()
+
+    // Helper to mark plugins as initialized and start scheduler if not already started
+    context.onPluginsInitialized = () => {
+      pluginsInitialized = true
+      if (!schedulerStarted) {
+        context.scheduler.startAll()
+        schedulerStarted = true
+      }
+    }
+
+    // If no plugins need to be loaded, start scheduler immediately after a short delay
+    // This ensures scheduler starts even if no API requests are made
+    setTimeout(() => {
+      if (!pluginsInitialized && !schedulerStarted) {
+        context.scheduler.startAll()
+        schedulerStarted = true
+      }
+    }, 2000)
 
     // Send scheduler initialization message to primary for consolidated logging
     process.send({

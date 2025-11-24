@@ -325,17 +325,17 @@ describe('SchedulerService', () => {
 
     it('should not start tasks on non-execution worker', () => {
       const nonExecutionScheduler = new SchedulerService(context, false)
-      const consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
+      const startSpy = vi.fn()
 
       nonExecutionScheduler.call(async () => {}, 'test_task').everyMinute()
 
+      // Mock the start method on the task
+      nonExecutionScheduler.tasks[0].start = startSpy
+
       nonExecutionScheduler.startAll()
 
-      expect(consoleLogSpy).toHaveBeenCalledWith(
-        expect.stringContaining('execution is disabled on this worker')
-      )
-
-      consoleLogSpy.mockRestore()
+      // Verify that start was NOT called because canExecute is false
+      expect(startSpy).not.toHaveBeenCalled()
     })
   })
 

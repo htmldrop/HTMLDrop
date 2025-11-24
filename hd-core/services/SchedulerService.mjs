@@ -372,7 +372,7 @@ export default class SchedulerService {
    */
   startAll() {
     if (!this.canExecute) {
-      console.log(`[Scheduler] ${this.tasks.length} task(s) registered but execution is disabled on this worker`)
+      // Don't log - this is expected on non-execution workers
       return
     }
 

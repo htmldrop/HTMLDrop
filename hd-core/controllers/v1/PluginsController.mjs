@@ -5,6 +5,7 @@ import express from 'express'
 import AdmZip from 'adm-zip'
 import { spawn } from 'child_process'
 import { validatePackageName, validateVersion, buildNpmInstallArgs } from '../../utils/npmValidator.mjs'
+import PluginLifecycleService from '../../services/PluginLifecycleService.mjs'
 
 const PLUGINS_BASE = path.resolve('./hd-content/plugins')
 if (!fs.existsSync(PLUGINS_BASE)) fs.mkdirSync(PLUGINS_BASE, { recursive: true })
@@ -349,6 +350,10 @@ export default (context) => {
       if (!activePlugins.includes(slug)) {
         activePlugins.push(slug)
         await updateActivePlugins(activePlugins)
+
+        // Call lifecycle hook and refresh badge counts
+        const lifecycleService = new PluginLifecycleService(req.context)
+        await lifecycleService.onActivate(slug)
       }
 
       res.json({ success: true, message: 'Plugin activated' })
@@ -401,9 +406,15 @@ export default (context) => {
 
       const { slug } = req.params
       const activePlugins = await getActivePlugins()
-      const filtered = activePlugins.filter((p) => p !== slug)
 
-      await updateActivePlugins(filtered)
+      if (activePlugins.includes(slug)) {
+        const filtered = activePlugins.filter((p) => p !== slug)
+        await updateActivePlugins(filtered)
+
+        // Call lifecycle hook and refresh badge counts
+        const lifecycleService = new PluginLifecycleService(req.context)
+        await lifecycleService.onDeactivate(slug)
+      }
 
       res.json({ success: true, message: 'Plugin deactivated' })
     } catch (err) {
@@ -967,6 +978,16 @@ export default (context) => {
 
         // Clean up temp directory
         await fs.promises.rm(tempDir, { recursive: true, force: true })
+
+        // Call lifecycle hook for version change
+        const lifecycleService = new PluginLifecycleService(req.context)
+        const isUpgrade = version > currentVersion
+
+        if (isUpgrade) {
+          await lifecycleService.onUpgrade(slug, currentVersion, version)
+        } else {
+          await lifecycleService.onDowngrade(slug, currentVersion, version)
+        }
 
         // Reactivate if it was active
         if (wasActive) {

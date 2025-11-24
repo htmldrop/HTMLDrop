@@ -54,6 +54,7 @@ const countPluginUpdates = async () => {
 
     // Prepare check tasks
     const checkTasks = []
+    const pluginNames = []
     for (const folder of pluginFolders) {
       const packageJsonPath = path.join(PLUGINS_BASE, folder, 'package.json')
       if (!fs.existsSync(packageJsonPath)) continue
@@ -62,8 +63,12 @@ const countPluginUpdates = async () => {
         const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8'))
         if (!packageJson.name || !packageJson.version) continue
 
+        pluginNames.push({ name: packageJson.name, current: packageJson.version })
         checkTasks.push(
           fetchPackageVersion(packageJson.name).then(latestVersion => ({
+            name: packageJson.name,
+            current: packageJson.version,
+            latest: latestVersion,
             hasUpdate: latestVersion && latestVersion !== packageJson.version
           }))
         )
@@ -75,9 +80,16 @@ const countPluginUpdates = async () => {
 
     // Process in batches to respect rate limits
     const results = await processBatch(checkTasks, MAX_CONCURRENT_CHECKS)
-    const updateCount = results.filter(r => r && r.hasUpdate).length
+    const updatesAvailable = results.filter(r => r && r.hasUpdate)
 
-    return updateCount
+    // Log updates found for debugging
+    if (updatesAvailable.length > 0) {
+      console.log('[BadgeCount] Plugin updates available:', updatesAvailable.map(u =>
+        `${u.name} (${u.current} → ${u.latest})`
+      ).join(', '))
+    }
+
+    return updatesAvailable.length
   } catch (error) {
     console.error('Failed to count plugin updates:', error)
     return 0
@@ -138,8 +150,9 @@ export default class BadgeCountService {
   /**
    * Update badge counts and store in database cache (shared across workers)
    * This should be called periodically or triggered by specific events
+   * @param {boolean} force - If true, bypass cache TTL and force update
    */
-  async updateBadgeCounts() {
+  async updateBadgeCounts(force = false) {
     try {
       const now = Date.now()
 
@@ -154,49 +167,54 @@ export default class BadgeCountService {
       let shouldUpdateThemes = true
       let shouldUpdateCms = true
 
-      // Check if plugin cache is still valid
-      if (pluginCache?.value) {
-        try {
-          const cached = JSON.parse(pluginCache.value)
-          if (cached.timestamp && now - cached.timestamp < CACHE_TTL) {
-            shouldUpdatePlugins = false
+      // Only check cache TTL if not forced
+      if (!force) {
+        // Check if plugin cache is still valid
+        if (pluginCache?.value) {
+          try {
+            const cached = JSON.parse(pluginCache.value)
+            if (cached.timestamp && now - cached.timestamp < CACHE_TTL) {
+              shouldUpdatePlugins = false
+            }
+          } catch (err) {
+            // Invalid cache, will update
           }
-        } catch (err) {
-          // Invalid cache, will update
+        }
+
+        // Check if theme cache is still valid
+        if (themeCache?.value) {
+          try {
+            const cached = JSON.parse(themeCache.value)
+            if (cached.timestamp && now - cached.timestamp < CACHE_TTL) {
+              shouldUpdateThemes = false
+            }
+          } catch (err) {
+            // Invalid cache, will update
+          }
+        }
+
+        // Check if CMS cache is still valid
+        if (cmsCache?.value) {
+          try {
+            const cached = JSON.parse(cmsCache.value)
+            if (cached.timestamp && now - cached.timestamp < CACHE_TTL) {
+              shouldUpdateCms = false
+            }
+          } catch (err) {
+            // Invalid cache, will update
+          }
+        }
+
+        // If all caches are valid, no need to update
+        if (!shouldUpdatePlugins && !shouldUpdateThemes && !shouldUpdateCms) {
+          return {
+            updated: false,
+            message: 'Cache still valid'
+          }
         }
       }
 
-      // Check if theme cache is still valid
-      if (themeCache?.value) {
-        try {
-          const cached = JSON.parse(themeCache.value)
-          if (cached.timestamp && now - cached.timestamp < CACHE_TTL) {
-            shouldUpdateThemes = false
-          }
-        } catch (err) {
-          // Invalid cache, will update
-        }
-      }
-
-      // Check if CMS cache is still valid
-      if (cmsCache?.value) {
-        try {
-          const cached = JSON.parse(cmsCache.value)
-          if (cached.timestamp && now - cached.timestamp < CACHE_TTL) {
-            shouldUpdateCms = false
-          }
-        } catch (err) {
-          // Invalid cache, will update
-        }
-      }
-
-      // If all caches are valid, no need to update
-      if (!shouldUpdatePlugins && !shouldUpdateThemes && !shouldUpdateCms) {
-        return {
-          updated: false,
-          message: 'Cache still valid'
-        }
-      }
+      console.log('[BadgeCount] Updating badge counts... (plugins:', shouldUpdatePlugins, 'themes:', shouldUpdateThemes, 'cms:', shouldUpdateCms, ')')
 
       // Count updates in parallel
       const [pluginCount, themeCount, cmsUpdate] = await Promise.all([
@@ -204,6 +222,8 @@ export default class BadgeCountService {
         shouldUpdateThemes ? countThemeUpdates() : Promise.resolve(JSON.parse(themeCache.value).count),
         shouldUpdateCms ? this._checkCmsUpdate() : Promise.resolve(JSON.parse(cmsCache.value).available ? 1 : 0)
       ])
+
+      console.log('[BadgeCount] Update complete - Plugins:', pluginCount, 'Themes:', themeCount, 'CMS:', cmsUpdate)
 
       // Store in database (upsert)
       if (shouldUpdatePlugins) {
