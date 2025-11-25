@@ -147,7 +147,7 @@ Deploy HTMLDrop to your favorite hosting platform with one click:
   <a href="https://cloud.digitalocean.com/apps/new?repo=https://github.com/htmldrop/htmldrop">
     <img src="https://www.deploytodo.com/do-btn-blue.svg" alt="Deploy to DigitalOcean" height="32">
   </a>
-  <a href="https://fly.io/launch">
+  <a href="https://fly.io/launch?repo=https://github.com/htmldrop/htmldrop">
     <img src="https://fly.io/static/images/brand/brandmark.svg" alt="Deploy on Fly.io" height="32">
   </a>
 </p>
