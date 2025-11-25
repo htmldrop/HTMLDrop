@@ -5,6 +5,7 @@ Complete guide for deploying HTMLDrop CMS to production.
 ## Table of Contents
 
 - [Requirements](#requirements)
+- [System Dependencies](#system-dependencies)
 - [Environment Configuration](#environment-configuration)
 - [Database Setup](#database-setup)
 - [SSL/HTTPS Configuration](#sslhttps-configuration)
@@ -24,6 +25,8 @@ Complete guide for deploying HTMLDrop CMS to production.
 ### Minimum Requirements
 
 - **Node.js:** >= 20.0.0
+- **npm:** (included with Node.js)
+- **git:** Required for CMS updates and version management
 - **RAM:** 1GB minimum, 2GB recommended
 - **CPU:** 1 core minimum, 2+ cores recommended
 - **Storage:** 10GB recommended (depends on content)
@@ -32,6 +35,8 @@ Complete guide for deploying HTMLDrop CMS to production.
 ### Recommended Production Setup
 
 - **Node.js:** 20.x LTS or 22.x LTS
+- **npm:** (included with Node.js)
+- **git:** For CMS updates via the admin panel
 - **RAM:** 4GB+
 - **CPU:** 4+ cores (for clustering)
 - **Storage:** SSD with 50GB+
@@ -39,6 +44,12 @@ Complete guide for deploying HTMLDrop CMS to production.
 - **Reverse Proxy:** Nginx or Apache
 - **Process Manager:** PM2
 - **SSL:** Let's Encrypt or commercial certificate
+
+### Why Git is Required
+
+HTMLDrop includes an automatic update system that allows you to update the CMS directly from the admin panel. The update service uses `isomorphic-git` internally to pull the latest changes from the GitHub repository. While the CMS can technically run without git installed, you will not be able to use the built-in update functionality.
+
+**Important:** The update feature requires git CLI to be installed on the server.
 
 ---
 
@@ -138,6 +149,57 @@ node -e "console.log(require('crypto').randomBytes(64).toString('hex'))"
 # Or use openssl
 openssl rand -hex 64
 ```
+
+---
+
+## System Dependencies
+
+### Installing Node.js and Git
+
+#### Ubuntu/Debian
+
+```bash
+# Install Node.js (using NodeSource repository)
+curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
+sudo apt update
+sudo apt install -y nodejs git
+
+# Verify installations
+node --version
+npm --version
+git --version
+```
+
+#### CentOS/RHEL
+
+```bash
+# Install Node.js
+curl -fsSL https://rpm.nodesource.com/setup_20.x | sudo bash -
+sudo dnf install -y nodejs git
+
+# Verify installations
+node --version
+npm --version
+git --version
+```
+
+#### macOS
+
+```bash
+# Using Homebrew
+brew install node git
+
+# Verify installations
+node --version
+npm --version
+git --version
+```
+
+#### Windows Server
+
+Download and install:
+- Node.js: https://nodejs.org/
+- Git: https://git-scm.com/download/win
 
 ---
 

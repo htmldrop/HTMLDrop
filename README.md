@@ -88,6 +88,7 @@ HTMLDrop is a **modern, open-source CMS** designed to bring the flexibility and 
 
 - **Node.js** >= 20.0.0
 - **npm**, **pnpm** or **yarn**
+- **git** (required for CMS updates and version management)
 - **Database** (PostgreSQL, MySQL, or SQLite)
 
 ### Installation
@@ -151,7 +152,12 @@ Deploy HTMLDrop to your favorite hosting platform with one click:
   </a>
 </p>
 
-**Note:** HTMLDrop requires a persistent Node.js server and a database. Railway, Render, Heroku, DigitalOcean, and Fly.io are recommended platforms for full-stack deployment.
+**Note:** HTMLDrop requires:
+- A persistent Node.js server (>= 20.0.0)
+- Git CLI installed (for CMS updates)
+- A database (PostgreSQL, MySQL, or SQLite)
+
+Railway, Render, Heroku, DigitalOcean, and Fly.io are recommended platforms for full-stack deployment. Most platforms include git by default in their build environments.
 
 ### Docker Deploy
 
@@ -173,6 +179,8 @@ docker-compose up -d
 ```
 
 This will start HTMLDrop with MySQL and Redis. Access at `http://localhost:3000`
+
+The Docker image includes git CLI for CMS updates and version management.
 
 ---
 
