@@ -98,7 +98,7 @@
               </div>
             </div>
           </div>
-          <div class="image-gallery--grid" v-if="loading">
+          <div class="image-gallery--grid" style="margin: 20px" v-if="loading">
             Loading...
           </div>
           <div class="image-gallery--grid" v-else>
