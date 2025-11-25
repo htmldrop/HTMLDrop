@@ -10,7 +10,7 @@ if (!process.env.TABLE_PREFIX) {
   process.env.TABLE_PREFIX = 'hd_'
 }
 
-// Parse DB_CONNECTION if it exists
+// Parse DB_CONNECTION if it exists, or use DATABASE_URL (Heroku, Railway, etc.)
 let connection
 if (process.env.DB_CONNECTION) {
   try {
@@ -18,6 +18,9 @@ if (process.env.DB_CONNECTION) {
   } catch (e) {
     connection = process.env.DB_CONNECTION
   }
+} else if (process.env.DATABASE_URL) {
+  // Support Heroku/Railway DATABASE_URL format
+  connection = process.env.DATABASE_URL
 }
 
 const baseConfig = {
