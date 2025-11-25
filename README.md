@@ -135,7 +135,7 @@ Deploy HTMLDrop to your favorite hosting platform with one click:
   <a href="https://railway.app/new/template?template=https://github.com/htmldrop/htmldrop">
     <img src="https://railway.app/button.svg" alt="Deploy on Railway" height="32">
   </a>
-  <a href="https://render.com/deploy">
+  <a href="https://render.com/deploy?repo=https://github.com/htmldrop/htmldrop">
     <img src="https://render.com/images/deploy-to-render-button.svg" alt="Deploy to Render" height="32">
   </a>
   <a href="https://heroku.com/deploy?template=https://github.com/htmldrop/htmldrop">
