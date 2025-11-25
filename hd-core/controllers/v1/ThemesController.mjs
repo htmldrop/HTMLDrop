@@ -6,6 +6,7 @@ import AdmZip from 'adm-zip'
 import { spawn } from 'child_process'
 import { validatePackageName, validateVersion, buildNpmInstallArgs } from '../../utils/npmValidator.mjs'
 import ThemeLifecycleService from '../../services/ThemeLifecycleService.mjs'
+import PersistenceService from '../../services/PersistenceService.mjs'
 
 const THEMES_BASE = path.resolve('./hd-content/themes')
 if (!fs.existsSync(THEMES_BASE)) fs.mkdirSync(THEMES_BASE, { recursive: true })
@@ -920,11 +921,17 @@ export default (context) => {
       const wasActive = slug === activeTheme
 
       const tempDir = path.join(THEMES_BASE, '.temp-update')
+      const backupDir = path.join(THEMES_BASE, `.backup-${slug}-${Date.now()}`)
 
       // Create temp directory
       await fs.promises.mkdir(tempDir, { recursive: true })
 
       try {
+        // Backup persistent files and directories before upgrade/downgrade
+        const persistenceService = new PersistenceService()
+        const backupInfo = await persistenceService.backup(themeFolder, backupDir)
+        console.log(`[ThemesController] Backed up ${backupInfo.files.length} files and ${backupInfo.directories.length} directories`)
+
         // Install specific version to temp directory using safe method
         await safeNpmInstall(packageName, version, {
           prefix: tempDir,
@@ -936,6 +943,7 @@ export default (context) => {
         const nodeModulesPath = path.join(tempDir, 'node_modules', packageName)
 
         if (!fs.existsSync(nodeModulesPath)) {
+          await persistenceService.cleanup(backupDir)
           await fs.promises.rm(tempDir, { recursive: true, force: true })
           return res.status(400).json({ error: 'Package installation failed' })
         }
@@ -943,6 +951,7 @@ export default (context) => {
         // Check for index.mjs
         const indexPath = path.join(nodeModulesPath, 'index.mjs')
         if (!fs.existsSync(indexPath)) {
+          await persistenceService.cleanup(backupDir)
           await fs.promises.rm(tempDir, { recursive: true, force: true })
           return res.status(400).json({ error: 'Invalid theme structure: missing index.mjs' })
         }
@@ -952,6 +961,13 @@ export default (context) => {
 
         // Move new version to themes directory
         await fs.promises.rename(nodeModulesPath, themeFolder)
+
+        // Restore persistent files and directories
+        const restoreInfo = await persistenceService.restore(backupDir, themeFolder)
+        console.log(`[ThemesController] Restored ${restoreInfo.files.length} files`)
+
+        // Clean up backup
+        await persistenceService.cleanup(backupDir)
 
         // Clean up temp directory
         await fs.promises.rm(tempDir, { recursive: true, force: true })
