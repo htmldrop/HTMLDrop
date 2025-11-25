@@ -3,6 +3,7 @@ import fs from 'fs'
 import crypto from 'crypto'
 import express from 'express'
 import ThemeLifecycleService from '../services/ThemeLifecycleService.mjs'
+import { TraceCategory } from '../services/PerformanceTracer.mjs'
 
 // Helper: compute folder hash (ignores node_modules)
 const getFolderHash = async (folderPath) => {
@@ -40,10 +41,22 @@ export default class RegisterThemes {
   async init() {
     // Dynamically load provider modules from active theme
     const { options } = this.context
+    const tracer = this.req.tracer
+
+    // Start theme registry init span
+    const themeRegistrySpan = tracer?.startSpan('themes.init', {
+      category: TraceCategory.THEME
+    })
 
     try {
       const themeSlug = options.theme
-      if (!themeSlug) return
+      if (!themeSlug) {
+        themeRegistrySpan?.addTag('skipped', 'no theme configured')
+        themeRegistrySpan?.end()
+        return
+      }
+
+      themeRegistrySpan?.addTag('theme', themeSlug)
 
       const themeFolder = path.resolve(`./content/themes/${themeSlug}`)
       const themeIndex = path.join(themeFolder, 'index.mjs')
@@ -51,6 +64,8 @@ export default class RegisterThemes {
       // Skip if theme folder doesn't exist
       if (!fs.existsSync(themeFolder) || !fs.existsSync(themeIndex)) {
         console.warn(`Theme "${themeSlug}" not found`)
+        themeRegistrySpan?.addTag('skipped', 'theme not found')
+        themeRegistrySpan?.end()
         return
       }
 
@@ -67,9 +82,16 @@ export default class RegisterThemes {
 
       if (themeModule) {
         // Check if theme folder changed (for hot reload)
+        const hashSpan = tracer?.startSpan('themes.checkHash', {
+          category: TraceCategory.IO,
+          tags: { theme: themeSlug }
+        })
         const currentHash = await getFolderHash(themeFolder)
+        hashSpan?.end()
+
         if (currentHash !== themeModule.hash) {
           needsImport = true
+          themeRegistrySpan?.addTag('reimport', 'hash changed')
           // Clear the cache entry to force reimport
           themeModuleCache.delete(themeSlug)
         }
@@ -77,16 +99,28 @@ export default class RegisterThemes {
 
       // Import or re-import module if needed
       if (needsImport) {
+        const importSpan = tracer?.startSpan('themes.import', {
+          category: TraceCategory.THEME,
+          tags: { theme: themeSlug }
+        })
+
         const folderHash = await getFolderHash(themeFolder)
         const mod = await import(`${themeIndex}?t=${folderHash}`)
+
+        importSpan?.addTag('hash', folderHash)
+        importSpan?.end()
 
         if (typeof mod.default === 'function') {
           themeModuleCache.set(themeSlug, { module: mod.default, hash: folderHash })
           themeModule = themeModuleCache.get(themeSlug)
+          themeRegistrySpan?.addTag('imported', true)
         } else {
           console.error(`Theme "${themeSlug}" does not export a default function`)
+          themeRegistrySpan?.end({ error: new Error('Theme does not export default function') })
           return
         }
+      } else {
+        themeRegistrySpan?.addTag('cached', true)
       }
 
       // ALWAYS call theme.init() on every request (to register routes, hooks, etc.)
@@ -94,16 +128,29 @@ export default class RegisterThemes {
         const router = express.Router()
 
         try {
+          const themeInitSpan = tracer?.startSpan('themes.instance', {
+            category: TraceCategory.THEME,
+            tags: { theme: themeSlug }
+          })
+
           const theme = await themeModule.module.call(
             { req: this.req, res: this.res, next: this.next, router },
             { req: this.req, res: this.res, next: this.next, router }
           )
 
+          themeInitSpan?.end()
+
           if (theme && typeof theme.init === 'function') {
+            const initSpan = tracer?.startSpan('themes.init.hook', {
+              category: TraceCategory.LIFECYCLE,
+              tags: { theme: themeSlug }
+            })
             await theme.init()
+            initSpan?.end()
           }
         } catch (err) {
           console.error(`Failed to initialize theme "${themeSlug}":`, err)
+          themeRegistrySpan?.addTag('initError', err.message)
         }
       }
 
@@ -114,6 +161,11 @@ export default class RegisterThemes {
         const isWorker1 = cluster.default.worker?.id === 1
 
         if (isWorker1) {
+          const lifecycleSpan = tracer?.startSpan('themes.lifecycle.onActivate', {
+            category: TraceCategory.LIFECYCLE,
+            tags: { theme: themeSlug, isStartup: true }
+          })
+
           const lifecycleService = new ThemeLifecycleService(this.context)
 
           try {
@@ -125,16 +177,21 @@ export default class RegisterThemes {
             })
             // Only set flag after successful activation
             themeActivationCalled = true
+            lifecycleSpan?.end()
           } catch (err) {
             // Don't fail server startup if lifecycle hook fails
             console.warn(`Failed to call onActivate for theme "${themeSlug}" on startup:`, err.message)
             // Set flag even on error to prevent repeated attempts on every request
             themeActivationCalled = true
+            lifecycleSpan?.end({ error: err })
           }
         }
       }
+
+      themeRegistrySpan?.end()
     } catch (e) {
       console.error('Theme could not load:', e)
+      themeRegistrySpan?.end({ error: e })
     }
   }
 }

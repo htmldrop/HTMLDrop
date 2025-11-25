@@ -3,6 +3,7 @@ import fs from 'fs'
 import crypto from 'crypto'
 import express from 'express'
 import PluginLifecycleService from '../services/PluginLifecycleService.mjs'
+import { TraceCategory } from '../services/PerformanceTracer.mjs'
 
 // Helper: compute folder hash (ignores node_modules)
 const getFolderHash = async (folderPath) => {
@@ -39,19 +40,32 @@ export default class RegisterPlugins {
 
   async init() {
     const { options } = this.context
+    const tracer = this.req.tracer
     const activePlugins = options.active_plugins || []
     const activePluginsKey = JSON.stringify(activePlugins)
+
+    // Start plugins init span
+    const pluginsSpan = tracer?.startSpan('plugins.init', {
+      category: TraceCategory.PLUGIN,
+      tags: { pluginCount: activePlugins.length }
+    })
 
     // Clear module cache if active plugins changed
     if (lastActivePlugins !== activePluginsKey) {
       pluginModuleCache.clear()
       lastActivePlugins = activePluginsKey
+      pluginsSpan?.addTag('cacheCleared', true)
     }
 
     const loadedPlugins = []
     const failedPlugins = []
 
     for (const pluginSlug of activePlugins) {
+      const pluginSpan = tracer?.startSpan(`plugins.load.${pluginSlug}`, {
+        category: TraceCategory.PLUGIN,
+        tags: { plugin: pluginSlug }
+      })
+
       try {
         const pluginFolder = path.resolve(`./content/plugins/${pluginSlug}`)
         const pluginIndex = path.join(pluginFolder, 'index.mjs')
@@ -59,6 +73,8 @@ export default class RegisterPlugins {
         // Skip if plugin folder doesn't exist (renamed or deleted)
         if (!fs.existsSync(pluginFolder) || !fs.existsSync(pluginIndex)) {
           failedPlugins.push(pluginSlug)
+          pluginSpan?.addTag('skipped', 'not found')
+          pluginSpan?.end()
           continue
         }
 
@@ -68,25 +84,44 @@ export default class RegisterPlugins {
 
         if (pluginModule) {
           // Check if plugin folder changed (for hot reload)
+          const hashSpan = tracer?.startSpan(`plugins.checkHash.${pluginSlug}`, {
+            category: TraceCategory.IO,
+            tags: { plugin: pluginSlug }
+          })
           const currentHash = await getFolderHash(pluginFolder)
+          hashSpan?.end()
+
           if (currentHash !== pluginModule.hash) {
             needsImport = true
+            pluginSpan?.addTag('reimport', 'hash changed')
           }
         }
 
         // Import or re-import module if needed
         if (needsImport) {
+          const importSpan = tracer?.startSpan(`plugins.import.${pluginSlug}`, {
+            category: TraceCategory.PLUGIN,
+            tags: { plugin: pluginSlug }
+          })
+
           const folderHash = await getFolderHash(pluginFolder)
           const mod = await import(`${pluginIndex}?t=${folderHash}`)
+
+          importSpan?.addTag('hash', folderHash)
+          importSpan?.end()
 
           if (typeof mod.default === 'function') {
             pluginModuleCache.set(pluginSlug, { module: mod.default, hash: folderHash })
             pluginModule = pluginModuleCache.get(pluginSlug)
             loadedPlugins.push(pluginSlug)
+            pluginSpan?.addTag('imported', true)
           } else {
             failedPlugins.push(pluginSlug)
+            pluginSpan?.end({ error: new Error('Plugin does not export default function') })
             continue
           }
+        } else {
+          pluginSpan?.addTag('cached', true)
         }
 
         // ALWAYS call plugin.init() on every request (to register routes, hooks, etc.)
@@ -98,17 +133,27 @@ export default class RegisterPlugins {
           console.log = () => {}
 
           try {
+            const initSpan = tracer?.startSpan(`plugins.init.${pluginSlug}`, {
+              category: TraceCategory.LIFECYCLE,
+              tags: { plugin: pluginSlug }
+            })
+
             const plugin = await pluginModule.module({ req: this.req, res: this.res, next: this.next, router })
             if (plugin && typeof plugin.init === 'function') {
               await plugin.init()
             }
+
+            initSpan?.end()
           } finally {
             console.log = originalLog
           }
         }
+
+        pluginSpan?.end()
       } catch (err) {
         console.error(`Worker ${process.pid} failed to load plugin "${pluginSlug}":`, err)
         failedPlugins.push(pluginSlug)
+        pluginSpan?.end({ error: err })
       }
     }
 
@@ -122,6 +167,11 @@ export default class RegisterPlugins {
         const lifecycleService = new PluginLifecycleService(this.context)
 
         for (const pluginSlug of loadedPlugins) {
+          const lifecycleSpan = tracer?.startSpan(`plugins.lifecycle.onActivate.${pluginSlug}`, {
+            category: TraceCategory.LIFECYCLE,
+            tags: { plugin: pluginSlug, isStartup: true }
+          })
+
           try {
             // Call onActivate to trigger lifecycle hooks
             await lifecycleService.callLifecycleHook(pluginSlug, 'onActivate', {
@@ -129,9 +179,11 @@ export default class RegisterPlugins {
               timestamp: new Date().toISOString(),
               isStartup: true
             })
+            lifecycleSpan?.end()
           } catch (err) {
             // Don't fail server startup if lifecycle hook fails
             console.warn(`Failed to call onActivate for plugin "${pluginSlug}" on startup:`, err.message)
+            lifecycleSpan?.end({ error: err })
           }
         }
       }
@@ -146,6 +198,14 @@ export default class RegisterPlugins {
     if (isFirstLoad && loadedPlugins.length > 0) {
       isFirstLoad = false
     }
+
+    pluginsSpan?.addTags({
+      loaded: loadedPlugins.length,
+      failed: failedPlugins.length,
+      loadedPlugins: loadedPlugins.join(','),
+      failedPlugins: failedPlugins.join(',')
+    })
+    pluginsSpan?.end()
 
     // Report back to primary process on first load
     if (process.send && (loadedPlugins.length > 0 || failedPlugins.length > 0)) {

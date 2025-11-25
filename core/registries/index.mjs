@@ -9,6 +9,7 @@ import RegisterPlugins from './RegisterPlugins.mjs'
 import RegisterJobs from './RegisterJobs.mjs'
 import RegisterEmailProviders from './RegisterEmailProviders.mjs'
 import * as emailHelper from '../utils/email-helper.mjs'
+import { TraceCategory } from '../services/PerformanceTracer.mjs'
 
 export default class Registry {
   constructor(req, res, next) {
@@ -145,6 +146,13 @@ export default class Registry {
   // Init providers
   // ----------------------
   async init() {
+    const tracer = this.req.tracer
+
+    // Trace providers loading
+    const providersSpan = tracer?.startSpan('providers.init', {
+      category: TraceCategory.CORE
+    })
+
     // Dynamically load provider modules
     const providersDir = path.resolve('./core/providers')
     if (fs.existsSync(providersDir)) {
@@ -153,9 +161,16 @@ export default class Registry {
         .filter((f) => f.isDirectory())
         .map((f) => f.name)
 
+      providersSpan?.addTag('providerCount', folders.length)
+
       for (const folder of folders) {
         const indexPath = path.join(providersDir, folder, 'index.mjs')
         if (fs.existsSync(indexPath)) {
+          const providerSpan = tracer?.startSpan(`providers.load.${folder}`, {
+            category: TraceCategory.CORE,
+            tags: { provider: folder }
+          })
+
           try {
             const mod = await import(indexPath)
             if (typeof mod.default === 'function') {
@@ -164,18 +179,35 @@ export default class Registry {
                 { req: this.req, res: this.res, next: this.next }
               )
             }
+            providerSpan?.end()
           } catch (err) {
             console.error(`Failed to load provider ${folder}:`, err)
+            providerSpan?.end({ error: err })
           }
         }
       }
     }
 
+    providersSpan?.end()
+
+    // Trace registries initialization
+    const registriesSpan = tracer?.startSpan('registries.init', {
+      category: TraceCategory.CORE,
+      tags: { registryCount: Object.keys(this.registries).length }
+    })
+
     for (const key of Object.keys(this.registries)) {
       if (typeof this.registries[key].init === 'function') {
+        const regSpan = tracer?.startSpan(`registries.init.${key}`, {
+          category: TraceCategory.CORE,
+          tags: { registry: key }
+        })
         await this.registries[key].init()
+        regSpan?.end()
       }
     }
+
+    registriesSpan?.end()
 
     // Mark plugins as initialized and start scheduler (only once per worker)
     if (this.req.context.onPluginsInitialized) {
@@ -183,6 +215,10 @@ export default class Registry {
     }
 
     // 🔥 fire the init action so plugins can hook in
+    const hookSpan = tracer?.startSpan('hooks.init', {
+      category: TraceCategory.HOOK
+    })
     this.doAction('init', this)
+    hookSpan?.end()
   }
 }

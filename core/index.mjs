@@ -18,6 +18,8 @@ import createWsAuthMiddleware from './utils/wsAuthMiddleware.mjs'
 import { initSecrets, ensureSecrets } from './utils/secrets.mjs'
 import SchedulerService from './services/SchedulerService.mjs'
 import BadgeCountService from './services/BadgeCountService.mjs'
+import TraceStorage from './services/TraceStorage.mjs'
+import TraceStorageDB from './services/TraceStorageDB.mjs'
 
 // Load .env from custom path if ENV_FILE_PATH is set, otherwise use default location
 const envPath = process.env.ENV_FILE_PATH || '.env'
@@ -313,6 +315,29 @@ if (cluster.isPrimary) {
   const server = createServer(app)
   const wss = new WebSocketServer({ server })
 
+  // Initialize trace storage for performance tracing
+  // Use DB storage if HD_TRACING_PERSIST=true, otherwise memory-only
+  // Configurable via environment variables
+  const useDBStorage = process.env.HD_TRACING_PERSIST === 'true'
+  let traceStorage = null
+
+  if (useDBStorage) {
+    // DB-backed storage with retention and archiving
+    traceStorage = new TraceStorageDB({
+      retentionDays: parseInt(process.env.HD_TRACING_RETENTION_DAYS) || 30,
+      archiveAfterDays: parseInt(process.env.HD_TRACING_ARCHIVE_AFTER_DAYS) || 7,
+      archivePath: process.env.HD_TRACING_ARCHIVE_PATH || './content/traces',
+      memoryCacheSize: parseInt(process.env.HD_TRACING_MAX_TRACES) || 100,
+      cleanupIntervalMs: parseInt(process.env.HD_TRACING_CLEANUP_INTERVAL_MS) || 60 * 60 * 1000
+    })
+  } else {
+    // Memory-only storage (faster, but lost on restart)
+    traceStorage = new TraceStorage({
+      maxTraces: parseInt(process.env.HD_TRACING_MAX_TRACES) || 100,
+      maxAgeMs: parseInt(process.env.HD_TRACING_MAX_AGE_MS) || 60 * 60 * 1000 // 1 hour
+    })
+  }
+
   const context = {
     app,
     port,
@@ -322,6 +347,7 @@ if (cluster.isPrimary) {
     options: null,
     parseVue,
     scheduler: null, // Will be initialized after knex
+    traceStorage, // Performance trace storage
     formatDate(date = new Date()) {
       return date.toISOString().replace('Z', '').replace('T', ' ')
     },
@@ -349,6 +375,12 @@ if (cluster.isPrimary) {
   initializeKnex().then(async (knex) => {
     context.knex = knex
     context.options = await initializeOptions(context.knex, context.table)
+
+    // Initialize DB-backed trace storage if enabled (needs context with knex)
+    if (traceStorage.init && typeof traceStorage.init === 'function') {
+      traceStorage.context = context
+      await traceStorage.init()
+    }
 
     // Initialize scheduler on all workers, but only worker 1 will execute tasks
     context.scheduler = new SchedulerService(context, cluster.worker.id === 1)
