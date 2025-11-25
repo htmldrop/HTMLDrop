@@ -18,3 +18,4 @@ content/config/*
 .env
 .claude
 config/local.json
+.DS_Store
