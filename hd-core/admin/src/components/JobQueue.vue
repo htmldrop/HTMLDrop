@@ -187,6 +187,7 @@ onUnmounted(() => {
   display: flex;
   flex-direction: column;
   gap: 12px;
+  overflow: hidden;
 }
 
 .job-item {

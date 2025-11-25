@@ -38,7 +38,7 @@ export default class RegisterThemes {
   }
 
   async init() {
-    // Dynamically load provider modules from active theme @todo - load theme dynamically
+    // Dynamically load provider modules from active theme
     const { options } = this.context
 
     try {
@@ -70,6 +70,8 @@ export default class RegisterThemes {
         const currentHash = await getFolderHash(themeFolder)
         if (currentHash !== themeModule.hash) {
           needsImport = true
+          // Clear the cache entry to force reimport
+          themeModuleCache.delete(themeSlug)
         }
       }
 
