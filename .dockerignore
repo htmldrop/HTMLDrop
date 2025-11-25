@@ -14,7 +14,7 @@ coverage
 *.log
 dist
 build
-hd-content/uploads/*
-!hd-content/uploads/.gitkeep
+content/uploads/*
+!content/uploads/.gitkeep
 .claude
 .github

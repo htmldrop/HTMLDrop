@@ -2,7 +2,7 @@
   "name": "HTMLDrop CMS",
   "description": "A powerful, extensible, and developer-friendly CMS built with Node.js, Vue 3, and modern JavaScript.",
   "repository": "https://github.com/htmldrop/htmldrop",
-  "logo": "https://raw.githubusercontent.com/htmldrop/htmldrop/main/hd-core/admin/src/assets/logo.png",
+  "logo": "https://raw.githubusercontent.com/htmldrop/htmldrop/main/core/admin/src/assets/logo.png",
   "keywords": [
     "cms",
     "nodejs",

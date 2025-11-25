@@ -46,5 +46,5 @@ primary_region = "ord"
     restart_limit = 0
 
 [[statics]]
-  guest_path = "/app/hd-content/uploads"
+  guest_path = "/app/content/uploads"
   url_prefix = "/uploads"

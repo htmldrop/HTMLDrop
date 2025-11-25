@@ -2,17 +2,17 @@
 node_modules
 
 # User content
-hd-content/plugins/*
-hd-content/themes/*
-hd-content/uploads/*
-hd-content/config/*
+content/plugins/*
+content/themes/*
+content/uploads/*
+content/config/*
 
 # Keep README files
-!hd-content/plugins/README.md
-!hd-content/plugins/CREATING_NPM_PLUGINS.md
-!hd-content/themes/README.md
-!hd-content/uploads/README.md
-!hd-content/config/README.md
+!content/plugins/README.md
+!content/plugins/CREATING_NPM_PLUGINS.md
+!content/themes/README.md
+!content/uploads/README.md
+!content/config/README.md
 
 # Config overrides
 .env

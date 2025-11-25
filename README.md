@@ -3,7 +3,7 @@
 > **Disclaimer:** HTMLDrop is an independent open-source project and has no affiliation with Automattic, WordPress, or any related entities. This project is inspired by WordPress's plugin/theme architecture but is a completely separate implementation built for Node.js.
 
 <p align="center">
-  <img src="hd-core/admin/src/assets/logo.png" alt="HTMLDrop Logo" width="200"/>
+  <img src="core/admin/src/assets/logo.png" alt="HTMLDrop Logo" width="200"/>
 </p>
 
 <p align="center">
@@ -17,15 +17,15 @@
 <p align="center">
   <a href="#-features">Features</a> •
   <a href="#-quick-start">Quick Start</a> •
-  <a href="hd-core/docs/api/README.md">API Docs</a> •
-  <a href="hd-core/docs/architecture/README.md">Architecture</a> •
+  <a href="core/docs/api/README.md">API Docs</a> •
+  <a href="core/docs/architecture/README.md">Architecture</a> •
   <a href="#-community">Community</a>
 </p>
 
 <p align="center">
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-GPL--2.0-blue.svg" alt="License"></a>
   <a href="https://nodejs.org"><img src="https://img.shields.io/badge/node-%3E%3D20.0.0-brightgreen.svg" alt="Node Version"></a>
-  <a href="hd-core/docs/CONTRIBUTING.md"><img src="https://img.shields.io/badge/PRs-welcome-brightgreen.svg" alt="PRs Welcome"></a>
+  <a href="core/docs/CONTRIBUTING.md"><img src="https://img.shields.io/badge/PRs-welcome-brightgreen.svg" alt="PRs Welcome"></a>
 </p>
 
 ---
@@ -125,7 +125,7 @@ npm i
 npm start
 ```
 
-See the [Deployment Guide](hd-core/docs/deployment/README.md) for detailed production setup.
+See the [Deployment Guide](core/docs/deployment/README.md) for detailed production setup.
 
 ### Quick Deploy
 
@@ -138,14 +138,12 @@ Deploy HTMLDrop to your favorite hosting platform with one click:
   <a href="https://render.com/deploy?repo=https://github.com/htmldrop/htmldrop">
     <img src="https://render.com/images/deploy-to-render-button.svg" alt="Deploy to Render" height="32">
   </a>
-  <a href="https://heroku.com/deploy?template=https://github.com/htmldrop/htmldrop">
-    <img src="https://www.herokucdn.com/deploy/button.svg" alt="Deploy to Heroku" height="32">
-  </a>
+  
 </p>
 
 <p align="center">
-  <a href="https://cloud.digitalocean.com/apps/new?repo=https://github.com/htmldrop/htmldrop">
-    <img src="https://www.deploytodo.com/do-btn-blue.svg" alt="Deploy to DigitalOcean" height="32">
+  <a href="https://heroku.com/deploy?template=https://github.com/htmldrop/htmldrop">
+    <img src="https://www.herokucdn.com/deploy/button.svg" alt="Deploy to Heroku" height="32">
   </a>
   <a href="https://fly.io/launch?repo=https://github.com/htmldrop/htmldrop">
     <img src="https://fly.io/static/images/brand/brandmark.svg" alt="Deploy on Fly.io" height="32">
@@ -157,7 +155,7 @@ Deploy HTMLDrop to your favorite hosting platform with one click:
 - Git CLI installed (for CMS updates)
 - A database (PostgreSQL, MySQL, or SQLite)
 
-Railway, Render, Heroku, DigitalOcean, and Fly.io are recommended platforms for full-stack deployment. Most platforms include git by default in their build environments.
+Railway, Render, Heroku, and Fly.io are recommended platforms for full-stack deployment. Most platforms include git by default in their build environments.
 
 ### Docker Deploy
 
@@ -188,32 +186,32 @@ The Docker image includes git CLI for CMS updates and version management.
 
 ### Getting Started
 
-- [Installation Guide](hd-core/docs/deployment/README.md#installation)
-- [Configuration](hd-core/docs/deployment/README.md#environment-configuration)
+- [Installation Guide](core/docs/deployment/README.md#installation)
+- [Configuration](core/docs/deployment/README.md#environment-configuration)
 - [Quick Start Tutorial](#) (coming soon)
 
 ### Core Concepts
 
-- [Architecture Overview](hd-core/docs/architecture/README.md)
-- [Database Schema](hd-core/docs/architecture/README.md#database-schema)
-- [Request Lifecycle](hd-core/docs/architecture/README.md#request-lifecycle)
-- [Plugin System](hd-core/docs/architecture/README.md#plugin-system)
-- [Theme System](hd-core/docs/architecture/README.md#theme-system)
+- [Architecture Overview](core/docs/architecture/README.md)
+- [Database Schema](core/docs/architecture/README.md#database-schema)
+- [Request Lifecycle](core/docs/architecture/README.md#request-lifecycle)
+- [Plugin System](core/docs/architecture/README.md#plugin-system)
+- [Theme System](core/docs/architecture/README.md#theme-system)
 
 ### Development
 
-- [API Reference](hd-core/docs/api/README.md)
-- [Theme Development](hd-core/docs/themes/README.md)
-- [Plugin Development](hd-content/plugins/README.md)
-- [Hooks & Filters](hd-core/docs/hooks/README.md)
-- [Contributing Guide](hd-core/docs/CONTRIBUTING.md)
+- [API Reference](core/docs/api/README.md)
+- [Theme Development](core/docs/themes/README.md)
+- [Plugin Development](content/plugins/README.md)
+- [Hooks & Filters](core/docs/hooks/README.md)
+- [Contributing Guide](core/docs/CONTRIBUTING.md)
 
 ### Deployment
 
-- [Production Setup](hd-core/docs/deployment/README.md)
-- [SSL Configuration](hd-core/docs/deployment/README.md#sslhttps-configuration)
-- [Performance Optimization](hd-core/docs/deployment/README.md#performance-optimization)
-- [Security Hardening](hd-core/docs/deployment/README.md#security-hardening)
+- [Production Setup](core/docs/deployment/README.md)
+- [SSL Configuration](core/docs/deployment/README.md#sslhttps-configuration)
+- [Performance Optimization](core/docs/deployment/README.md#performance-optimization)
+- [Security Hardening](core/docs/deployment/README.md#security-hardening)
 
 ---
 
@@ -222,7 +220,7 @@ The Docker image includes git CLI for CMS updates and version management.
 Themes support any frontend framework or vanilla JavaScript. Here's an example using Vue 3 with SSR:
 
 ```javascript
-// hd-content/themes/my-theme/index.mjs
+// content/themes/my-theme/index.mjs
 import { renderToString } from '@vue/server-renderer'
 import { createSSRApp } from 'vue'
 import App from './App.vue'
@@ -250,7 +248,7 @@ export default async ({ req, res, next, router }) => {
 }
 ```
 
-See the [Theme Development Guide](hd-core/docs/themes/README.md) for more details.
+See the [Theme Development Guide](core/docs/themes/README.md) for more details.
 
 ---
 
@@ -259,7 +257,7 @@ See the [Theme Development Guide](hd-core/docs/themes/README.md) for more detail
 Plugins extend functionality using hooks and filters:
 
 ```javascript
-// hd-content/plugins/my-plugin/index.mjs
+// content/plugins/my-plugin/index.mjs
 export default async ({ req, res, next, router }) => {
   return {
     async init() {
@@ -299,7 +297,7 @@ export default async ({ req, res, next, router }) => {
 }
 ```
 
-See the [Plugin Development Guide](hd-content/plugins/README.md) for more details.
+See the [Plugin Development Guide](content/plugins/README.md) for more details.
 
 ---
 
@@ -346,7 +344,7 @@ See the [Plugin Development Guide](hd-content/plugins/README.md) for more detail
 
 ```
 htmldrop-cms/
-├── hd-core/                   # Core application
+├── core/                   # Core application
 │   ├── admin/                 # Vue 3 admin panel
 │   ├── controllers/           # API controllers
 │   ├── middlewares/           # Express middlewares
@@ -356,20 +354,20 @@ htmldrop-cms/
 │   ├── utils/                 # Helper utilities
 │   └── database/              # Migrations & seeds
 │
-├── hd-content/                # User content (WordPress-like)
+├── content/                # User content (WordPress-like)
 │   ├── plugins/               # Installed plugins
 │   ├── themes/                # Installed themes
 │   ├── uploads/               # Media uploads
 │   └── config/                # Configuration files
 │
-├── hd-core/docs/              # Documentation
+├── core/docs/              # Documentation
 │   ├── api/                   # API reference
 │   ├── architecture/          # System architecture
 │   ├── themes/                # Theme development
 │   ├── hooks/                 # Hooks & filters
 │   └── deployment/            # Deployment guides
 │
-└── hd-core/tests/             # Test files
+└── core/tests/             # Test files
 ```
 
 ---
@@ -448,7 +446,7 @@ We welcome contributions from the community! Here's how you can help:
 
 ### Getting Started
 
-1. Read the [Contributing Guide](hd-core/docs/CONTRIBUTING.md)
+1. Read the [Contributing Guide](core/docs/CONTRIBUTING.md)
 2. Look for [good first issues](https://github.com/htmldrop/htmldrop/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22)
 3. Fork, code, and submit a PR!
 
@@ -458,7 +456,7 @@ We welcome contributions from the community! Here's how you can help:
 
 ### Get Help
 
-- 📖 **Documentation** - [hd-core/docs/](hd-core/docs/)
+- 📖 **Documentation** - [core/docs/](core/docs/)
 - 💬 **Discussions** - [GitHub Discussions](https://github.com/htmldrop/htmldrop/discussions)
 - 🐛 **Bug Reports** - [GitHub Issues](https://github.com/htmldrop/htmldrop/issues)
 - 💡 **Feature Requests** - [GitHub Issues](https://github.com/htmldrop/htmldrop/issues)
