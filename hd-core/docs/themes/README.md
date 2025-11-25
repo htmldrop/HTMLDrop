@@ -99,6 +99,44 @@ export default async ({ req, res, next, router }) => {
 }
 ```
 
+### Type Safety & IntelliSense
+
+For TypeScript/JSDoc type hints and autocompletion in VS Code (with Intelephense or similar), use the `createContext` helper:
+
+```javascript
+import { createContext } from '../../../hd-core/types/context.mjs'
+
+export default async ({ req, res, next, router }) => {
+  // Get typed context, hooks, and guard with IntelliSense support
+  const { context, hooks, guard } = createContext(req)
+
+  return {
+    async init() {
+      // Now you get autocomplete for hooks methods
+      const { addAction, addFilter } = hooks
+
+      addAction('create_post', ({ post }) => {
+        // Full type hints for post object
+        console.log(post.title)
+      })
+    },
+    async render() {
+      // Autocomplete for context properties
+      const { knex, table, options } = context
+
+      // Full IntelliSense for Knex queries
+      const posts = await knex(table('posts'))
+        .where('status', 'published')
+    }
+  }
+}
+```
+
+The `createContext` helper provides full type definitions for:
+- `context` - Database access, options, helpers
+- `hooks` - addAction, addFilter, doAction, applyFilter, etc.
+- `guard` - Permission checking utilities
+
 ---
 
 ## Theme Approaches
@@ -278,9 +316,29 @@ See [PERSISTENCE_CONFIG.md](../PERSISTENCE_CONFIG.md) for details.
 
 ## Publishing
 
+### Publishing to NPM
+
+To make your theme installable through the HTMLDrop admin panel, publish it to NPM with the `hd-theme` keyword:
+
+```json
+{
+  "name": "@your-org/my-theme",
+  "version": "1.0.0",
+  "main": "index.mjs",
+  "type": "module",
+  "keywords": ["hd-theme"],  // Required for theme discovery
+  "author": "Your Name"
+}
+```
+
+Then publish:
+
 ```bash
+npm login
 npm publish --access public
 ```
+
+**Important:** The `hd-theme` keyword makes your theme searchable and installable through the HTMLDrop admin panel's theme installation page. Without this keyword, users won't be able to find your theme in the admin interface.
 
 ---
 
