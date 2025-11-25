@@ -219,7 +219,7 @@ The Docker image includes git CLI for CMS updates and version management.
 
 ## 🎨 Creating Themes
 
-Themes are built with Vue 3 and support SSR for SEO:
+Themes support any frontend framework or vanilla JavaScript. Here's an example using Vue 3 with SSR:
 
 ```javascript
 // hd-content/themes/my-theme/index.mjs
