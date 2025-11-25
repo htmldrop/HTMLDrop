@@ -178,7 +178,7 @@ cd htmldrop
 docker-compose up -d
 ```
 
-This will start HTMLDrop with MySQL and Redis. Access at `http://localhost:3000`
+This will start HTMLDrop with MySQL and Redis. Access at `http://localhost`
 
 The Docker image includes git CLI for CMS updates and version management.
 
