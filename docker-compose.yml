@@ -27,6 +27,12 @@ services:
       CORS_ORIGIN: ${CORS_ORIGIN:-*}
       REDIS_URL: redis://redis:6379
       GITHUB_TOKEN: ${GITHUB_TOKEN:-}
+      # Performance Tracing (optional)
+      HD_TRACING_ENABLED: ${HD_TRACING_ENABLED:-true}
+      HD_TRACING_SAMPLE_RATE: ${HD_TRACING_SAMPLE_RATE:-1.0}
+      HD_TRACING_VERBOSE: ${HD_TRACING_VERBOSE:-false}
+      HD_TRACING_PERSIST: ${HD_TRACING_PERSIST:-false}
+      HD_TRACING_MAX_TRACES: ${HD_TRACING_MAX_TRACES:-100}
     restart: always
 
   # MySQL Database

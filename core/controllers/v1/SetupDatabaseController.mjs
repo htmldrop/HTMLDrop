@@ -98,7 +98,13 @@ export default (context) => {
       JWT_REFRESH_EXPIRES_IN: process.env.JWT_REFRESH_EXPIRES_IN || '7d',
       ALLOW_REGISTRATIONS: process.env.ALLOW_REGISTRATIONS || 'false',
       DEFAULT_ROLES: process.env.DEFAULT_ROLES || 'user',
-      TABLE_PREFIX: 'hd_'
+      TABLE_PREFIX: 'hd_',
+      // Performance Tracing defaults
+      HD_TRACING_ENABLED: process.env.HD_TRACING_ENABLED || 'true',
+      HD_TRACING_SAMPLE_RATE: process.env.HD_TRACING_SAMPLE_RATE || '1.0',
+      HD_TRACING_VERBOSE: process.env.HD_TRACING_VERBOSE || 'false',
+      HD_TRACING_PERSIST: process.env.HD_TRACING_PERSIST || 'false',
+      HD_TRACING_MAX_TRACES: process.env.HD_TRACING_MAX_TRACES || '100'
     }
 
     // Define the mapping for updates coming from the request body.

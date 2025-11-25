@@ -31,7 +31,38 @@ HD_TRACING_MAX_TRACES=100
 
 # Maximum age of stored traces in milliseconds (default: 3600000 = 1 hour)
 HD_TRACING_MAX_AGE_MS=3600000
+
+# --- Database Persistence (optional) ---
+
+# Store traces in database instead of memory only (default: false)
+HD_TRACING_PERSIST=false
+
+# Days to keep traces in database (default: 30)
+HD_TRACING_RETENTION_DAYS=30
+
+# Archive traces older than N days to gzipped files (default: 7, set to 0 to disable)
+HD_TRACING_ARCHIVE_AFTER_DAYS=7
+
+# Path for archived trace files (default: ./content/traces)
+HD_TRACING_ARCHIVE_PATH=./content/traces
+
+# Cleanup interval in milliseconds (default: 3600000 = 1 hour)
+HD_TRACING_CLEANUP_INTERVAL_MS=3600000
 ```
+
+### Storage Modes
+
+**Memory-only (default):**
+- Fast, no database overhead
+- Traces lost on server restart
+- Good for development and quick debugging
+
+**Database-backed (`HD_TRACING_PERSIST=true`):**
+- Traces survive server restarts
+- Queryable via API with pagination
+- Automatic retention and cleanup
+- Optional archiving to compressed files
+- Good for production debugging and long-term analysis
 
 ### Database Options
 
