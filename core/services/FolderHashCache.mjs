@@ -12,6 +12,7 @@ import fs from 'fs'
 import path from 'path'
 import crypto from 'crypto'
 import cluster from 'cluster'
+import chokidar from 'chokidar'
 
 // Global cache shared across all instances
 // { folderPath: { hash, watcher } }
@@ -89,26 +90,26 @@ function setupWatcher(folderPath) {
   }
 
   try {
-    // Use recursive watching (supported on macOS and Windows, may need fallback on Linux)
-    const watcher = fs.watch(folderPath, { recursive: true }, (eventType, filename) => {
-      // Ignore node_modules and hidden files
-      if (filename && (filename.includes('node_modules') || filename.startsWith('.'))) {
-        return
-      }
+    const watcher = chokidar.watch(folderPath, {
+      ignored: /(^|[\/\\])(\.|node_modules)/,
+      persistent: true,
+      ignoreInitial: true
+    })
 
-      // Invalidate local cache
+    const invalidate = () => {
       const cached = cache.get(folderPath)
       if (cached) {
-        cached.hash = null // Mark as invalid, keep watcher
+        cached.hash = null
       }
-
-      // Notify all workers to invalidate their caches
       broadcastInvalidation(folderPath)
-    })
+    }
+
+    watcher.on('add', invalidate)
+    watcher.on('change', invalidate)
+    watcher.on('unlink', invalidate)
 
     watcher.on('error', (err) => {
       console.warn(`[FolderHashCache] Watcher error for ${folderPath}:`, err.message)
-      // Remove watcher on error
       const cached = cache.get(folderPath)
       if (cached?.watcher) {
         cached.watcher.close()
