@@ -20,6 +20,7 @@ import SchedulerService from './services/SchedulerService.mjs'
 import BadgeCountService from './services/BadgeCountService.mjs'
 import TraceStorage from './services/TraceStorage.mjs'
 import TraceStorageDB from './services/TraceStorageDB.mjs'
+import { initSharedSSRCache } from './services/SharedSSRCache.mjs'
 
 // Load .env from custom path if ENV_FILE_PATH is set, otherwise use default location
 const envPath = process.env.ENV_FILE_PATH || '.env'
@@ -84,6 +85,9 @@ const port = process.env.PORT || 3001
 
 if (cluster.isPrimary) {
   console.log(`Primary process running with ${numCPUs} workers`)
+
+  // Initialize shared SSR cache IPC handlers on primary
+  initSharedSSRCache()
 
   // Fork workers
   const workers = []
@@ -314,6 +318,9 @@ if (cluster.isPrimary) {
   const app = express()
   const server = createServer(app)
   const wss = new WebSocketServer({ server })
+
+  // Initialize shared SSR cache IPC handlers on worker
+  initSharedSSRCache()
 
   // Initialize trace storage for performance tracing
   // Use DB storage if HD_TRACING_PERSIST=true, otherwise memory-only
