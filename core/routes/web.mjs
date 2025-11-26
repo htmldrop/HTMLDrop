@@ -9,6 +9,12 @@ import { TraceCategory } from '../services/PerformanceTracer.mjs'
 export default (context) => {
   const router = express.Router()
   const uploadsPath = path.resolve('./content/uploads')
+  const themesPath = path.resolve('./content/themes')
+
+  // Hash cache: { themeName: { hash, timestamp } }
+  // Cache is invalidated after 2 seconds to pick up file changes during development
+  const hashCache = new Map()
+  const HASH_CACHE_TTL_MS = 2000
 
   // Apply admin bar middleware to all web routes
   router.use(adminBarMiddleware)
@@ -16,10 +22,28 @@ export default (context) => {
   // Serve attachments (before registry middleware - static files don't need hooks)
   router.use('/uploads', express.static(uploadsPath))
 
+  // Serve theme static assets directly (before heavy middleware)
+  // This handles /assets/*, /static/*, /public/* from themes
+  router.use('/assets', (req, res, next) => {
+    const theme = context.options?.theme
+    if (!theme) return next()
+    express.static(path.join(themesPath, theme, 'assets'))(req, res, next)
+  })
+  router.use('/static', (req, res, next) => {
+    const theme = context.options?.theme
+    if (!theme) return next()
+    express.static(path.join(themesPath, theme, 'static'))(req, res, next)
+  })
+  router.use('/public', (req, res, next) => {
+    const theme = context.options?.theme
+    if (!theme) return next()
+    express.static(path.join(themesPath, theme, 'public'))(req, res, next)
+  })
+
   // Apply registry middleware to set up hooks (including tracer) for themes
   router.use(registryMiddleware(context))
 
-  // Helper: compute folder hash (ignores node_modules)
+  // Helper: compute folder hash (ignores node_modules) with caching
   const getFolderHash = async (folderPath) => {
     const files = await fs.readdir(folderPath, { withFileTypes: true })
     const mtimes = []
@@ -36,6 +60,22 @@ export default (context) => {
     }
 
     return crypto.createHash('md5').update(mtimes.join('|')).digest('hex')
+  }
+
+  // Cached version of getFolderHash
+  const getCachedFolderHash = async (themeSlug, folderPath) => {
+    const now = Date.now()
+    const cached = hashCache.get(themeSlug)
+
+    // Return cached hash if still valid
+    if (cached && now - cached.timestamp < HASH_CACHE_TTL_MS) {
+      return { hash: cached.hash, cached: true }
+    }
+
+    // Compute new hash
+    const hash = await getFolderHash(folderPath)
+    hashCache.set(themeSlug, { hash, timestamp: now })
+    return { hash, cached: false }
   }
 
   // Web routes - dynamic theme loading per request
@@ -64,11 +104,13 @@ export default (context) => {
       const themeFolder = path.resolve(`./content/themes/${themeSlug}`)
       const themeIndex = path.join(themeFolder, 'index.mjs')
 
-      const folderHash = await tracer?.trace(
-        'theme.computeHash',
-        async () => getFolderHash(themeFolder),
-        { category: TraceCategory.IO, tags: { theme: themeSlug } }
-      ) || await getFolderHash(themeFolder)
+      // Use cached hash to avoid expensive folder traversal on every request
+      const { hash: folderHash, cached: hashWasCached } = await getCachedFolderHash(themeSlug, themeFolder)
+
+      // Only trace if we actually computed the hash (not from cache)
+      if (!hashWasCached && tracer) {
+        tracer.getCurrentSpan()?.addTag('hashComputed', true)
+      }
 
       // Trace theme import
       const themeImportSpan = tracer?.startSpan('theme.import', {

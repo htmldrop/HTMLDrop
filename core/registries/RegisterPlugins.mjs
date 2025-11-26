@@ -29,6 +29,26 @@ const pluginModuleCache = new Map()
 let lastActivePlugins = null
 let isFirstLoad = true
 
+// Hash cache to avoid expensive folder traversal on every request
+// { pluginSlug: { hash, timestamp } }
+const hashCache = new Map()
+const HASH_CACHE_TTL_MS = 2000 // 2 seconds - allows hot reload during development
+
+const getCachedFolderHash = async (pluginSlug, folderPath) => {
+  const now = Date.now()
+  const cached = hashCache.get(pluginSlug)
+
+  // Return cached hash if still valid
+  if (cached && now - cached.timestamp < HASH_CACHE_TTL_MS) {
+    return { hash: cached.hash, cached: true }
+  }
+
+  // Compute new hash
+  const hash = await getFolderHash(folderPath)
+  hashCache.set(pluginSlug, { hash, timestamp: now })
+  return { hash, cached: false }
+}
+
 export default class RegisterPlugins {
   constructor(req, res, next) {
     this.req = req
@@ -83,17 +103,23 @@ export default class RegisterPlugins {
         let needsImport = !pluginModule
 
         if (pluginModule) {
-          // Check if plugin folder changed (for hot reload)
-          const hashSpan = tracer?.startSpan(`plugins.checkHash.${pluginSlug}`, {
-            category: TraceCategory.IO,
-            tags: { plugin: pluginSlug }
-          })
-          const currentHash = await getFolderHash(pluginFolder)
-          hashSpan?.end()
+          // Check if plugin folder changed (for hot reload) using cached hash
+          const { hash: currentHash, cached: hashWasCached } = await getCachedFolderHash(pluginSlug, pluginFolder)
+
+          // Only log hash check if we actually computed it
+          if (!hashWasCached) {
+            const hashSpan = tracer?.startSpan(`plugins.checkHash.${pluginSlug}`, {
+              category: TraceCategory.IO,
+              tags: { plugin: pluginSlug, computed: true }
+            })
+            hashSpan?.end()
+          }
 
           if (currentHash !== pluginModule.hash) {
             needsImport = true
             pluginSpan?.addTag('reimport', 'hash changed')
+            // Clear hash cache to ensure fresh hash on import
+            hashCache.delete(pluginSlug)
           }
         }
 
@@ -104,7 +130,8 @@ export default class RegisterPlugins {
             tags: { plugin: pluginSlug }
           })
 
-          const folderHash = await getFolderHash(pluginFolder)
+          // Get hash (may be cached if we just checked it above)
+          const { hash: folderHash } = await getCachedFolderHash(pluginSlug, pluginFolder)
           const mod = await import(`${pluginIndex}?t=${folderHash}`)
 
           importSpan?.addTag('hash', folderHash)

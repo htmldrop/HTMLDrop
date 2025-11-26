@@ -29,6 +29,26 @@ const themeModuleCache = new Map()
 let lastActiveTheme = null
 let themeActivationCalled = false
 
+// Hash cache to avoid expensive folder traversal on every request
+// { themeSlug: { hash, timestamp } }
+const hashCache = new Map()
+const HASH_CACHE_TTL_MS = 2000 // 2 seconds - allows hot reload during development
+
+const getCachedFolderHash = async (themeSlug, folderPath) => {
+  const now = Date.now()
+  const cached = hashCache.get(themeSlug)
+
+  // Return cached hash if still valid
+  if (cached && now - cached.timestamp < HASH_CACHE_TTL_MS) {
+    return { hash: cached.hash, cached: true }
+  }
+
+  // Compute new hash
+  const hash = await getFolderHash(folderPath)
+  hashCache.set(themeSlug, { hash, timestamp: now })
+  return { hash, cached: false }
+}
+
 export default class RegisterThemes {
   constructor(req, res, next) {
     this.req = req
@@ -81,19 +101,25 @@ export default class RegisterThemes {
       let needsImport = !themeModule
 
       if (themeModule) {
-        // Check if theme folder changed (for hot reload)
-        const hashSpan = tracer?.startSpan('themes.checkHash', {
-          category: TraceCategory.IO,
-          tags: { theme: themeSlug }
-        })
-        const currentHash = await getFolderHash(themeFolder)
-        hashSpan?.end()
+        // Check if theme folder changed (for hot reload) using cached hash
+        const { hash: currentHash, cached: hashWasCached } = await getCachedFolderHash(themeSlug, themeFolder)
+
+        // Only log hash check if we actually computed it
+        if (!hashWasCached) {
+          const hashSpan = tracer?.startSpan('themes.checkHash', {
+            category: TraceCategory.IO,
+            tags: { theme: themeSlug, computed: true }
+          })
+          hashSpan?.end()
+        }
 
         if (currentHash !== themeModule.hash) {
           needsImport = true
           themeRegistrySpan?.addTag('reimport', 'hash changed')
           // Clear the cache entry to force reimport
           themeModuleCache.delete(themeSlug)
+          // Also clear hash cache to ensure fresh hash on import
+          hashCache.delete(themeSlug)
         }
       }
 
@@ -104,7 +130,8 @@ export default class RegisterThemes {
           tags: { theme: themeSlug }
         })
 
-        const folderHash = await getFolderHash(themeFolder)
+        // Get hash (may be cached if we just checked it above)
+        const { hash: folderHash } = await getCachedFolderHash(themeSlug, themeFolder)
         const mod = await import(`${themeIndex}?t=${folderHash}`)
 
         importSpan?.addTag('hash', folderHash)
