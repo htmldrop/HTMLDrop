@@ -1,53 +1,14 @@
 import path from 'path'
 import fs from 'fs'
-import crypto from 'crypto'
 import express from 'express'
 import PluginLifecycleService from '../services/PluginLifecycleService.mjs'
 import { TraceCategory } from '../services/PerformanceTracer.mjs'
-
-// Helper: compute folder hash (ignores node_modules)
-const getFolderHash = async (folderPath) => {
-  const files = await fs.promises.readdir(folderPath, { withFileTypes: true })
-  const mtimes = []
-
-  for (const file of files) {
-    if (file.name === 'node_modules') continue
-    const fullPath = path.join(folderPath, file.name)
-    if (file.isDirectory()) {
-      mtimes.push(await getFolderHash(fullPath))
-    } else {
-      const stats = await fs.promises.stat(fullPath)
-      mtimes.push(stats.mtimeMs.toString())
-    }
-  }
-
-  return crypto.createHash('md5').update(mtimes.join('|')).digest('hex')
-}
+import { getFolderHash, invalidateCache } from '../services/FolderHashCache.mjs'
 
 // Worker-level cache for imported plugin modules
 const pluginModuleCache = new Map()
 let lastActivePlugins = null
 let isFirstLoad = true
-
-// Hash cache to avoid expensive folder traversal on every request
-// { pluginSlug: { hash, timestamp } }
-const hashCache = new Map()
-const HASH_CACHE_TTL_MS = 2000 // 2 seconds - allows hot reload during development
-
-const getCachedFolderHash = async (pluginSlug, folderPath) => {
-  const now = Date.now()
-  const cached = hashCache.get(pluginSlug)
-
-  // Return cached hash if still valid
-  if (cached && now - cached.timestamp < HASH_CACHE_TTL_MS) {
-    return { hash: cached.hash, cached: true }
-  }
-
-  // Compute new hash
-  const hash = await getFolderHash(folderPath)
-  hashCache.set(pluginSlug, { hash, timestamp: now })
-  return { hash, cached: false }
-}
 
 export default class RegisterPlugins {
   constructor(req, res, next) {
@@ -103,8 +64,8 @@ export default class RegisterPlugins {
         let needsImport = !pluginModule
 
         if (pluginModule) {
-          // Check if plugin folder changed (for hot reload) using cached hash
-          const { hash: currentHash, cached: hashWasCached } = await getCachedFolderHash(pluginSlug, pluginFolder)
+          // Check if plugin folder changed (for hot reload) using file-watcher-based cache
+          const { hash: currentHash, cached: hashWasCached } = await getFolderHash(pluginFolder)
 
           // Only log hash check if we actually computed it
           if (!hashWasCached) {
@@ -118,8 +79,8 @@ export default class RegisterPlugins {
           if (currentHash !== pluginModule.hash) {
             needsImport = true
             pluginSpan?.addTag('reimport', 'hash changed')
-            // Clear hash cache to ensure fresh hash on import
-            hashCache.delete(pluginSlug)
+            // Invalidate folder hash cache to ensure fresh hash on import
+            invalidateCache(pluginFolder)
           }
         }
 
@@ -131,7 +92,7 @@ export default class RegisterPlugins {
           })
 
           // Get hash (may be cached if we just checked it above)
-          const { hash: folderHash } = await getCachedFolderHash(pluginSlug, pluginFolder)
+          const { hash: folderHash } = await getFolderHash(pluginFolder)
           const mod = await import(`${pluginIndex}?t=${folderHash}`)
 
           importSpan?.addTag('hash', folderHash)

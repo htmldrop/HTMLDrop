@@ -1,20 +1,13 @@
 import express from 'express'
 import path from 'path'
-import fs from 'fs/promises'
-import crypto from 'crypto'
 import adminBarMiddleware from '../middlewares/adminBarMiddleware.mjs'
 import registryMiddleware from '../middlewares/registryMiddleware.mjs'
 import { TraceCategory } from '../services/PerformanceTracer.mjs'
+import { getFolderHash } from '../services/FolderHashCache.mjs'
 
 export default (context) => {
   const router = express.Router()
   const uploadsPath = path.resolve('./content/uploads')
-  const themesPath = path.resolve('./content/themes')
-
-  // Hash cache: { themeName: { hash, timestamp } }
-  // Cache is invalidated after 2 seconds to pick up file changes during development
-  const hashCache = new Map()
-  const HASH_CACHE_TTL_MS = 2000
 
   // Apply admin bar middleware to all web routes
   router.use(adminBarMiddleware)
@@ -24,41 +17,6 @@ export default (context) => {
 
   // Apply registry middleware to set up hooks (including tracer) for themes
   router.use(registryMiddleware(context))
-
-  // Helper: compute folder hash (ignores node_modules) with caching
-  const getFolderHash = async (folderPath) => {
-    const files = await fs.readdir(folderPath, { withFileTypes: true })
-    const mtimes = []
-
-    for (const file of files) {
-      if (file.name === 'node_modules') continue
-      const fullPath = path.join(folderPath, file.name)
-      if (file.isDirectory()) {
-        mtimes.push(await getFolderHash(fullPath))
-      } else {
-        const stats = await fs.stat(fullPath)
-        mtimes.push(stats.mtimeMs.toString())
-      }
-    }
-
-    return crypto.createHash('md5').update(mtimes.join('|')).digest('hex')
-  }
-
-  // Cached version of getFolderHash
-  const getCachedFolderHash = async (themeSlug, folderPath) => {
-    const now = Date.now()
-    const cached = hashCache.get(themeSlug)
-
-    // Return cached hash if still valid
-    if (cached && now - cached.timestamp < HASH_CACHE_TTL_MS) {
-      return { hash: cached.hash, cached: true }
-    }
-
-    // Compute new hash
-    const hash = await getFolderHash(folderPath)
-    hashCache.set(themeSlug, { hash, timestamp: now })
-    return { hash, cached: false }
-  }
 
   // Web routes - dynamic theme loading per request
   router.all(/.*/, async (req, res, next) => {
@@ -92,8 +50,8 @@ export default (context) => {
       const themeFolder = path.resolve(`./content/themes/${themeSlug}`)
       const themeIndex = path.join(themeFolder, 'index.mjs')
 
-      // Use cached hash to avoid expensive folder traversal on every request
-      const { hash: folderHash, cached: hashWasCached } = await getCachedFolderHash(themeSlug, themeFolder)
+      // Use file-watcher-based cached hash (only recomputes when files actually change)
+      const { hash: folderHash, cached: hashWasCached } = await getFolderHash(themeFolder)
 
       // Only trace if we actually computed the hash (not from cache)
       if (!hashWasCached && tracer) {

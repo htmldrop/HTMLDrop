@@ -1,53 +1,14 @@
 import path from 'path'
 import fs from 'fs'
-import crypto from 'crypto'
 import express from 'express'
 import ThemeLifecycleService from '../services/ThemeLifecycleService.mjs'
 import { TraceCategory } from '../services/PerformanceTracer.mjs'
-
-// Helper: compute folder hash (ignores node_modules)
-const getFolderHash = async (folderPath) => {
-  const files = await fs.promises.readdir(folderPath, { withFileTypes: true })
-  const mtimes = []
-
-  for (const file of files) {
-    if (file.name === 'node_modules') continue
-    const fullPath = path.join(folderPath, file.name)
-    if (file.isDirectory()) {
-      mtimes.push(await getFolderHash(fullPath))
-    } else {
-      const stats = await fs.promises.stat(fullPath)
-      mtimes.push(stats.mtimeMs.toString())
-    }
-  }
-
-  return crypto.createHash('md5').update(mtimes.join('|')).digest('hex')
-}
+import { getFolderHash, invalidateCache } from '../services/FolderHashCache.mjs'
 
 // Worker-level cache for imported theme module
 const themeModuleCache = new Map()
 let lastActiveTheme = null
 let themeActivationCalled = false
-
-// Hash cache to avoid expensive folder traversal on every request
-// { themeSlug: { hash, timestamp } }
-const hashCache = new Map()
-const HASH_CACHE_TTL_MS = 2000 // 2 seconds - allows hot reload during development
-
-const getCachedFolderHash = async (themeSlug, folderPath) => {
-  const now = Date.now()
-  const cached = hashCache.get(themeSlug)
-
-  // Return cached hash if still valid
-  if (cached && now - cached.timestamp < HASH_CACHE_TTL_MS) {
-    return { hash: cached.hash, cached: true }
-  }
-
-  // Compute new hash
-  const hash = await getFolderHash(folderPath)
-  hashCache.set(themeSlug, { hash, timestamp: now })
-  return { hash, cached: false }
-}
 
 export default class RegisterThemes {
   constructor(req, res, next) {
@@ -101,8 +62,8 @@ export default class RegisterThemes {
       let needsImport = !themeModule
 
       if (themeModule) {
-        // Check if theme folder changed (for hot reload) using cached hash
-        const { hash: currentHash, cached: hashWasCached } = await getCachedFolderHash(themeSlug, themeFolder)
+        // Check if theme folder changed (for hot reload) using file-watcher-based cache
+        const { hash: currentHash, cached: hashWasCached } = await getFolderHash(themeFolder)
 
         // Only log hash check if we actually computed it
         if (!hashWasCached) {
@@ -118,8 +79,8 @@ export default class RegisterThemes {
           themeRegistrySpan?.addTag('reimport', 'hash changed')
           // Clear the cache entry to force reimport
           themeModuleCache.delete(themeSlug)
-          // Also clear hash cache to ensure fresh hash on import
-          hashCache.delete(themeSlug)
+          // Also invalidate folder hash cache to ensure fresh hash on import
+          invalidateCache(themeFolder)
         }
       }
 
@@ -131,7 +92,7 @@ export default class RegisterThemes {
         })
 
         // Get hash (may be cached if we just checked it above)
-        const { hash: folderHash } = await getCachedFolderHash(themeSlug, themeFolder)
+        const { hash: folderHash } = await getFolderHash(themeFolder)
         const mod = await import(`${themeIndex}?t=${folderHash}`)
 
         importSpan?.addTag('hash', folderHash)
