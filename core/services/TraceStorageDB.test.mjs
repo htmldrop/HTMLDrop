@@ -9,6 +9,30 @@ describe('TraceStorageDB', () => {
   let context
   let storage
 
+  // Helper to create traces table (simulates migration)
+  const createTracesTable = async (knexDb, tableName) => {
+    await knexDb.schema.createTable(tableName, (table) => {
+      table.increments('id')
+      table.string('trace_id', 36).unique()
+      table.string('request_method', 10)
+      table.string('request_path', 500)
+      table.string('request_url', 2000)
+      table.integer('user_id').nullable()
+      table.integer('total_duration')
+      table.integer('span_count')
+      table.integer('error_count')
+      table.json('summary')
+      table.json('spans')
+      table.json('waterfall')
+      table.json('metadata')
+      table.timestamp('created_at').defaultTo(knexDb.fn.now())
+      table.index('created_at')
+      table.index('request_path')
+      table.index('total_duration')
+      table.index('error_count')
+    })
+  }
+
   beforeEach(async () => {
     // Create in-memory SQLite database for testing
     db = knex({
@@ -21,6 +45,9 @@ describe('TraceStorageDB', () => {
       knex: db,
       table: (name) => `test_${name}`
     }
+
+    // Create traces table (simulates migration)
+    await createTracesTable(db, 'test_traces')
 
     storage = new TraceStorageDB({
       context,
@@ -39,7 +66,8 @@ describe('TraceStorageDB', () => {
   })
 
   describe('init', () => {
-    it('should create traces table', async () => {
+    it('should verify traces table exists', async () => {
+      // Table is created by migration (simulated in beforeEach)
       const hasTable = await db.schema.hasTable('test_traces')
       expect(hasTable).toBe(true)
     })
