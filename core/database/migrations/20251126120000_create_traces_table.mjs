@@ -9,7 +9,7 @@ const tableName = `${process.env.TABLE_PREFIX}traces`
 export const up = async (knex) => {
   await knex.schema.createTable(tableName, (table) => {
     table.increments('id')
-    table.string('trace_id', 36).primary()
+    table.string('trace_id', 36).unique().notNullable()
     table.string('request_method', 10)
     table.string('request_path', 500)
     table.string('request_url', 2000)

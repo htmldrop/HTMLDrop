@@ -13,7 +13,7 @@ describe('TraceStorageDB', () => {
   const createTracesTable = async (knexDb, tableName) => {
     await knexDb.schema.createTable(tableName, (table) => {
       table.increments('id')
-      table.string('trace_id', 36).unique()
+      table.string('trace_id', 36).unique().notNullable()
       table.string('request_method', 10)
       table.string('request_path', 500)
       table.string('request_url', 2000)
