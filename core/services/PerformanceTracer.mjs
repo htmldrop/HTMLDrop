@@ -540,6 +540,8 @@ export const TraceCategory = {
   PLUGIN: 'plugin',
   DATABASE: 'database',
   SSR: 'ssr',
+  WEB: 'web',
+  HASH: 'hash',
   RENDER: 'render',
   MIDDLEWARE: 'middleware',
   LIFECYCLE: 'lifecycle',

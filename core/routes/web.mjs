@@ -65,9 +65,9 @@ export default (context) => {
     // Get tracer from request (may not exist for non-API routes without registry middleware)
     const tracer = req.tracer
 
-    // Start SSR request span
-    const ssrSpan = tracer?.startSpan('ssr.request', {
-      category: TraceCategory.SSR,
+    // Start WEB request span
+    const webSpan = tracer?.startSpan('web.request', {
+      category: TraceCategory.WEB,
       tags: { url: req.originalUrl, method: req.method }
     })
 
@@ -76,11 +76,17 @@ export default (context) => {
 
       // If database not configured, redirect to admin setup
       if (!knex || !options || !options.theme) {
-        ssrSpan?.end()
+        webSpan?.end()
         return res.redirect('/admin')
       }
 
       const themeSlug = options.theme
+
+      // Trace folder hash
+      const folderHashSpan = tracer?.startSpan('theme.hash', {
+        category: TraceCategory.HASH,
+        tags: { theme: themeSlug }
+      })
 
       // Trace folder hash computation
       const themeFolder = path.resolve(`./content/themes/${themeSlug}`)
@@ -93,6 +99,8 @@ export default (context) => {
       if (!hashWasCached && tracer) {
         tracer.getCurrentSpan()?.addTag('hashComputed', true)
       }
+
+      folderHashSpan?.end()
 
       // Trace theme import
       const themeImportSpan = tracer?.startSpan('theme.import', {
@@ -125,18 +133,18 @@ export default (context) => {
       themeRenderSpan?.end()
 
       if (html) {
-        ssrSpan?.addTag('responseSize', html.length)
+        webSpan?.addTag('responseSize', html.length)
         res.type('html').send(html)
       }
 
-      ssrSpan?.end()
+      webSpan?.end()
 
       // Pass control to theme
       if (!res.headersSent) {
         tempRouter.handle(req, res, next)
       }
     } catch (err) {
-      ssrSpan?.end({ error: err })
+      webSpan?.end({ error: err })
       console.error('Theme error:', err)
       res.type('html').send('<body>Theme not available</body>')
     }
