@@ -22,7 +22,7 @@ class UserService {
   async getUsers(options = {}) {
     const { limit = 10, offset = 0, role, search } = options
 
-    let query = this.knex(this.table('users')).select('id', 'username', 'email', 'display_name', 'created_at')
+    let query = this.knex(this.table('users')).select('id', 'username', 'email', 'first_name', 'last_name', 'created_at')
 
     if (role) {
       query = query
@@ -36,7 +36,8 @@ class UserService {
         builder
           .where('username', 'like', `%${search}%`)
           .orWhere('email', 'like', `%${search}%`)
-          .orWhere('display_name', 'like', `%${search}%`)
+          .orWhere('first_name', 'like', `%${search}%`)
+          .orWhere('last_name', 'like', `%${search}%`)
       })
     }
 
@@ -51,7 +52,7 @@ class UserService {
   async getUserById(id) {
     return this.knex(this.table('users'))
       .where({ id })
-      .select('id', 'username', 'email', 'display_name', 'created_at')
+      .select('id', 'username', 'email', 'first_name', 'last_name', 'created_at')
       .first()
   }
 
@@ -79,7 +80,7 @@ class UserService {
    * @returns {Promise<number>} Created user ID
    */
   async createUser(data) {
-    const { username, email, password, display_name } = data
+    const { username, email, password, first_name, last_name } = data
 
     const hashedPassword = await bcrypt.hash(password, BCRYPT_ROUNDS)
 
@@ -87,7 +88,8 @@ class UserService {
       username,
       email,
       password: hashedPassword,
-      display_name: display_name || username
+      first_name: first_name || username,
+      last_name: last_name || ''
     })
 
     // Assign default role (subscriber)
@@ -110,12 +112,13 @@ class UserService {
    * @returns {Promise<void>}
    */
   async updateUser(id, data) {
-    const { username, email, display_name, password } = data
+    const { username, email, first_name, last_name, password } = data
 
     const updateData = {}
     if (username !== undefined) updateData.username = username
     if (email !== undefined) updateData.email = email
-    if (display_name !== undefined) updateData.display_name = display_name
+    if (first_name !== undefined) updateData.first_name = first_name
+    if (last_name !== undefined) updateData.last_name = last_name
 
     if (password) {
       updateData.password = await bcrypt.hash(password, BCRYPT_ROUNDS)

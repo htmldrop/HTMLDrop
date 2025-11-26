@@ -583,11 +583,21 @@ See the [Scheduler Documentation](../development/SCHEDULER.md) for complete guid
 ```sql
 users (
   id SERIAL PRIMARY KEY,
+  username VARCHAR UNIQUE,
+  status VARCHAR DEFAULT 'active',
+  first_name VARCHAR,
+  middle_name VARCHAR,
+  last_name VARCHAR,
+  picture VARCHAR(1024),
+  locale VARCHAR,
   email VARCHAR UNIQUE NOT NULL,
+  phone VARCHAR UNIQUE,
   password VARCHAR NOT NULL,
-  display_name VARCHAR,
+  email_verified_at TIMESTAMP,
+  phone_verified_at TIMESTAMP,
   created_at TIMESTAMP,
-  updated_at TIMESTAMP
+  updated_at TIMESTAMP,
+  deleted_at TIMESTAMP
 )
 
 usermeta (
@@ -1119,6 +1129,20 @@ User effectively has: ["edit_posts", "create_posts"]
 
 ## Request Lifecycle
 
+### Route Classification
+
+HTMLDrop uses a **route-based middleware strategy** for optimal performance:
+
+| Route Pattern | Registry Middleware | Use Case |
+|---------------|---------------------|----------|
+| `/api/*` | **Yes** | Full hook system, plugins, tracing |
+| `/admin/*` | No | Static SPA files |
+| `/assets/*` | No | Static theme assets (Vite build output) |
+| `/uploads/*` | No | User uploaded files |
+| `/*` (other) | No | SSR pages (themes handle directly) |
+
+**Why?** Registry initialization (hooks, plugins, providers) adds overhead. Only API routes need the full hook system. Static assets and SSR pages are handled directly for maximum performance.
+
 ### Admin Request
 
 ```
@@ -1150,7 +1174,7 @@ User effectively has: ["edit_posts", "create_posts"]
      ↓
 4. Authenticate middleware (verify JWT)
      ↓
-5. Registries middleware (load plugins/themes/post-types)
+5. Registry middleware (hooks, plugins, tracing)
      ↓
 6. Route handler (PostsController)
      ↓
@@ -1165,23 +1189,43 @@ User effectively has: ["edit_posts", "create_posts"]
 11. Return JSON response
 ```
 
-### Web Request (Theme)
+### Static Asset Request
+
+```
+1. Request: GET /assets/index-abc123.js
+     ↓
+2. Admin bar middleware (pass-through for non-HTML)
+     ↓
+3. Registry middleware SKIPPED (path doesn't start with /api/)
+     ↓
+4. Theme static middleware serves file
+     ↓
+5. Response with cache headers (1 year, immutable)
+```
+
+### Web Request (SSR)
 
 ```
 1. Request: GET /
      ↓
-2. Context middleware
+2. Admin bar middleware
      ↓
-3. Registries middleware
+3. Registry middleware SKIPPED (path doesn't start with /api/)
      ↓
-4. Load active theme
+4. Web route handler
      ↓
-5. Call theme.render()
+5. Load active theme
      ↓
-6. SSR Vue components
+6. Theme.render() with internal tracing
      ↓
-7. Return HTML
+7. SSR Vue components
+     ↓
+8. Cache HTML (SharedSSRCache)
+     ↓
+9. Return HTML
 ```
+
+> **Note:** Themes can implement their own tracing using the `startSpan` helper provided during initialization. The registry middleware skip only affects the per-request registry initialization, not the theme's internal tracing capabilities.
 
 ---
 
@@ -1256,8 +1300,9 @@ process.on('message', async (msg) => {
 
 ### Known Performance Issues
 
-1. **Registry initialization on every request**
-   - Solution: Cache registry, reload only on changes
+1. ~~**Registry initialization on every request**~~
+   - **RESOLVED:** Registry middleware now only runs for `/api/*` routes
+   - Static assets and SSR pages skip registry initialization entirely
 
 2. **N+1 query problem in meta loading**
    - Solution: Batch queries with `withMetaMany()`

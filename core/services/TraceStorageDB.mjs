@@ -51,50 +51,16 @@ export default class TraceStorageDB {
   }
 
   /**
-   * Initialize the storage (create table if needed, start cleanup)
+   * Initialize the storage (start cleanup interval)
+   * Note: The traces table is created via migration (20251126120000_create_traces_table.mjs)
    */
   async init() {
     if (this.initialized) return
 
-    const { knex, table } = this.context
+    const { knex } = this.context
     if (!knex) {
       console.warn('[TraceStorageDB] No database connection, falling back to memory-only mode')
       return
-    }
-
-    // Create traces table if it doesn't exist
-    // Use try-catch to handle race conditions when multiple workers start simultaneously
-    const tableName = table('traces')
-    try {
-      const hasTable = await knex.schema.hasTable(tableName)
-
-      if (!hasTable) {
-        await knex.schema.createTable(tableName, (t) => {
-          t.string('trace_id', 36).primary()
-          t.string('request_method', 10)
-          t.string('request_path', 500)
-          t.string('request_url', 2000)
-          t.integer('user_id').nullable()
-          t.integer('total_duration')
-          t.integer('span_count')
-          t.integer('error_count')
-          t.json('summary')
-          t.json('spans')
-          t.json('waterfall')
-          t.json('metadata')
-          t.timestamp('created_at').defaultTo(knex.fn.now())
-          t.index(['created_at'])
-          t.index(['request_path'])
-          t.index(['total_duration'])
-          t.index(['error_count'])
-        })
-        console.log('[TraceStorageDB] Created traces table')
-      }
-    } catch (err) {
-      // Ignore "table already exists" errors (race condition with other workers)
-      if (!err.message?.includes('already exists')) {
-        throw err
-      }
     }
 
     // Create archive directory if archiving is enabled

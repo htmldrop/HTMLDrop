@@ -22,24 +22,6 @@ export default (context) => {
   // Serve attachments (before registry middleware - static files don't need hooks)
   router.use('/uploads', express.static(uploadsPath))
 
-  // Serve theme static assets directly (before heavy middleware)
-  // This handles /assets/*, /static/*, /public/* from themes
-  router.use('/assets', (req, res, next) => {
-    const theme = context.options?.theme
-    if (!theme) return next()
-    express.static(path.join(themesPath, theme, 'assets'))(req, res, next)
-  })
-  router.use('/static', (req, res, next) => {
-    const theme = context.options?.theme
-    if (!theme) return next()
-    express.static(path.join(themesPath, theme, 'static'))(req, res, next)
-  })
-  router.use('/public', (req, res, next) => {
-    const theme = context.options?.theme
-    if (!theme) return next()
-    express.static(path.join(themesPath, theme, 'public'))(req, res, next)
-  })
-
   // Apply registry middleware to set up hooks (including tracer) for themes
   router.use(registryMiddleware(context))
 

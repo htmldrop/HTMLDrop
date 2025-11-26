@@ -1,6 +1,18 @@
 import Registry from '../registries/index.mjs'
 import PerformanceTracer, { TraceCategory } from '../services/PerformanceTracer.mjs'
 
+/**
+ * Registry Middleware
+ *
+ * Only API routes (/api/*) go through the full registry initialization flow.
+ * This includes:
+ * - Performance tracing setup
+ * - Hook system initialization
+ * - Provider and plugin loading
+ *
+ * All other routes (static assets, SSR pages, etc.) skip this middleware
+ * for better performance. Themes handle their own routing for SSR.
+ */
 export default (context) => async (req, res, next) => {
   // Create a request-level context that inherits from global context
   req.context = context
@@ -21,6 +33,87 @@ export default (context) => async (req, res, next) => {
   // Attach tracer to request for access throughout the request lifecycle
   req.tracer = tracer
   req.context.tracer = tracer
+
+  // Only API routes need the full registry/hook system
+  // Static assets and SSR pages skip for performance - themes handle their own tracing
+  // Note: req.baseUrl contains the mount path (e.g., '/api'), req.path is relative to it
+  const fullPath = req.baseUrl + req.path
+  if (!fullPath.startsWith('/api/') && !fullPath.startsWith('/api')) {
+    
+    // Provide minimal hooks for themes that use createContext()
+    // These are lightweight stubs - the full registry is not initialized
+    req.hooks = req.hooks || {
+      // Core hook methods (no-op for SSR)
+      addAction: () => {},
+      addFilter: () => {},
+      doAction: async () => {},
+      applyFilters: async (_, value) => value,
+
+      // Post type/field registration (no-op for SSR)
+      registerPostType: async () => {},
+      registerPostField: async () => {},
+      registerTaxonomy: async () => {},
+      registerTermField: async () => {},
+
+      // Menu registration (no-op for SSR)
+      addMenuPage: () => {},
+      addSubMenuPage: () => {},
+
+      // Getters return empty/null for SSR
+      getPostType: async () => null,
+      getAllPostTypes: async () => [],
+      getFields: async () => [],
+      getTaxonomy: async () => null,
+      getAllTaxonomies: async () => [],
+      getTaxonomyFields: async () => [],
+      getAttachmentUrl: async () => null,
+      theExcerpt: (post, length = 150) => (post?.excerpt || post?.content || '').slice(0, length),
+
+      // Dashboard/admin functions (return empty for SSR)
+      getMenuTree: async () => [],
+      getControls: async () => [],
+      addControl: async () => {},
+
+      // Job functions (no-op for SSR)
+      createJob: async () => null,
+      getJobs: async () => [],
+      getJob: async () => null,
+      cleanupOldJobs: async () => 0,
+
+      // Email functions (no-op for SSR)
+      sendEmail: async () => {},
+      sendWelcomeEmail: async () => {},
+      sendPasswordResetEmail: async () => {},
+      sendTemplateEmail: async () => {},
+      verifyEmailConnection: async () => false,
+
+      // Tracer helpers - themes can use these for SSR tracing
+      tracer,
+      startSpan: tracer.startSpan.bind(tracer),
+      trace: tracer.trace.bind(tracer),
+      getCurrentSpan: tracer.getCurrentSpan.bind(tracer)
+    }
+
+    // Guard stub - SSR pages are typically public
+    req.guard = req.guard || {
+      user: async () => null
+    }
+
+    // Store trace on response finish (same as API routes)
+    res.on('finish', () => {
+      tracer.end()
+
+      if (process.env.HD_TRACING_VERBOSE === 'true' || context.options?.tracing?.verbose) {
+        console.log(tracer.toString())
+      }
+
+      if (context.traceStorage) {
+        context.traceStorage.store(tracer.toJSON())
+      }
+    })
+
+    return next()
+  }
 
   // Start the main registry initialization span
   const registrySpan = tracer.startSpan('registry.init', {

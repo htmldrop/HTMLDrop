@@ -316,7 +316,7 @@ addAction('user_register', async (user) => {
   await sendEmail({
     to: user.email,
     subject: 'Welcome to our site!',
-    body: `Hi ${user.display_name}, welcome to our community!`
+    body: `Hi ${user.first_name || user.username}, welcome to our community!`
   })
 
   // Assign default role

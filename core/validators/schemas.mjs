@@ -50,7 +50,9 @@ export const loginSchema = z.object({
 export const registerSchema = z.object({
   email: emailSchema,
   password: passwordSchema,
-  display_name: z.string().min(1, 'Display name is required').max(255)
+  username: z.string().min(1, 'Username is required').max(255),
+  first_name: z.string().max(255).optional(),
+  last_name: z.string().max(255).optional()
 })
 
 export const refreshTokenSchema = z.object({
@@ -279,17 +281,21 @@ export const listTermsSchema = paginationSchema.merge(sortSchema).extend({
 // ============================================================================
 
 export const createUserSchema = z.object({
+  username: z.string().min(1, 'Username is required').max(255),
   email: emailSchema,
   password: passwordSchema,
-  display_name: z.string().min(1, 'Display name is required').max(255),
+  first_name: z.string().max(255).optional(),
+  last_name: z.string().max(255).optional(),
   roles: z.array(z.string()).default([]),
   meta: z.record(z.any()).optional()
 })
 
 export const updateUserSchema = z.object({
+  username: z.string().min(1).max(255).optional(),
   email: emailSchema.optional(),
   password: passwordSchema.optional(),
-  display_name: z.string().min(1).max(255).optional(),
+  first_name: z.string().max(255).optional(),
+  last_name: z.string().max(255).optional(),
   roles: z.array(z.string()).optional(),
   meta: z.record(z.any()).optional()
 })

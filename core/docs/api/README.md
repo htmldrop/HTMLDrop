@@ -72,8 +72,10 @@ Authenticate user and receive JWT tokens.
   "refresh_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
   "user": {
     "id": 1,
+    "username": "johndoe",
     "email": "user@example.com",
-    "display_name": "John Doe"
+    "first_name": "John",
+    "last_name": "Doe"
   }
 }
 ```
@@ -100,9 +102,11 @@ Create a new user account.
 **Request Body:**
 ```json
 {
+  "username": "janesmith",
   "email": "newuser@example.com",
   "password": "securePassword123",
-  "display_name": "Jane Smith"
+  "first_name": "Jane",
+  "last_name": "Smith"
 }
 ```
 
@@ -110,8 +114,10 @@ Create a new user account.
 ```json
 {
   "id": 2,
+  "username": "janesmith",
   "email": "newuser@example.com",
-  "display_name": "Jane Smith",
+  "first_name": "Jane",
+  "last_name": "Smith",
   "created_at": "2025-11-11T10:00:00.000Z"
 }
 ```
@@ -244,7 +250,9 @@ Get a paginated list of posts with filtering, searching, and sorting.
       "authors": [
         {
           "id": 1,
-          "display_name": "John Doe"
+          "username": "johndoe",
+          "first_name": "John",
+          "last_name": "Doe"
         }
       ],
       "taxonomies": {
@@ -307,8 +315,10 @@ Get a specific post by ID or slug.
   "authors": [
     {
       "id": 1,
-      "display_name": "John Doe",
-      "email": "john@example.com"
+      "username": "johndoe",
+      "email": "john@example.com",
+      "first_name": "John",
+      "last_name": "Doe"
     }
   ],
   "taxonomies": {
@@ -1003,8 +1013,10 @@ Get all users.
   "items": [
     {
       "id": 1,
+      "username": "johndoe",
       "email": "user@example.com",
-      "display_name": "John Doe",
+      "first_name": "John",
+      "last_name": "Doe",
       "created_at": "2025-11-11T10:00:00.000Z",
       "roles": ["admin"]
     }
@@ -1029,15 +1041,16 @@ Get a specific user by ID.
 ```json
 {
   "id": 1,
+  "username": "johndoe",
   "email": "user@example.com",
-  "display_name": "John Doe",
+  "first_name": "John",
+  "last_name": "Doe",
   "created_at": "2025-11-11T10:00:00.000Z",
   "updated_at": "2025-11-11T10:00:00.000Z",
   "meta": {
     "bio": "Software developer"
   },
-  "roles": ["admin"],
-  "capabilities": ["manage_posts", "manage_users"]
+  "roles": ["admin"]
 }
 ```
 
@@ -1058,9 +1071,11 @@ Create a new user.
 **Request Body:**
 ```json
 {
+  "username": "janesmith",
   "email": "newuser@example.com",
   "password": "securePassword123",
-  "display_name": "Jane Smith",
+  "first_name": "Jane",
+  "last_name": "Smith",
   "roles": ["editor"]
 }
 ```
@@ -1084,7 +1099,8 @@ Update an existing user.
 **Request Body:** (all fields optional)
 ```json
 {
-  "display_name": "Updated Name",
+  "first_name": "Updated",
+  "last_name": "Name",
   "meta": {
     "bio": "Updated bio"
   },
@@ -1537,9 +1553,11 @@ Create the initial admin user.
 **Request Body:**
 ```json
 {
+  "username": "admin",
   "email": "admin@example.com",
   "password": "securePassword123",
-  "display_name": "Admin User"
+  "first_name": "Admin",
+  "last_name": "User"
 }
 ```
 
