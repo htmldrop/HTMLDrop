@@ -1,4 +1,5 @@
 import Registry from '../registries/index.mjs'
+import RegisterJobs from '../registries/RegisterJobs.mjs'
 import PerformanceTracer, { TraceCategory } from '../services/PerformanceTracer.mjs'
 import fs from 'fs'
 import path from 'path'
@@ -165,7 +166,10 @@ export default (context) => async (req, res, next) => {
   const isNonApiRoute = !fullPath.startsWith('/api/')
 
   if (isNonApiRoute || shouldSkipRegistry) {
-    
+
+    // Initialize jobs registry for SSR routes (lightweight, only needs context)
+    const jobsRegistry = new RegisterJobs(context)
+
     // Provide minimal hooks for themes that use createContext()
     // These are lightweight stubs - the full registry is not initialized
     req.hooks = req.hooks || {
@@ -200,11 +204,11 @@ export default (context) => async (req, res, next) => {
       getControls: async () => [],
       addControl: async () => {},
 
-      // Job functions (no-op for SSR)
-      createJob: async () => null,
-      getJobs: async () => [],
-      getJob: async () => null,
-      cleanupOldJobs: async () => 0,
+      // Job functions (functional - uses RegisterJobs)
+      createJob: jobsRegistry.createJob.bind(jobsRegistry),
+      getJobs: jobsRegistry.getJobs.bind(jobsRegistry),
+      getJob: jobsRegistry.getJob.bind(jobsRegistry),
+      cleanupOldJobs: jobsRegistry.cleanupOldJobs.bind(jobsRegistry),
 
       // Email functions (no-op for SSR)
       sendEmail: async () => {},
