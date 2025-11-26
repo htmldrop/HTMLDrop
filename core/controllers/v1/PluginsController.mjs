@@ -986,8 +986,8 @@ export default (context) => {
         await fs.promises.rename(nodeModulesPath, pluginFolder)
 
         // Restore persistent files and directories
-        const restoreInfo = await persistenceService.restore(backupDir, pluginFolder)
-        console.log(`[PluginsController] Restored ${restoreInfo.files.length} files`)
+        const restoreInfo = await persistenceService.restore(backupDir, pluginFolder, backupInfo)
+        console.log(`[PluginsController] Restored ${restoreInfo.files.length} files and ${restoreInfo.directories.length} directories`)
 
         // Clean up backup
         await persistenceService.cleanup(backupDir)

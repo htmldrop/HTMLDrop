@@ -112,9 +112,10 @@ class PersistenceService {
    * Uses rename for directories (instant) and copy only for individual files
    * @param {string} backupDir - Temporary backup directory
    * @param {string} directory - Theme or plugin directory path
+   * @param {Object} backedUp - Original backup info with paths that were backed up
    * @returns {Promise<Object>} Restore info
    */
-  async restore(backupDir, directory) {
+  async restore(backupDir, directory, backedUp = null) {
     console.log(`[PersistenceService] Restoring backup from ${backupDir} to ${directory}`)
 
     if (!fs.existsSync(backupDir)) {
@@ -127,16 +128,18 @@ class PersistenceService {
       directories: []
     }
 
-    // Get top-level items in backup directory
-    const entries = await fs.promises.readdir(backupDir, { withFileTypes: true })
+    // If we have the original backup info, use exact paths to restore
+    // This preserves sibling directories (e.g., includes/providers when restoring includes/repos)
+    if (backedUp) {
+      // Restore directories to their exact original paths
+      for (const dir of backedUp.directories) {
+        const sourcePath = path.join(backupDir, dir)
+        const destPath = path.join(directory, dir)
 
-    for (const entry of entries) {
-      const sourcePath = path.join(backupDir, entry.name)
-      const destPath = path.join(directory, entry.name)
+        if (!fs.existsSync(sourcePath)) continue
 
-      try {
-        if (entry.isDirectory()) {
-          // Remove destination if it exists (new version may have created it)
+        try {
+          // Remove only the specific destination directory if it exists
           if (fs.existsSync(destPath)) {
             await fs.promises.rm(destPath, { recursive: true, force: true })
           }
@@ -146,31 +149,92 @@ class PersistenceService {
 
           // Rename directory back (instant operation)
           await fs.promises.rename(sourcePath, destPath)
-          restored.directories.push(entry.name)
-          console.log(`[PersistenceService] Restored directory: ${entry.name}`)
-        } else {
-          // Create parent directory if needed
-          await fs.promises.mkdir(path.dirname(destPath), { recursive: true })
-
-          // Copy file back
-          await fs.promises.copyFile(sourcePath, destPath)
-          restored.files.push(entry.name)
-          console.log(`[PersistenceService] Restored file: ${entry.name}`)
-        }
-      } catch (error) {
-        // If rename fails (cross-device), fall back to copy
-        if (error.code === 'EXDEV' && entry.isDirectory()) {
-          console.log(`[PersistenceService] Cross-device move, falling back to copy for: ${entry.name}`)
-          await this._copyDirectory(sourcePath, destPath)
-          restored.directories.push(entry.name)
-        } else {
-          console.error(`[PersistenceService] Failed to restore ${entry.name}:`, error.message)
+          restored.directories.push(dir)
+          console.log(`[PersistenceService] Restored directory: ${dir}`)
+        } catch (error) {
+          if (error.code === 'EXDEV') {
+            console.log(`[PersistenceService] Cross-device move, falling back to copy for: ${dir}`)
+            await this._copyDirectory(sourcePath, destPath)
+            restored.directories.push(dir)
+          } else {
+            console.error(`[PersistenceService] Failed to restore directory ${dir}:`, error.message)
+          }
         }
       }
+
+      // Restore files to their exact original paths
+      for (const file of backedUp.files) {
+        const sourcePath = path.join(backupDir, file)
+        const destPath = path.join(directory, file)
+
+        if (!fs.existsSync(sourcePath)) continue
+
+        try {
+          await fs.promises.mkdir(path.dirname(destPath), { recursive: true })
+          await fs.promises.copyFile(sourcePath, destPath)
+          restored.files.push(file)
+          console.log(`[PersistenceService] Restored file: ${file}`)
+        } catch (error) {
+          console.error(`[PersistenceService] Failed to restore file ${file}:`, error.message)
+        }
+      }
+    } else {
+      // Fallback: scan backup directory (legacy behavior, less accurate for nested paths)
+      await this._restoreRecursive(backupDir, directory, '', restored)
     }
 
     console.log(`[PersistenceService] Restore complete: ${restored.files.length} files, ${restored.directories.length} directories`)
     return restored
+  }
+
+  /**
+   * Recursively restore from backup (fallback when original paths unknown)
+   * @private
+   */
+  async _restoreRecursive(backupDir, targetDir, relativePath, restored) {
+    const currentBackupPath = path.join(backupDir, relativePath)
+    const entries = await fs.promises.readdir(currentBackupPath, { withFileTypes: true })
+
+    for (const entry of entries) {
+      const entryRelativePath = relativePath ? path.join(relativePath, entry.name) : entry.name
+      const sourcePath = path.join(backupDir, entryRelativePath)
+      const destPath = path.join(targetDir, entryRelativePath)
+
+      try {
+        if (entry.isDirectory()) {
+          // Check if this looks like a leaf directory (no subdirs) or should be merged
+          const subEntries = await fs.promises.readdir(sourcePath, { withFileTypes: true })
+          const hasSubDirs = subEntries.some((e) => e.isDirectory())
+
+          if (hasSubDirs) {
+            // Has subdirectories - recurse to merge properly
+            await fs.promises.mkdir(destPath, { recursive: true })
+            await this._restoreRecursive(backupDir, targetDir, entryRelativePath, restored)
+          } else {
+            // Leaf directory - restore entirely
+            if (fs.existsSync(destPath)) {
+              await fs.promises.rm(destPath, { recursive: true, force: true })
+            }
+            await fs.promises.mkdir(path.dirname(destPath), { recursive: true })
+            await fs.promises.rename(sourcePath, destPath)
+            restored.directories.push(entryRelativePath)
+            console.log(`[PersistenceService] Restored directory: ${entryRelativePath}`)
+          }
+        } else {
+          await fs.promises.mkdir(path.dirname(destPath), { recursive: true })
+          await fs.promises.copyFile(sourcePath, destPath)
+          restored.files.push(entryRelativePath)
+          console.log(`[PersistenceService] Restored file: ${entryRelativePath}`)
+        }
+      } catch (error) {
+        if (error.code === 'EXDEV' && entry.isDirectory()) {
+          await this._copyDirectory(sourcePath, destPath)
+          restored.directories.push(entryRelativePath)
+        } else {
+          console.error(`[PersistenceService] Failed to restore ${entryRelativePath}:`, error.message)
+        }
+      }
+    }
   }
 
   /**
