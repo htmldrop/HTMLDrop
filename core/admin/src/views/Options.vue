@@ -14,7 +14,7 @@
       </div>
       <div class="search">
         <input v-model="search" @keypress.enter="offset = 0; getItems()"/>
-        <button @click="offset = 0; getItems()" class="search-button">{{ translate('Search in') }} {{ translate('Users')?.toLowerCase() }}</button>
+        <button @click="offset = 0; getItems()" class="search-button">{{ translate('Search in') }} {{ translate('Options')?.toLowerCase() }}</button>
       </div>
     </div>
     <div class="filters-and-navigation">
