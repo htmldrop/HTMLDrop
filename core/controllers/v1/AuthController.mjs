@@ -328,7 +328,9 @@ export default (context) => {
       knex(table('revoked_tokens')).where('expires_at', '<', new Date()).del()
       knex(table('refresh_tokens')).where('expires_at', '<', new Date()).del()
 
-      if (process.env.ALLOW_REGISTRATIONS !== 'true') {
+      // Check if registrations are allowed (prefer options over env)
+      const allowRegistrations = context.options?.allow_registrations ?? (process.env.ALLOW_REGISTRATIONS === 'true')
+      if (!allowRegistrations) {
         return res.status(400).send('Automatic registration of new users is disabled')
       }
 

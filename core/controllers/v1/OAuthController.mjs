@@ -168,7 +168,9 @@ export default (context) => {
 
       // If user doesn't exist, create one
       if (!user) {
-        if (process.env.ALLOW_REGISTRATIONS !== 'true') {
+        // Check if registrations are allowed (prefer options over env)
+        const allowRegistrations = context.options?.allow_registrations ?? (process.env.ALLOW_REGISTRATIONS === 'true')
+        if (!allowRegistrations) {
           return res.status(400).send('Automatic registration of new users is disabled')
         }
         const [userId] = await knex(table('users')).insert({

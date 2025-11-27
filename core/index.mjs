@@ -444,28 +444,8 @@ if (cluster.isPrimary) {
   // Initialize shared SSR cache IPC handlers on worker
   initSharedSSRCache()
 
-  // Initialize trace storage for performance tracing
-  // Use DB storage if HD_TRACING_PERSIST=true, otherwise memory-only
-  // Configurable via environment variables
-  const useDBStorage = process.env.HD_TRACING_PERSIST === 'true'
+  // Trace storage will be initialized after options are loaded
   let traceStorage = null
-
-  if (useDBStorage) {
-    // DB-backed storage with retention and archiving
-    traceStorage = new TraceStorageDB({
-      retentionDays: parseInt(process.env.HD_TRACING_RETENTION_DAYS) || 30,
-      archiveAfterDays: parseInt(process.env.HD_TRACING_ARCHIVE_AFTER_DAYS) || 7,
-      archivePath: process.env.HD_TRACING_ARCHIVE_PATH || './content/traces',
-      memoryCacheSize: parseInt(process.env.HD_TRACING_MAX_TRACES) || 100,
-      cleanupIntervalMs: parseInt(process.env.HD_TRACING_CLEANUP_INTERVAL_MS) || 60 * 60 * 1000
-    })
-  } else {
-    // Memory-only storage (faster, but lost on restart)
-    traceStorage = new TraceStorage({
-      maxTraces: parseInt(process.env.HD_TRACING_MAX_TRACES) || 100,
-      maxAgeMs: parseInt(process.env.HD_TRACING_MAX_AGE_MS) || 60 * 60 * 1000 // 1 hour
-    })
-  }
 
   const context = {
     app,
@@ -476,7 +456,7 @@ if (cluster.isPrimary) {
     options: null,
     parseVue,
     scheduler: null, // Will be initialized after knex
-    traceStorage, // Performance trace storage
+    traceStorage: null, // Will be initialized after options are loaded
     formatDate(date = new Date()) {
       return date.toISOString().replace('Z', '').replace('T', ' ')
     },
@@ -504,6 +484,33 @@ if (cluster.isPrimary) {
   initializeKnex().then(async (knex) => {
     context.knex = knex
     context.options = await initializeOptions(context.knex, context.table)
+
+    // Initialize trace storage for performance tracing
+    // Use options if available, otherwise fall back to environment variables
+    const tracingConfig = context.options?.tracing || {}
+    const useDBStorage = tracingConfig.persist ?? (process.env.HD_TRACING_PERSIST === 'true')
+    const maxTraces = tracingConfig.maxTraces ?? (parseInt(process.env.HD_TRACING_MAX_TRACES) || 100)
+    const maxAgeMs = tracingConfig.maxAgeMs ?? (parseInt(process.env.HD_TRACING_MAX_AGE_MS) || 3600000)
+
+    if (useDBStorage) {
+      // DB-backed storage with retention and archiving
+      traceStorage = new TraceStorageDB({
+        retentionDays: tracingConfig.retentionDays ?? (parseInt(process.env.HD_TRACING_RETENTION_DAYS) || 30),
+        archiveAfterDays: tracingConfig.archiveAfterDays ?? (parseInt(process.env.HD_TRACING_ARCHIVE_AFTER_DAYS) || 7),
+        archivePath: tracingConfig.archivePath ?? (process.env.HD_TRACING_ARCHIVE_PATH || './content/traces'),
+        memoryCacheSize: maxTraces,
+        cleanupIntervalMs: tracingConfig.cleanupIntervalMs ?? (parseInt(process.env.HD_TRACING_CLEANUP_INTERVAL_MS) || 3600000)
+      })
+    } else {
+      // Memory-only storage (faster, but lost on restart)
+      traceStorage = new TraceStorage({
+        maxTraces,
+        maxAgeMs
+      })
+    }
+
+    // Update context with traceStorage
+    context.traceStorage = traceStorage
 
     // Initialize DB-backed trace storage if enabled (needs context with knex)
     if (traceStorage.init && typeof traceStorage.init === 'function') {
