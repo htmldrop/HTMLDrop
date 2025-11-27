@@ -374,6 +374,9 @@ class ThemeLifecycleService {
         await this.onDeactivate(currentTheme)
       }
 
+      // Run npm install to ensure dependencies are available
+      await this.runNpmInstall(themeSlug, 'activate')
+
       // Activate new theme
       await this.callLifecycleHook(themeSlug, 'onActivate', {
         themeSlug,
