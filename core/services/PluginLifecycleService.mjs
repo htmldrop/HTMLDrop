@@ -8,7 +8,7 @@ import fs from 'fs'
 import path from 'path'
 import PluginMigrationService from './PluginMigrationService.mjs'
 import BadgeCountService from './BadgeCountService.mjs'
-import { invalidateCache, requestWatcherSetup, requestWatcherTeardown } from './FolderHashCache.mjs'
+import { invalidateCache } from './FolderHashCache.mjs'
 
 // NPM logo SVG
 const NPM_LOGO_SVG = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 780 250"><path fill="#CB3837" d="M240,250h100v-50h100V0H240V250z M340,50h50v100h-50V50z M480,0v200h100V50h50v150h50V50h50v150h50V0H480z M0,200h100V50h50v150h50V0H0V200z"/></svg>'
@@ -391,8 +391,6 @@ class PluginLifecycleService {
     console.log(`Running onInstall for plugin: ${pluginSlug}`)
 
     try {
-      const pluginPath = path.join(this.PLUGINS_BASE, pluginSlug)
-
       // Run npm install first to ensure dependencies are available
       await this.runNpmInstall(pluginSlug, 'install')
 
@@ -416,9 +414,7 @@ class PluginLifecycleService {
         status: 'installed'
       })
 
-      // Load watch_ignore patterns from config and set up file watcher
-      const ignorePatterns = await this.getWatchIgnorePatterns(pluginSlug)
-      requestWatcherSetup(pluginPath, ignorePatterns)
+      // Note: Watcher setup is handled by RegisterPlugins for active plugins only
 
       console.log(`Plugin ${pluginSlug} installed successfully`)
     } catch (error) {
@@ -443,8 +439,6 @@ class PluginLifecycleService {
     }
 
     try {
-      const pluginPath = path.join(this.PLUGINS_BASE, pluginSlug)
-
       // Run npm install to ensure dependencies are available
       await this.runNpmInstall(pluginSlug, 'activate')
 
@@ -459,9 +453,7 @@ class PluginLifecycleService {
         status: 'active'
       })
 
-      // Load watch_ignore patterns from config and set up file watcher
-      const ignorePatterns = await this.getWatchIgnorePatterns(pluginSlug)
-      requestWatcherSetup(pluginPath, ignorePatterns)
+      // Note: Watcher setup is handled by RegisterPlugins for active plugins only
 
       // Refresh badge counts (plugin updates may have changed)
       await this.refreshBadgeCounts()

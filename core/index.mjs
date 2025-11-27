@@ -163,11 +163,12 @@ if (cluster.isPrimary) {
     }
   }
 
-  // Set up file watchers for themes and plugins on primary process
-  const { getFolderHash } = await import('./services/FolderHashCache.mjs')
+  // Set up file watchers for active themes and plugins only on primary process
+  // Watchers for active plugins/themes are managed by RegisterPlugins/RegisterThemes
+  // This block sets them up eagerly on startup instead of waiting for first request
+  const { requestWatcherSetup } = await import('./services/FolderHashCache.mjs')
   const fs = await import('fs')
-  const themesPath = path.resolve('./content/themes')
-  const pluginsPath = path.resolve('./content/plugins')
+  const options = await initializeOptions(knex, (name) => `${process.env.TABLE_PREFIX || ''}${name}`)
 
   // Helper to load watch_ignore patterns from config.mjs
   const loadWatchIgnorePatterns = async (folderPath) => {
@@ -190,27 +191,23 @@ if (cluster.isPrimary) {
     }
   }
 
-  // Set up watchers for all themes
-  if (fs.existsSync(themesPath)) {
-    const themeFolders = fs.readdirSync(themesPath, { withFileTypes: true })
-      .filter(f => f.isDirectory())
-      .map(f => ({ name: f.name, path: path.join(themesPath, f.name) }))
-
-    for (const theme of themeFolders) {
-      const ignorePatterns = await loadWatchIgnorePatterns(theme.path)
-      await getFolderHash(theme.path, ignorePatterns)
+  // Set up watcher for active theme only
+  if (options?.theme) {
+    const themePath = path.resolve(`./content/themes/${options.theme}`)
+    if (fs.existsSync(themePath)) {
+      const ignorePatterns = await loadWatchIgnorePatterns(themePath)
+      requestWatcherSetup(themePath, ignorePatterns)
     }
   }
 
-  // Set up watchers for all plugins
-  if (fs.existsSync(pluginsPath)) {
-    const pluginFolders = fs.readdirSync(pluginsPath, { withFileTypes: true })
-      .filter(f => f.isDirectory())
-      .map(f => ({ name: f.name, path: path.join(pluginsPath, f.name) }))
-
-    for (const plugin of pluginFolders) {
-      const ignorePatterns = await loadWatchIgnorePatterns(plugin.path)
-      await getFolderHash(plugin.path, ignorePatterns)
+  // Set up watchers for active plugins only
+  if (options?.active_plugins && Array.isArray(options.active_plugins)) {
+    for (const pluginSlug of options.active_plugins) {
+      const pluginPath = path.resolve(`./content/plugins/${pluginSlug}`)
+      if (fs.existsSync(pluginPath)) {
+        const ignorePatterns = await loadWatchIgnorePatterns(pluginPath)
+        requestWatcherSetup(pluginPath, ignorePatterns)
+      }
     }
   }
 

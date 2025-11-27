@@ -3,12 +3,13 @@ import fs from 'fs'
 import express from 'express'
 import ThemeLifecycleService from '../services/ThemeLifecycleService.mjs'
 import { TraceCategory } from '../services/PerformanceTracer.mjs'
-import { getFolderHash, invalidateCache } from '../services/FolderHashCache.mjs'
+import { getFolderHash, invalidateCache, requestWatcherSetup, requestWatcherTeardown } from '../services/FolderHashCache.mjs'
 
 // Worker-level cache for imported theme module
 const themeModuleCache = new Map()
 let lastActiveTheme = null
 let themeActivationCalled = false
+let watchedTheme = null // Track which theme has a watcher
 
 export default class RegisterThemes {
   constructor(req, res, next) {
@@ -55,6 +56,20 @@ export default class RegisterThemes {
         themeModuleCache.clear()
         lastActiveTheme = themeSlug
         themeActivationCalled = false // Reset activation flag when theme changes
+
+        // Tear down watcher for old theme if it exists
+        if (watchedTheme && watchedTheme !== themeSlug) {
+          const oldThemeFolder = path.resolve(`./content/themes/${watchedTheme}`)
+          requestWatcherTeardown(oldThemeFolder)
+          watchedTheme = null
+        }
+      }
+
+      // Set up watcher for this active theme (only once)
+      if (watchedTheme !== themeSlug) {
+        console.log(`[RegisterThemes] Setting up watcher for theme: ${themeSlug}`)
+        requestWatcherSetup(themeFolder)
+        watchedTheme = themeSlug
       }
 
       // Check if we need to import/re-import the module

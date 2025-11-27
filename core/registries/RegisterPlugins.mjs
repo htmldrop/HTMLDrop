@@ -3,12 +3,13 @@ import fs from 'fs'
 import express from 'express'
 import PluginLifecycleService from '../services/PluginLifecycleService.mjs'
 import { TraceCategory } from '../services/PerformanceTracer.mjs'
-import { getFolderHash, invalidateCache } from '../services/FolderHashCache.mjs'
+import { getFolderHash, invalidateCache, requestWatcherSetup, requestWatcherTeardown } from '../services/FolderHashCache.mjs'
 
 // Worker-level cache for imported plugin modules
 const pluginModuleCache = new Map()
 let lastActivePlugins = null
 let isFirstLoad = true
+let watchedPlugins = new Set() // Track which plugins have watchers
 
 export default class RegisterPlugins {
   constructor(req, res, next) {
@@ -36,6 +37,16 @@ export default class RegisterPlugins {
       pluginModuleCache.clear()
       lastActivePlugins = activePluginsKey
       pluginsSpan?.addTag('cacheCleared', true)
+
+      // Tear down watchers for plugins that are no longer active
+      const activePluginsSet = new Set(activePlugins)
+      for (const watchedPlugin of watchedPlugins) {
+        if (!activePluginsSet.has(watchedPlugin)) {
+          const pluginFolder = path.resolve(`./content/plugins/${watchedPlugin}`)
+          requestWatcherTeardown(pluginFolder)
+          watchedPlugins.delete(watchedPlugin)
+        }
+      }
     }
 
     const loadedPlugins = []
@@ -56,7 +67,19 @@ export default class RegisterPlugins {
           failedPlugins.push(pluginSlug)
           pluginSpan?.addTag('skipped', 'not found')
           pluginSpan?.end()
+          // Remove from watched plugins if it was previously watched
+          if (watchedPlugins.has(pluginSlug)) {
+            requestWatcherTeardown(pluginFolder)
+            watchedPlugins.delete(pluginSlug)
+          }
           continue
+        }
+
+        // Set up watcher for this active plugin (only once, after validation)
+        if (!watchedPlugins.has(pluginSlug)) {
+          console.log(`[RegisterPlugins] Setting up watcher for plugin: ${pluginSlug}`)
+          requestWatcherSetup(pluginFolder)
+          watchedPlugins.add(pluginSlug)
         }
 
         // Check if we need to import/re-import the module

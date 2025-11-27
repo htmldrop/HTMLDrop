@@ -39,7 +39,22 @@ if (isPrimary) {
   cluster.default.on('message', async (worker, msg) => {
     if (msg?.type === 'setup_watcher' && msg.folderPath) {
       console.log(`[FolderHashCache] Primary received setup_watcher request for: ${msg.folderPath}`)
-      await getFolderHash(msg.folderPath, msg.ignorePatterns)
+
+      // Set up watcher directly (don't go through getFolderHash)
+      let cached = cache.get(msg.folderPath)
+
+      // Create cache entry if it doesn't exist
+      if (!cached) {
+        cache.set(msg.folderPath, { hash: null, watcher: null, ignorePatterns: msg.ignorePatterns || [] })
+        cached = cache.get(msg.folderPath)
+      }
+
+      // Set up watcher if we don't have one yet
+      if (!cached.watcher) {
+        const watcher = setupWatcher(msg.folderPath, msg.ignorePatterns || [])
+        cached.watcher = watcher
+        cached.ignorePatterns = msg.ignorePatterns || []
+      }
     } else if (msg?.type === 'close_watcher' && msg.folderPath) {
       console.log(`[FolderHashCache] Primary received close_watcher request for: ${msg.folderPath}`)
       closeWatcher(msg.folderPath)
@@ -110,6 +125,12 @@ function setupWatcher(folderPath, customIgnorePatterns = []) {
     return null
   }
 
+  // Don't set up watchers for hidden folders (starting with .)
+  const folderName = path.basename(folderPath)
+  if (folderName.startsWith('.')) {
+    return null
+  }
+
   try {
     // Build ignore patterns array
     const ignorePatterns = [
@@ -168,27 +189,14 @@ function setupWatcher(folderPath, customIgnorePatterns = []) {
 export async function getFolderHash(folderPath, ignorePatterns = []) {
   let cached = cache.get(folderPath)
 
-  // First time seeing this folder - compute hash and set up watcher
+  // First time seeing this folder - compute hash but DON'T set up watcher
+  // Watchers should be explicitly set up via requestWatcherSetup()
   if (!cached) {
-    console.log(`[FolderHashCache] First access to folder: ${folderPath}`)
+    // console.log(`[FolderHashCache] First access to folder: ${folderPath}`)
     const hash = await computeFolderHash(folderPath)
-    const watcher = setupWatcher(folderPath, ignorePatterns)
 
-    cache.set(folderPath, { hash, watcher, ignorePatterns })
-    console.log(`[FolderHashCache] Watcher ${watcher ? 'created' : 'skipped (worker)'} for: ${folderPath}`)
+    cache.set(folderPath, { hash, watcher: null, ignorePatterns })
     return { hash, cached: false }
-  }
-
-  // Cache exists but watcher is missing (e.g., worker created cache entry without watcher)
-  // Set up watcher if we're on primary and don't have one yet
-  if (isPrimary && !cached.watcher) {
-    console.log(`[FolderHashCache] Setting up missing watcher for: ${folderPath}`)
-    const watcher = setupWatcher(folderPath, ignorePatterns)
-    cached.watcher = watcher
-    cached.ignorePatterns = ignorePatterns
-    if (watcher) {
-      console.log(`[FolderHashCache] Watcher created for: ${folderPath}`)
-    }
   }
 
   // Cache exists but was invalidated by watcher
@@ -221,12 +229,31 @@ export function invalidateCache(folderPath) {
  * @param {Array<string>} ignorePatterns - Additional patterns to ignore in watcher
  */
 export function requestWatcherSetup(folderPath, ignorePatterns = []) {
+  // Don't set up watchers for hidden folders (starting with .)
+  const folderName = path.basename(folderPath)
+  if (folderName.startsWith('.')) {
+    return
+  }
+
   if (!isPrimary && process.send) {
     console.log(`[FolderHashCache] Worker requesting watcher setup for: ${folderPath}`)
     process.send({ type: 'setup_watcher', folderPath, ignorePatterns })
   } else if (isPrimary) {
-    // If called from primary, set up directly
-    getFolderHash(folderPath, ignorePatterns)
+    // If called from primary, set up watcher directly
+    let cached = cache.get(folderPath)
+
+    // Create cache entry if it doesn't exist
+    if (!cached) {
+      cache.set(folderPath, { hash: null, watcher: null, ignorePatterns })
+      cached = cache.get(folderPath)
+    }
+
+    // Set up watcher if we don't have one yet
+    if (!cached.watcher) {
+      const watcher = setupWatcher(folderPath, ignorePatterns)
+      cached.watcher = watcher
+      cached.ignorePatterns = ignorePatterns
+    }
   }
 }
 

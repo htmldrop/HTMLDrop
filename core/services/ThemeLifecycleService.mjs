@@ -7,7 +7,7 @@
 import fs from 'fs'
 import path from 'path'
 import BadgeCountService from './BadgeCountService.mjs'
-import { invalidateCache, requestWatcherSetup, requestWatcherTeardown } from './FolderHashCache.mjs'
+import { invalidateCache } from './FolderHashCache.mjs'
 
 // NPM logo SVG
 const NPM_LOGO_SVG = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 780 250"><path fill="#CB3837" d="M240,250h100v-50h100V0H240V250z M340,50h50v100h-50V50z M480,0v200h100V50h50v150h50V50h50v150h50V0H480z M0,200h100V50h50v150h50V0H0V200z"/></svg>'
@@ -378,8 +378,6 @@ class ThemeLifecycleService {
     console.log(`Running onInstall for theme: ${themeSlug}`)
 
     try {
-      const themePath = path.join(this.THEMES_BASE, themeSlug)
-
       // Run npm install first to ensure dependencies are available
       await this.runNpmInstall(themeSlug, 'install')
 
@@ -394,9 +392,7 @@ class ThemeLifecycleService {
         status: 'installed'
       })
 
-      // Load watch_ignore patterns from config and set up file watcher
-      const ignorePatterns = await this.getWatchIgnorePatterns(themeSlug)
-      requestWatcherSetup(themePath, ignorePatterns)
+      // Note: Watcher setup is handled by RegisterThemes for active theme only
 
       console.log(`Theme ${themeSlug} installed successfully`)
     } catch (error) {
@@ -415,8 +411,6 @@ class ThemeLifecycleService {
     console.log(`Running onActivate for theme: ${themeSlug}`)
 
     try {
-      const themePath = path.join(this.THEMES_BASE, themeSlug)
-
       // Get the currently active theme
       const currentTheme = await this.getActiveTheme()
 
@@ -444,9 +438,7 @@ class ThemeLifecycleService {
         status: 'active'
       })
 
-      // Load watch_ignore patterns from config and set up file watcher
-      const ignorePatterns = await this.getWatchIgnorePatterns(themeSlug)
-      requestWatcherSetup(themePath, ignorePatterns)
+      // Note: Watcher setup is handled by RegisterThemes for active theme only
 
       // Refresh badge counts (theme updates may have changed)
       await this.refreshBadgeCounts()
