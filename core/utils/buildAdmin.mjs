@@ -76,8 +76,8 @@ export async function buildAdminIfNeeded(force = false) {
     }
 
     if (needsInstall) {
-      console.log('📥 Installing admin dependencies...')
-      const installProcess = spawn('npm', ['install'], {
+      console.log('📥 Installing admin dependencies (including dev dependencies for build)...')
+      const installProcess = spawn('npm', ['install', '--include=dev'], {
         cwd: adminPath,
         stdio: 'inherit',
         shell: true
