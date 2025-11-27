@@ -66,7 +66,7 @@
             :disabled="installingTheme === pkg.package.name"
             class="install-btn deactivate-btn"
           >
-            {{ installingTheme === pkg.package.name ? translate('Deactivating') + '...' : translate('Deactivate') }}
+            {{ installingTheme === pkg.package.name ? translate('Activating') + '...' : translate('Deactivate') }}
           </button>
         </div>
       </div>
