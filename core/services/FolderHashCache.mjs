@@ -179,6 +179,18 @@ export async function getFolderHash(folderPath, ignorePatterns = []) {
     return { hash, cached: false }
   }
 
+  // Cache exists but watcher is missing (e.g., worker created cache entry without watcher)
+  // Set up watcher if we're on primary and don't have one yet
+  if (isPrimary && !cached.watcher) {
+    console.log(`[FolderHashCache] Setting up missing watcher for: ${folderPath}`)
+    const watcher = setupWatcher(folderPath, ignorePatterns)
+    cached.watcher = watcher
+    cached.ignorePatterns = ignorePatterns
+    if (watcher) {
+      console.log(`[FolderHashCache] Watcher created for: ${folderPath}`)
+    }
+  }
+
   // Cache exists but was invalidated by watcher
   if (cached.hash === null) {
     const hash = await computeFolderHash(folderPath)
