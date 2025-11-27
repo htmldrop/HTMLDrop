@@ -10,8 +10,19 @@ export async function buildAdminIfNeeded(force = false) {
   const adminDistPath = path.resolve('./core/admin/dist')
   const adminPath = path.resolve('./core/admin')
 
-  // Check if dist folder exists
-  if (!force && fs.existsSync(adminDistPath)) {
+  console.log(`[BuildAdmin] Checking admin build (force: ${force})`)
+  console.log(`[BuildAdmin] Admin path: ${adminPath}`)
+  console.log(`[BuildAdmin] Dist path: ${adminDistPath}`)
+
+  // Check if dist folder exists AND contains index.html (not just an empty folder)
+  const indexHtmlPath = path.join(adminDistPath, 'index.html')
+  const distExists = fs.existsSync(adminDistPath)
+  const indexHtmlExists = fs.existsSync(indexHtmlPath)
+
+  console.log(`[BuildAdmin] Dist exists: ${distExists}`)
+  console.log(`[BuildAdmin] index.html exists: ${indexHtmlExists}`)
+
+  if (!force && distExists && indexHtmlExists) {
     console.log('✓ Admin UI already built')
     return true
   }

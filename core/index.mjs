@@ -90,8 +90,14 @@ if (cluster.isPrimary) {
   initSharedSSRCache()
 
   // Build admin UI if it doesn't exist
-  const { buildAdminIfNeeded } = await import('./utils/buildAdmin.mjs')
-  await buildAdminIfNeeded()
+  try {
+    const { buildAdminIfNeeded } = await import('./utils/buildAdmin.mjs')
+    const buildResult = await buildAdminIfNeeded()
+    console.log(`[Startup] Admin build result: ${buildResult}`)
+  } catch (error) {
+    console.error('[Startup] Failed to build admin UI:', error.message)
+    console.error('[Startup] Error stack:', error.stack)
+  }
 
   // Fail all running jobs on server restart
   const knex = await initializeKnex()
