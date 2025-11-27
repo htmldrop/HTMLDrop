@@ -8,7 +8,7 @@ import fs from 'fs'
 import path from 'path'
 import PluginMigrationService from './PluginMigrationService.mjs'
 import BadgeCountService from './BadgeCountService.mjs'
-import { invalidateCache, getFolderHash } from './FolderHashCache.mjs'
+import { invalidateCache, requestWatcherSetup, requestWatcherTeardown } from './FolderHashCache.mjs'
 
 // NPM logo SVG
 const NPM_LOGO_SVG = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 780 250"><path fill="#CB3837" d="M240,250h100v-50h100V0H240V250z M340,50h50v100h-50V50z M480,0v200h100V50h50v150h50V50h50v150h50V0H480z M0,200h100V50h50v150h50V0H0V200z"/></svg>'
@@ -292,6 +292,40 @@ class PluginLifecycleService {
   }
 
   /**
+   * Load plugin config.mjs and extract watch_ignore patterns
+   * @param {string} pluginSlug - The plugin slug
+   * @returns {Promise<Array<string>>} Array of ignore patterns
+   */
+  async getWatchIgnorePatterns(pluginSlug) {
+    try {
+      const configPath = path.join(this.PLUGINS_BASE, pluginSlug, 'config.mjs')
+
+      if (!fs.existsSync(configPath)) {
+        return []
+      }
+
+      // Dynamic import with cache-busting
+      const timestamp = Date.now()
+      const config = await import(`${configPath}?t=${timestamp}`)
+      const watchIgnore = config.default?.watch_ignore || []
+
+      // Convert string patterns to regex patterns for chokidar
+      return watchIgnore.map(pattern => {
+        // If pattern starts with /, treat as path from plugin root
+        if (pattern.startsWith('/')) {
+          const pluginPath = path.join(this.PLUGINS_BASE, pluginSlug)
+          return new RegExp(path.join(pluginPath, pattern.slice(1)).replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
+        }
+        // Otherwise treat as glob pattern
+        return pattern
+      })
+    } catch (error) {
+      console.warn(`Could not load watch_ignore config for plugin ${pluginSlug}:`, error.message)
+      return []
+    }
+  }
+
+  /**
    * Call a lifecycle hook on a plugin
    * @param {string} pluginSlug - The plugin slug
    * @param {string} hookName - The lifecycle hook name (onInstall, onActivate, etc.)
@@ -382,8 +416,9 @@ class PluginLifecycleService {
         status: 'installed'
       })
 
-      // Set up file watcher for this plugin (on primary process)
-      await getFolderHash(pluginPath)
+      // Load watch_ignore patterns from config and set up file watcher
+      const ignorePatterns = await this.getWatchIgnorePatterns(pluginSlug)
+      requestWatcherSetup(pluginPath, ignorePatterns)
 
       console.log(`Plugin ${pluginSlug} installed successfully`)
     } catch (error) {
@@ -424,8 +459,9 @@ class PluginLifecycleService {
         status: 'active'
       })
 
-      // Set up file watcher for this plugin (on primary process)
-      await getFolderHash(pluginPath)
+      // Load watch_ignore patterns from config and set up file watcher
+      const ignorePatterns = await this.getWatchIgnorePatterns(pluginSlug)
+      requestWatcherSetup(pluginPath, ignorePatterns)
 
       // Refresh badge counts (plugin updates may have changed)
       await this.refreshBadgeCounts()
@@ -470,6 +506,10 @@ class PluginLifecycleService {
         deactivated_at: new Date().toISOString(),
         status: 'inactive'
       })
+
+      // Request watcher teardown for this plugin
+      const pluginPath = path.join(this.PLUGINS_BASE, pluginSlug)
+      requestWatcherTeardown(pluginPath)
 
       // Refresh badge counts (plugin updates may have changed)
       await this.refreshBadgeCounts()

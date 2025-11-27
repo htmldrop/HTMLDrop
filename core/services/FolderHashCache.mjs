@@ -15,7 +15,7 @@ import cluster from 'cluster'
 import chokidar from 'chokidar'
 
 // Global cache shared across all instances
-// { folderPath: { hash, watcher } }
+// { folderPath: { hash, watcher, ignorePatterns } }
 const cache = new Map()
 
 // Track if we're the primary process (runs watchers) or a worker (receives IPC)
@@ -29,6 +29,20 @@ if (!isPrimary && process.send) {
       if (cached) {
         cached.hash = null // Mark as invalid
       }
+    }
+  })
+}
+
+// Set up IPC listener for primary to receive watcher setup/teardown requests
+if (isPrimary) {
+  const cluster = await import('cluster')
+  cluster.default.on('message', async (worker, msg) => {
+    if (msg?.type === 'setup_watcher' && msg.folderPath) {
+      console.log(`[FolderHashCache] Primary received setup_watcher request for: ${msg.folderPath}`)
+      await getFolderHash(msg.folderPath, msg.ignorePatterns)
+    } else if (msg?.type === 'close_watcher' && msg.folderPath) {
+      console.log(`[FolderHashCache] Primary received close_watcher request for: ${msg.folderPath}`)
+      closeWatcher(msg.folderPath)
     }
   })
 }
@@ -87,16 +101,24 @@ function broadcastInvalidation(folderPath) {
 /**
  * Set up a file watcher for a folder (only on primary process)
  * When any file changes, invalidate the cache entry and notify workers
+ * @param {string} folderPath - Absolute path to the folder
+ * @param {Array<string>} customIgnorePatterns - Additional patterns to ignore
  */
-function setupWatcher(folderPath) {
+function setupWatcher(folderPath, customIgnorePatterns = []) {
   // Only set up watchers on primary process to save resources
   if (!isPrimary) {
     return null
   }
 
   try {
+    // Build ignore patterns array
+    const ignorePatterns = [
+      /(^|[\/\\])(\.|node_modules)/, // Default: hidden files and node_modules
+      ...customIgnorePatterns
+    ]
+
     const watcher = chokidar.watch(folderPath, {
-      ignored: /(^|[\/\\])(\.|node_modules)/,
+      ignored: ignorePatterns,
       persistent: true,
       ignoreInitial: true,
       depth: 99 // Watch all subdirectories
@@ -140,18 +162,19 @@ function setupWatcher(folderPath) {
  * Get the hash for a folder, using cache with file watching
  *
  * @param {string} folderPath - Absolute path to the folder
+ * @param {Array<string>} ignorePatterns - Additional patterns to ignore in watcher
  * @returns {Promise<{hash: string, cached: boolean}>}
  */
-export async function getFolderHash(folderPath) {
+export async function getFolderHash(folderPath, ignorePatterns = []) {
   let cached = cache.get(folderPath)
 
   // First time seeing this folder - compute hash and set up watcher
   if (!cached) {
     console.log(`[FolderHashCache] First access to folder: ${folderPath}`)
     const hash = await computeFolderHash(folderPath)
-    const watcher = setupWatcher(folderPath)
+    const watcher = setupWatcher(folderPath, ignorePatterns)
 
-    cache.set(folderPath, { hash, watcher })
+    cache.set(folderPath, { hash, watcher, ignorePatterns })
     console.log(`[FolderHashCache] Watcher ${watcher ? 'created' : 'skipped (worker)'} for: ${folderPath}`)
     return { hash, cached: false }
   }
@@ -177,6 +200,48 @@ export function invalidateCache(folderPath) {
   const cached = cache.get(folderPath)
   if (cached) {
     cached.hash = null
+  }
+}
+
+/**
+ * Request watcher setup from primary process (call from worker)
+ * @param {string} folderPath - Absolute path to the folder
+ * @param {Array<string>} ignorePatterns - Additional patterns to ignore in watcher
+ */
+export function requestWatcherSetup(folderPath, ignorePatterns = []) {
+  if (!isPrimary && process.send) {
+    console.log(`[FolderHashCache] Worker requesting watcher setup for: ${folderPath}`)
+    process.send({ type: 'setup_watcher', folderPath, ignorePatterns })
+  } else if (isPrimary) {
+    // If called from primary, set up directly
+    getFolderHash(folderPath, ignorePatterns)
+  }
+}
+
+/**
+ * Request watcher teardown from primary process (call from worker)
+ * @param {string} folderPath - Absolute path to the folder
+ */
+export function requestWatcherTeardown(folderPath) {
+  if (!isPrimary && process.send) {
+    console.log(`[FolderHashCache] Worker requesting watcher teardown for: ${folderPath}`)
+    process.send({ type: 'close_watcher', folderPath })
+  } else if (isPrimary) {
+    // If called from primary, close directly
+    closeWatcher(folderPath)
+  }
+}
+
+/**
+ * Close watcher for a specific folder
+ * @param {string} folderPath - Absolute path to the folder
+ */
+function closeWatcher(folderPath) {
+  const cached = cache.get(folderPath)
+  if (cached?.watcher) {
+    console.log(`[FolderHashCache] Closing watcher for: ${folderPath}`)
+    cached.watcher.close()
+    cached.watcher = null
   }
 }
 
@@ -216,6 +281,8 @@ export function getCacheStats() {
 export default {
   getFolderHash,
   invalidateCache,
+  requestWatcherSetup,
+  requestWatcherTeardown,
   clearAllCache,
   getCacheStats
 }

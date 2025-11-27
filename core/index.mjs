@@ -169,14 +169,36 @@ if (cluster.isPrimary) {
   const themesPath = path.resolve('./content/themes')
   const pluginsPath = path.resolve('./content/plugins')
 
+  // Helper to load watch_ignore patterns from config.mjs
+  const loadWatchIgnorePatterns = async (folderPath) => {
+    try {
+      const configPath = path.join(folderPath, 'config.mjs')
+      if (!fs.existsSync(configPath)) return []
+
+      const config = await import(`${configPath}?t=${Date.now()}`)
+      const watchIgnore = config.default?.watch_ignore || []
+
+      // Convert string patterns to regex patterns
+      return watchIgnore.map(pattern => {
+        if (pattern.startsWith('/')) {
+          return new RegExp(path.join(folderPath, pattern.slice(1)).replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
+        }
+        return pattern
+      })
+    } catch (error) {
+      return []
+    }
+  }
+
   // Set up watchers for all themes
   if (fs.existsSync(themesPath)) {
     const themeFolders = fs.readdirSync(themesPath, { withFileTypes: true })
       .filter(f => f.isDirectory())
-      .map(f => path.join(themesPath, f.name))
+      .map(f => ({ name: f.name, path: path.join(themesPath, f.name) }))
 
-    for (const themeFolder of themeFolders) {
-      await getFolderHash(themeFolder)
+    for (const theme of themeFolders) {
+      const ignorePatterns = await loadWatchIgnorePatterns(theme.path)
+      await getFolderHash(theme.path, ignorePatterns)
     }
   }
 
@@ -184,10 +206,11 @@ if (cluster.isPrimary) {
   if (fs.existsSync(pluginsPath)) {
     const pluginFolders = fs.readdirSync(pluginsPath, { withFileTypes: true })
       .filter(f => f.isDirectory())
-      .map(f => path.join(pluginsPath, f.name))
+      .map(f => ({ name: f.name, path: path.join(pluginsPath, f.name) }))
 
-    for (const pluginFolder of pluginFolders) {
-      await getFolderHash(pluginFolder)
+    for (const plugin of pluginFolders) {
+      const ignorePatterns = await loadWatchIgnorePatterns(plugin.path)
+      await getFolderHash(plugin.path, ignorePatterns)
     }
   }
 
