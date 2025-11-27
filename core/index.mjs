@@ -89,6 +89,108 @@ if (cluster.isPrimary) {
   // Initialize shared SSR cache IPC handlers on primary
   initSharedSSRCache()
 
+  // Fail all running jobs on server restart
+  const knex = await initializeKnex()
+  if (knex) {
+    const table = (name) => `${process.env.TABLE_PREFIX || ''}${name}`
+
+    try {
+      // Find all running jobs
+      const runningJobPosts = await knex(table('posts'))
+        .where('post_type_slug', 'jobs')
+        .select('id')
+
+      const runningJobIds = runningJobPosts.map(p => p.id)
+
+      if (runningJobIds.length > 0) {
+        const runningJobs = await knex(table('post_meta'))
+          .whereIn('post_id', runningJobIds)
+          .where('field_slug', 'status')
+          .whereIn('value', ['running', 'pending'])
+
+        const jobsToFail = runningJobs.map(m => m.post_id)
+
+        if (jobsToFail.length > 0) {
+          // Update status to failed
+          await knex(table('post_meta'))
+            .whereIn('post_id', jobsToFail)
+            .where('field_slug', 'status')
+            .update({ value: 'failed' })
+
+          // Add error message
+          const now = new Date().toISOString()
+          for (const jobId of jobsToFail) {
+            // Update or insert error_message
+            const existingError = await knex(table('post_meta'))
+              .where({ post_id: jobId, field_slug: 'error_message' })
+              .first()
+
+            if (existingError) {
+              await knex(table('post_meta'))
+                .where({ post_id: jobId, field_slug: 'error_message' })
+                .update({ value: 'Job interrupted by server restart' })
+            } else {
+              await knex(table('post_meta')).insert({
+                post_id: jobId,
+                field_slug: 'error_message',
+                value: 'Job interrupted by server restart'
+              })
+            }
+
+            // Update or insert completed_at
+            const existingCompleted = await knex(table('post_meta'))
+              .where({ post_id: jobId, field_slug: 'completed_at' })
+              .first()
+
+            if (existingCompleted) {
+              await knex(table('post_meta'))
+                .where({ post_id: jobId, field_slug: 'completed_at' })
+                .update({ value: now })
+            } else {
+              await knex(table('post_meta')).insert({
+                post_id: jobId,
+                field_slug: 'completed_at',
+                value: now
+              })
+            }
+          }
+
+          console.log(`✓ Marked ${jobsToFail.length} running jobs as failed due to server restart`)
+        }
+      }
+    } catch (error) {
+      console.error('Failed to cleanup running jobs on restart:', error.message)
+    }
+  }
+
+  // Set up file watchers for themes and plugins on primary process
+  const { getFolderHash } = await import('./services/FolderHashCache.mjs')
+  const fs = await import('fs')
+  const themesPath = path.resolve('./content/themes')
+  const pluginsPath = path.resolve('./content/plugins')
+
+  // Set up watchers for all themes
+  if (fs.existsSync(themesPath)) {
+    const themeFolders = fs.readdirSync(themesPath, { withFileTypes: true })
+      .filter(f => f.isDirectory())
+      .map(f => path.join(themesPath, f.name))
+
+    for (const themeFolder of themeFolders) {
+      await getFolderHash(themeFolder)
+    }
+  }
+
+  // Set up watchers for all plugins
+  if (fs.existsSync(pluginsPath)) {
+    const pluginFolders = fs.readdirSync(pluginsPath, { withFileTypes: true })
+      .filter(f => f.isDirectory())
+      .map(f => path.join(pluginsPath, f.name))
+
+    for (const pluginFolder of pluginFolders) {
+      await getFolderHash(pluginFolder)
+    }
+  }
+
   // Fork workers
   const workers = []
   for (let i = 0; i < numCPUs; i++) {

@@ -21,6 +21,7 @@ export default class RegisterJobs {
    * @param {string} jobConfig.source - Source of the job (plugin/theme name)
    * @param {number} jobConfig.createdBy - User ID who created the job
    * @param {boolean} jobConfig.showNotification - Whether to show popup notification (default: false)
+   * @param {number} jobConfig.timeout - Timeout in milliseconds (default: 300000 = 5 minutes, 0 = no timeout)
    * @returns {Promise<Object>} Job instance with control methods
    */
   async createJob({
@@ -31,7 +32,8 @@ export default class RegisterJobs {
     metadata = {},
     source = 'system',
     createdBy = null,
-    showNotification = false
+    showNotification = false,
+    timeout = 300000
   }) {
     const jobId = randomUUID()
     const { knex, table } = this.context
@@ -63,7 +65,8 @@ export default class RegisterJobs {
       { slug: 'source', value: source },
       { slug: 'error_message', value: '' },
       { slug: 'result', value: '' },
-      { slug: 'show_notification', value: String(showNotification) }
+      { slug: 'show_notification', value: String(showNotification) },
+      { slug: 'timeout', value: String(timeout) }
     ]
 
     for (const field of fields) {
@@ -128,6 +131,7 @@ export default class RegisterJobs {
       result: metaObj.result ? JSON.parse(metaObj.result) : null,
       source: metaObj.source || 'system',
       showNotification: metaObj.show_notification === 'true',
+      timeout: parseInt(metaObj.timeout || '300000', 10),
       startedAt: metaObj.started_at,
       completedAt: metaObj.completed_at,
       createdAt: post.created_at,
@@ -169,6 +173,7 @@ export default class RegisterJobs {
   _createJobInstance(jobData) {
     const { knex, table } = this.context
     const self = this
+    let timeoutHandle = null
 
     return {
       id: jobData.id,
@@ -182,6 +187,7 @@ export default class RegisterJobs {
       metadata: jobData.metadata,
       source: jobData.source,
       showNotification: jobData.showNotification,
+      timeout: jobData.timeout,
       createdBy: jobData.createdBy,
       startedAt: jobData.startedAt,
       completedAt: jobData.completedAt,
@@ -197,6 +203,17 @@ export default class RegisterJobs {
 
         await self._updateJobMeta(this.id, 'status', 'running')
         await self._updateJobMeta(this.id, 'started_at', this.startedAt)
+
+        // Set up timeout if configured (timeout > 0)
+        if (this.timeout > 0) {
+          timeoutHandle = setTimeout(async () => {
+            // Only fail if job is still running
+            if (this.status === 'running') {
+              console.warn(`Job ${this.jobId} timed out after ${this.timeout}ms`)
+              await this.fail(`Job timed out after ${this.timeout / 1000} seconds`)
+            }
+          }, this.timeout)
+        }
 
         self._broadcastJobUpdate(this)
         return this
@@ -231,6 +248,12 @@ export default class RegisterJobs {
         this.progress = 100
         this.completedAt = self.context.formatDate()
 
+        // Clear timeout
+        if (timeoutHandle) {
+          clearTimeout(timeoutHandle)
+          timeoutHandle = null
+        }
+
         await self._updateJobMeta(this.id, 'status', 'completed')
         await self._updateJobMeta(this.id, 'progress', '100')
         await self._updateJobMeta(this.id, 'completed_at', this.completedAt)
@@ -252,6 +275,12 @@ export default class RegisterJobs {
         this.status = 'failed'
         this.completedAt = self.context.formatDate()
 
+        // Clear timeout
+        if (timeoutHandle) {
+          clearTimeout(timeoutHandle)
+          timeoutHandle = null
+        }
+
         await self._updateJobMeta(this.id, 'status', 'failed')
         await self._updateJobMeta(this.id, 'error_message', errorMessage)
         await self._updateJobMeta(this.id, 'completed_at', this.completedAt)
@@ -267,6 +296,12 @@ export default class RegisterJobs {
       async cancel() {
         this.status = 'cancelled'
         this.completedAt = self.context.formatDate()
+
+        // Clear timeout
+        if (timeoutHandle) {
+          clearTimeout(timeoutHandle)
+          timeoutHandle = null
+        }
 
         await self._updateJobMeta(this.id, 'status', 'cancelled')
         await self._updateJobMeta(this.id, 'completed_at', this.completedAt)
@@ -377,6 +412,7 @@ export default class RegisterJobs {
         result: meta.result ? JSON.parse(meta.result) : null,
         source: meta.source || 'system',
         showNotification: meta.show_notification === 'true',
+        timeout: parseInt(meta.timeout || '300000', 10),
         startedAt: meta.started_at,
         completedAt: meta.completed_at,
         createdAt: post.created_at,

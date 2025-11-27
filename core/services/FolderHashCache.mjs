@@ -34,10 +34,15 @@ if (!isPrimary && process.send) {
 }
 
 /**
- * Compute folder hash by collecting mtimes of all files (ignores node_modules)
+ * Compute folder hash by collecting mtimes of all files (ignores node_modules contents)
  */
 async function computeFolderHash(folderPath) {
   const mtimes = []
+
+  // Check if node_modules exists (include in hash without scanning contents)
+  const nodeModulesPath = path.join(folderPath, 'node_modules')
+  const hasNodeModules = fs.existsSync(nodeModulesPath)
+  mtimes.push(`node_modules:${hasNodeModules}`)
 
   async function traverse(dir) {
     const entries = await fs.promises.readdir(dir, { withFileTypes: true })
@@ -93,10 +98,12 @@ function setupWatcher(folderPath) {
     const watcher = chokidar.watch(folderPath, {
       ignored: /(^|[\/\\])(\.|node_modules)/,
       persistent: true,
-      ignoreInitial: true
+      ignoreInitial: true,
+      depth: 99 // Watch all subdirectories
     })
 
-    const invalidate = () => {
+    const invalidate = (path) => {
+      console.log(`[FolderHashCache] File changed: ${path}`)
       const cached = cache.get(folderPath)
       if (cached) {
         cached.hash = null
@@ -107,6 +114,11 @@ function setupWatcher(folderPath) {
     watcher.on('add', invalidate)
     watcher.on('change', invalidate)
     watcher.on('unlink', invalidate)
+    watcher.on('addDir', invalidate)
+    watcher.on('unlinkDir', invalidate)
+    watcher.on('ready', () => {
+      console.log(`[FolderHashCache] Watcher ready for: ${folderPath}`)
+    })
 
     watcher.on('error', (err) => {
       console.warn(`[FolderHashCache] Watcher error for ${folderPath}:`, err.message)
@@ -135,10 +147,12 @@ export async function getFolderHash(folderPath) {
 
   // First time seeing this folder - compute hash and set up watcher
   if (!cached) {
+    console.log(`[FolderHashCache] First access to folder: ${folderPath}`)
     const hash = await computeFolderHash(folderPath)
     const watcher = setupWatcher(folderPath)
 
     cache.set(folderPath, { hash, watcher })
+    console.log(`[FolderHashCache] Watcher ${watcher ? 'created' : 'skipped (worker)'} for: ${folderPath}`)
     return { hash, cached: false }
   }
 

@@ -7,6 +7,7 @@
 import fs from 'fs'
 import path from 'path'
 import BadgeCountService from './BadgeCountService.mjs'
+import { invalidateCache, getFolderHash } from './FolderHashCache.mjs'
 
 // NPM logo SVG
 const NPM_LOGO_SVG = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 780 250"><path fill="#CB3837" d="M240,250h100v-50h100V0H240V250z M340,50h50v100h-50V50z M480,0v200h100V50h50v150h50V50h50v150h50V0H480z M0,200h100V50h50v150h50V0H0V200z"/></svg>'
@@ -177,6 +178,10 @@ class ThemeLifecycleService {
         success: true,
         message: `Dependencies installed successfully for ${themeSlug}`
       })
+
+      // Invalidate folder hash cache to trigger theme reload
+      invalidateCache(themePath)
+      console.log(`Invalidated cache for ${themePath} after npm install`)
     } catch (error) {
       await job.fail(error.message)
       throw error
@@ -193,7 +198,7 @@ class ThemeLifecycleService {
     try {
       const { spawn } = await import('child_process')
 
-      return new Promise((resolve, reject) => {
+      await new Promise((resolve, reject) => {
         const npmProcess = spawn('npm', ['install', '--production'], {
           cwd: themePath,
           env: { ...process.env },
@@ -263,6 +268,10 @@ class ThemeLifecycleService {
           reject(new Error(`Failed to start npm install: ${error.message}`))
         })
       })
+
+      // Invalidate folder hash cache after successful npm install
+      invalidateCache(themePath)
+      console.log(`Invalidated cache for ${themePath} after npm install`)
     } catch (error) {
       console.error(`npm install failed for ${themePath}:`, error)
       throw new Error(`Failed to install dependencies: ${error.message}`)
@@ -335,6 +344,8 @@ class ThemeLifecycleService {
     console.log(`Running onInstall for theme: ${themeSlug}`)
 
     try {
+      const themePath = path.join(this.THEMES_BASE, themeSlug)
+
       // Run npm install first to ensure dependencies are available
       await this.runNpmInstall(themeSlug, 'install')
 
@@ -348,6 +359,9 @@ class ThemeLifecycleService {
         installed_at: new Date().toISOString(),
         status: 'installed'
       })
+
+      // Set up file watcher for this theme (on primary process)
+      await getFolderHash(themePath)
 
       console.log(`Theme ${themeSlug} installed successfully`)
     } catch (error) {
@@ -366,6 +380,8 @@ class ThemeLifecycleService {
     console.log(`Running onActivate for theme: ${themeSlug}`)
 
     try {
+      const themePath = path.join(this.THEMES_BASE, themeSlug)
+
       // Get the currently active theme
       const currentTheme = await this.getActiveTheme()
 
@@ -392,6 +408,9 @@ class ThemeLifecycleService {
         activated_at: new Date().toISOString(),
         status: 'active'
       })
+
+      // Set up file watcher for this theme (on primary process)
+      await getFolderHash(themePath)
 
       // Refresh badge counts (theme updates may have changed)
       await this.refreshBadgeCounts()

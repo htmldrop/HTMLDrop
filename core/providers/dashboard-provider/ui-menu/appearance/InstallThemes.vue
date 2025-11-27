@@ -250,7 +250,7 @@ export default {
 
       try {
         const slug = pkg.name.replace(/^@.*?\//, '').replace(/[^a-z0-9-]/gi, '-')
-        const result = await this.apiFetch(`${this.apiBase}/api/v1/themes/${slug}/deactivate`, {
+        const result = await this.apiFetch(`${this.apiBase}/api/v1/themes/deactivate`, {
           method: 'POST'
         })
         const data = await result.json()

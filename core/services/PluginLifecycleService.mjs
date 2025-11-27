@@ -8,6 +8,7 @@ import fs from 'fs'
 import path from 'path'
 import PluginMigrationService from './PluginMigrationService.mjs'
 import BadgeCountService from './BadgeCountService.mjs'
+import { invalidateCache, getFolderHash } from './FolderHashCache.mjs'
 
 // NPM logo SVG
 const NPM_LOGO_SVG = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 780 250"><path fill="#CB3837" d="M240,250h100v-50h100V0H240V250z M340,50h50v100h-50V50z M480,0v200h100V50h50v150h50V50h50v150h50V0H480z M0,200h100V50h50v150h50V0H0V200z"/></svg>'
@@ -190,6 +191,10 @@ class PluginLifecycleService {
         success: true,
         message: `Dependencies installed successfully for ${pluginSlug}`
       })
+
+      // Invalidate folder hash cache to trigger plugin reload
+      invalidateCache(pluginPath)
+      console.log(`Invalidated cache for ${pluginPath} after npm install`)
     } catch (error) {
       await job.fail(error.message)
       throw error
@@ -206,7 +211,7 @@ class PluginLifecycleService {
     try {
       const { spawn } = await import('child_process')
 
-      return new Promise((resolve, reject) => {
+      await new Promise((resolve, reject) => {
         const npmProcess = spawn('npm', ['install', '--production'], {
           cwd: pluginPath,
           env: { ...process.env },
@@ -276,6 +281,10 @@ class PluginLifecycleService {
           reject(new Error(`Failed to start npm install: ${error.message}`))
         })
       })
+
+      // Invalidate folder hash cache after successful npm install
+      invalidateCache(pluginPath)
+      console.log(`Invalidated cache for ${pluginPath} after npm install`)
     } catch (error) {
       console.error(`npm install failed for ${pluginPath}:`, error)
       throw new Error(`Failed to install dependencies: ${error.message}`)
@@ -348,6 +357,8 @@ class PluginLifecycleService {
     console.log(`Running onInstall for plugin: ${pluginSlug}`)
 
     try {
+      const pluginPath = path.join(this.PLUGINS_BASE, pluginSlug)
+
       // Run npm install first to ensure dependencies are available
       await this.runNpmInstall(pluginSlug, 'install')
 
@@ -370,6 +381,9 @@ class PluginLifecycleService {
         installed_at: new Date().toISOString(),
         status: 'installed'
       })
+
+      // Set up file watcher for this plugin (on primary process)
+      await getFolderHash(pluginPath)
 
       console.log(`Plugin ${pluginSlug} installed successfully`)
     } catch (error) {
@@ -394,6 +408,11 @@ class PluginLifecycleService {
     }
 
     try {
+      const pluginPath = path.join(this.PLUGINS_BASE, pluginSlug)
+
+      // Run npm install to ensure dependencies are available
+      await this.runNpmInstall(pluginSlug, 'activate')
+
       await this.callLifecycleHook(pluginSlug, 'onActivate', {
         pluginSlug,
         timestamp: new Date().toISOString()
@@ -404,6 +423,9 @@ class PluginLifecycleService {
         activated_at: new Date().toISOString(),
         status: 'active'
       })
+
+      // Set up file watcher for this plugin (on primary process)
+      await getFolderHash(pluginPath)
 
       // Refresh badge counts (plugin updates may have changed)
       await this.refreshBadgeCounts()

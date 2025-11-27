@@ -57,6 +57,7 @@ Each job has these meta fields in `hd_post_meta`:
 - `error_message` - Error message if failed
 - `result` - Result data if completed
 - `source` - Plugin/theme name
+- `timeout` - Timeout in milliseconds (default: 300000 = 5 minutes)
 - `started_at` - When job started
 - `completed_at` - When job completed
 
@@ -88,7 +89,7 @@ export default async function MyPlugin({ req }) {
 }
 ```
 
-### Advanced Example with Custom Icon
+### Advanced Example with Custom Icon and Timeout
 
 ```javascript
 const job = await hooks.createJob({
@@ -101,6 +102,7 @@ const job = await hooks.createJob({
       <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
     </svg>
   `,
+  timeout: 600000, // 10 minutes timeout
   metadata: {
     backupType: 'full',
     compression: true
@@ -188,6 +190,67 @@ Cancels the job.
 
 ```javascript
 await job.cancel()
+```
+
+## Job Timeout
+
+Jobs support automatic timeout to prevent hung processes. By default, jobs timeout after 5 minutes.
+
+### Timeout Configuration
+
+```javascript
+// Default 5 minute timeout
+const job = await hooks.createJob({
+  name: 'Quick Task',
+  type: 'process'
+  // timeout: 300000 (default)
+})
+
+// Custom 10 minute timeout
+const job = await hooks.createJob({
+  name: 'Long Running Task',
+  type: 'process',
+  timeout: 600000 // 10 minutes
+})
+
+// Disable timeout (runs forever until completed/failed)
+const job = await hooks.createJob({
+  name: 'Manual Task',
+  type: 'process',
+  timeout: 0 // No timeout
+})
+```
+
+### How Timeout Works
+
+1. When `job.start()` is called, a timeout timer begins
+2. If the job doesn't complete/fail/cancel before timeout expires, it automatically fails
+3. The timeout is cleared when:
+   - `job.complete()` is called
+   - `job.fail()` is called
+   - `job.cancel()` is called
+4. Timed out jobs have error message: "Job timed out after X seconds"
+
+### Example with Timeout Handling
+
+```javascript
+const job = await hooks.createJob({
+  name: 'Git Build',
+  type: 'build',
+  timeout: 300000 // 5 minutes
+})
+
+try {
+  await job.start()
+
+  // Long-running operation
+  await buildFromGit()
+
+  await job.complete({ success: true })
+} catch (error) {
+  // This will be called if buildFromGit() throws OR if timeout expires
+  await job.fail(error.message)
+}
 ```
 
 ## API Endpoints
@@ -339,6 +402,22 @@ for (let i = 0; i < items.length; i++) {
 Always set `source` to your plugin/theme name for tracking:
 ```javascript
 source: 'my-awesome-plugin'
+```
+
+### 6. Set Appropriate Timeouts
+Choose timeout values based on expected job duration:
+```javascript
+// Quick jobs (< 1 minute)
+timeout: 60000 // 1 minute
+
+// Normal jobs (1-5 minutes)
+timeout: 300000 // 5 minutes (default)
+
+// Long jobs (5-30 minutes)
+timeout: 1800000 // 30 minutes
+
+// Very long jobs or manual supervision
+timeout: 0 // No timeout
 ```
 
 ## Cleanup
