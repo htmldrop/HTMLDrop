@@ -6,7 +6,7 @@ export default (context) => {
 
   /**
    * POST /api/v1/badge-counts/refresh
-   * Triggers a refresh of badge counts (respects cache TTL)
+   * Triggers a refresh of badge counts (forces immediate update, bypassing cache TTL)
    * Requires: manage_dashboard capability
    */
   router.post('/refresh', async (req, res) => {
@@ -21,7 +21,8 @@ export default (context) => {
       }
 
       const badgeCountService = new BadgeCountService(context)
-      const result = await badgeCountService.updateBadgeCounts()
+      // Force update to bypass cache TTL when manually refreshing
+      const result = await badgeCountService.updateBadgeCounts(true)
 
       res.json({
         success: true,

@@ -120,6 +120,9 @@ const countThemeUpdates = async () => {
 
         checkTasks.push(
           fetchPackageVersion(packageJson.name).then(latestVersion => ({
+            name: packageJson.name,
+            current: packageJson.version,
+            latest: latestVersion,
             hasUpdate: latestVersion && latestVersion !== packageJson.version
           }))
         )
@@ -131,9 +134,16 @@ const countThemeUpdates = async () => {
 
     // Process in batches to respect rate limits
     const results = await processBatch(checkTasks, MAX_CONCURRENT_CHECKS)
-    const updateCount = results.filter(r => r && r.hasUpdate).length
+    const updatesAvailable = results.filter(r => r && r.hasUpdate)
 
-    return updateCount
+    // Log updates found for debugging
+    if (updatesAvailable.length > 0) {
+      console.log('[BadgeCount] Theme updates available:', updatesAvailable.map(u =>
+        `${u.name} (${u.current} → ${u.latest})`
+      ).join(', '))
+    }
+
+    return updatesAvailable.length
   } catch (error) {
     console.error('Failed to count theme updates:', error)
     return 0
