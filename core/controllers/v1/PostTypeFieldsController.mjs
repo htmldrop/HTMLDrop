@@ -25,7 +25,16 @@ export default (context) => {
 
     if (!type?.resolvedCapabilities?.length) return null
 
-    const validCaps = type.resolvedCapabilities.filter((c) => routeCaps.includes(c))
+    const resolvedCapabilities = [
+      ...type.resolvedCapabilities,
+      'edit_post_type',
+      'read_post_type',
+      'edit_post_types',
+      'delete_post_types',
+      'create_post_types',
+    ]
+
+    const validCaps = resolvedCapabilities.filter((c) => routeCaps.includes(c))
     if (!validCaps.length) return null
 
     const hasAccess = await req.guard.user({ canOneOf: validCaps })
@@ -176,6 +185,11 @@ export default (context) => {
 
     data.slug = normalizeSlug(data.slug || data.name)
     data.post_type_slug = normalizeSlug(postType)
+
+    // Only set post_type_id if the post type has an ID (database-registered types)
+    if (type.id) {
+      data.post_type_id = type.id
+    }
 
     const [id] = await knex(table('post_type_fields')).insert(data)
     const created = await knex(table('post_type_fields')).where('id', id).first()

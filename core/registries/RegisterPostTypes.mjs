@@ -42,14 +42,18 @@ export default class RegisterPostTypes {
       })
     )
 
-    // Load fields from DB
-    const dbFields = await knex(table('post_type_fields')).select('*')
+    // Load fields from DB, ordered by 'order' column
+    const dbFields = await knex(table('post_type_fields')).select('*').orderBy('order', 'asc')
 
     // Process fields in parallel
     await Promise.all(
       dbFields.map(async (field) => {
         const priority = field.priority ?? 5
-        const slug = idToSlug.get(field.post_type_id)
+        // Try to get slug from post_type_id first, then fall back to post_type_slug
+        let slug = idToSlug.get(field.post_type_id)
+        if (!slug && field.post_type_slug) {
+          slug = field.post_type_slug
+        }
         if (!slug) return
 
         if (!this.fields.has(slug)) this.fields.set(slug, [])
@@ -106,6 +110,17 @@ export default class RegisterPostTypes {
         position: 100,
         capabilities: type.capabilities
       })
+      await this.hooks.addSubMenuPage({
+        slug: 'fields/admin',
+        parent_slug: type.slug,
+        page_title: this.translate('Fields', locale),
+        menu_title: this.translate('Fields', locale),
+        name_plural: this.translate('Fields', locale),
+        name_singular: this.translate('Field', locale),
+        badge: 0,
+        position: 10000,
+        capabilities: type.capabilities
+      })
     }
   }
 
@@ -156,7 +171,14 @@ export default class RegisterPostTypes {
   async getFields(slug) {
     await this.load()
     const fields = this.fields.get(slug) || []
-    return this.hooks.applyFilters('postTypeFields', fields, slug)
+    // Sort fields by order, then by priority
+    const sorted = fields.sort((a, b) => {
+      const orderA = a.field.order ?? 1000
+      const orderB = b.field.order ?? 1000
+      if (orderA !== orderB) return orderA - orderB
+      return (a.priority ?? 5) - (b.priority ?? 5)
+    })
+    return this.hooks.applyFilters('postTypeFields', sorted, slug)
   }
 
   async getAllPostTypes() {

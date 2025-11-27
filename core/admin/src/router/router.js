@@ -64,6 +64,12 @@ const router = createRouter({
           name: 'Post',
           component: () => import('@/views/Post.vue'),
           props: true
+        },
+        {
+          path: ':slug/fields/admin',
+          name: 'PostFields',
+          component: () => import('@/views/PostFields.vue'),
+          props: true
         }
       ]
     },

@@ -17,7 +17,7 @@
                 @mouseleave="isHoveringDropdown = false"
                 v-if="item?.children?.length"
             >
-                <router-link class="link" :to="'/' + item.slug + '/' + child.slug" :class="{ active: isActive(item, child) }" v-for="child in item.children">
+                <router-link class="link" :to="'/' + item.slug + '/' + child.slug" :class="{ active: isActive(item, child) }" v-for="child in item.children?.filter(itm => itm.position < 10000)">
                     {{ child.menu_title }}
                     <div v-if="child.badge" class="badge" :class="{ 'badge-large': (child.badge)?.toString().length > 1}">{{ child.badge }}</div>
                 </router-link>
@@ -27,6 +27,10 @@
                 <button @click="mediaUploader = true" v-else-if="item.slug === 'attachments'" class="link">
                     {{ translate('Upload') }} {{ translate(item.name_singular)?.toLowerCase() }}
                 </button>
+                <router-link class="link" :to="'/' + item.slug + '/' + child.slug" :class="{ active: isActive(item, child) }" v-for="child in item.children?.filter(itm => itm.position >= 10000)">
+                    {{ child.menu_title }}
+                    <div v-if="child.badge" class="badge" :class="{ 'badge-large': (child.badge)?.toString().length > 1}">{{ child.badge }}</div>
+                </router-link>
                 <teleport to="body">
                     <component
                         v-if="mediaUploader"
