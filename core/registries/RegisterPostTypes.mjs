@@ -29,6 +29,11 @@ export default class RegisterPostTypes {
           type.capabilities = JSON.parse(type.capabilities || '{}')
         }
 
+        // Convert boolean fields from integers to booleans
+        if (typeof type.show_in_menu !== 'undefined') {
+          type.show_in_menu = Boolean(type.show_in_menu)
+        }
+
         // Skip if user can't access
         if (type.capabilities && Object.keys(type.capabilities).length) {
           const resolved = await this.req.guard?.user({ canOneOf: type.capabilities })
@@ -39,6 +44,45 @@ export default class RegisterPostTypes {
         const priority = type.priority ?? 5
         this.postTypes.set(type.slug, { data: { ...type }, priority, source: 'db' })
         idToSlug.set(type.id, type.slug)
+
+        // Register menu for database post types that should show in menu
+        const locale = this.req?.user?.locale
+        if (type.show_in_menu) {
+          const capabilities = type.capabilities || {}
+          await this.hooks.addMenuPage({
+            slug: type.slug,
+            page_title: type.name_plural,
+            menu_title: type.name_plural,
+            name_plural: type.name_plural,
+            name_singular: type.name_singular,
+            icon: type.icon,
+            badge: type.badge,
+            position: type.position,
+            capabilities
+          })
+          await this.hooks.addSubMenuPage({
+            slug: '',
+            parent_slug: type.slug,
+            page_title: this.translate('Home', locale),
+            menu_title: this.translate('Home', locale),
+            name_plural: this.translate('Home', locale),
+            name_singular: this.translate('Home', locale),
+            badge: 0,
+            position: 100,
+            capabilities
+          })
+          await this.hooks.addSubMenuPage({
+            slug: 'fields/admin',
+            parent_slug: type.slug,
+            page_title: this.translate('Fields', locale),
+            menu_title: this.translate('Fields', locale),
+            name_plural: this.translate('Fields', locale),
+            name_singular: this.translate('Field', locale),
+            badge: 0,
+            position: 10000,
+            capabilities
+          })
+        }
       })
     )
 
@@ -48,6 +92,14 @@ export default class RegisterPostTypes {
     // Process fields in parallel
     await Promise.all(
       dbFields.map(async (field) => {
+        // Convert boolean fields from integers to booleans
+        if (typeof field.required !== 'undefined') {
+          field.required = Boolean(field.required)
+        }
+        if (typeof field.revisions !== 'undefined') {
+          field.revisions = Boolean(field.revisions)
+        }
+
         const priority = field.priority ?? 5
         // Try to get slug from post_type_id first, then fall back to post_type_slug
         let slug = idToSlug.get(field.post_type_id)

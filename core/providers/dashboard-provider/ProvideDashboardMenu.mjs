@@ -253,6 +253,16 @@ export default async ({ req, res, next }) => {
       slug: 'menus',
       page_title: translate('Menus', locale),
       menu_title: translate('Menus', locale)
+    },
+    {
+      capabilities: { manage_dashboard: 'manage_dashboard' },
+      badge: 0,
+      position: 1100,
+      file: 'PostTypes.vue',
+      parent_slug: 'settings',
+      slug: 'post-types',
+      page_title: translate('Post Types', locale),
+      menu_title: translate('Post Types', locale)
     }
   ]
 

@@ -93,7 +93,7 @@ export default {
   inject: ['translate', 'apiBase', 'apiFetch', 'navTree', 'controls', 'getControl'],
   props: ['sub'],
   data: () => ({
-    slug: 'options',
+    slug: 'settings',
     postTypeFields: [],
     title: '',
     newSlug: '',
@@ -101,6 +101,7 @@ export default {
     obj: {}
   }),
   created() {
+    console.log({ node: this.node })
     this.init()
   },
   computed: {

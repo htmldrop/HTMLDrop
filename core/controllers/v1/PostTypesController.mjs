@@ -14,7 +14,12 @@ export default (context) => {
     return value
   }
 
-  const parseRow = (row) => Object.fromEntries(Object.entries(row).map(([k, v]) => [k, parseJSON(v)]))
+  const parseRow = (row) => {
+    const parsed = Object.fromEntries(Object.entries(row).map(([k, v]) => [k, parseJSON(v)]))
+    // Convert known boolean fields from integers to booleans
+    if ('show_in_menu' in parsed) parsed.show_in_menu = Boolean(parsed.show_in_menu)
+    return parsed
+  }
 
   // ------------------------
   // Helper: check route capability
@@ -110,7 +115,10 @@ export default (context) => {
     }
 
     const data = Object.fromEntries(
-      Object.entries(req.body).map(([k, v]) => [k, Array.isArray(v) || typeof v === 'object' ? JSON.stringify(v) : v])
+      Object.entries(req.body).map(([k, v]) => [
+        k,
+        typeof v === 'boolean' ? (v ? 1 : 0) : Array.isArray(v) || typeof v === 'object' ? JSON.stringify(v) : v
+      ])
     )
 
     if (!data.slug && !data.name_plural) return res.status(403).json({ error: 'name_plural or slug is required' })
@@ -230,7 +238,10 @@ export default (context) => {
 
     const { idOrSlug } = req.params
     const data = Object.fromEntries(
-      Object.entries(req.body).map(([k, v]) => [k, Array.isArray(v) || typeof v === 'object' ? JSON.stringify(v) : v])
+      Object.entries(req.body).map(([k, v]) => [
+        k,
+        typeof v === 'boolean' ? (v ? 1 : 0) : Array.isArray(v) || typeof v === 'object' ? JSON.stringify(v) : v
+      ])
     )
 
     const query = knex(table('post_types'))
@@ -240,6 +251,7 @@ export default (context) => {
     if (typeof data.slug !== 'undefined') data.slug = normalizeSlug(data.slug)
 
     await query.clone().update(data)
+
     const updated = await query.first()
     if (!updated) return res.status(404).json({ error: 'Post type not found' })
 

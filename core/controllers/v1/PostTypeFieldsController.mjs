@@ -14,7 +14,13 @@ export default (context) => {
     return value
   }
 
-  const parseRow = (row) => Object.fromEntries(Object.entries(row).map(([k, v]) => [k, parseJSON(v)]))
+  const parseRow = (row) => {
+    const parsed = Object.fromEntries(Object.entries(row).map(([k, v]) => [k, parseJSON(v)]))
+    // Convert known boolean fields from integers to booleans
+    if ('required' in parsed) parsed.required = Boolean(parsed.required)
+    if ('revisions' in parsed) parsed.revisions = Boolean(parsed.revisions)
+    return parsed
+  }
 
   /**
    * Helper: check route capability
@@ -173,7 +179,10 @@ export default (context) => {
     if (!type) return res.status(403).json({ error: 'Permission denied or post type not accessible' })
 
     const data = Object.fromEntries(
-      Object.entries(req.body).map(([k, v]) => [k, Array.isArray(v) || typeof v === 'object' ? JSON.stringify(v) : v])
+      Object.entries(req.body).map(([k, v]) => [
+        k,
+        typeof v === 'boolean' ? (v ? 1 : 0) : Array.isArray(v) || typeof v === 'object' ? JSON.stringify(v) : v
+      ])
     )
 
     if (data.post_type_id && Number(data.post_type_id) !== Number(type.id)) {
@@ -317,7 +326,10 @@ export default (context) => {
     if (!type) return res.status(403).json({ error: 'Permission denied or post type not accessible' })
 
     const data = Object.fromEntries(
-      Object.entries(req.body).map(([k, v]) => [k, Array.isArray(v) || typeof v === 'object' ? JSON.stringify(v) : v])
+      Object.entries(req.body).map(([k, v]) => [
+        k,
+        typeof v === 'boolean' ? (v ? 1 : 0) : Array.isArray(v) || typeof v === 'object' ? JSON.stringify(v) : v
+      ])
     )
 
     if (data.post_type_id && Number(data.post_type_id) !== Number(type.id)) {
