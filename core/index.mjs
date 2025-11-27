@@ -89,6 +89,10 @@ if (cluster.isPrimary) {
   // Initialize shared SSR cache IPC handlers on primary
   initSharedSSRCache()
 
+  // Build admin UI if it doesn't exist
+  const { buildAdminIfNeeded } = await import('./utils/buildAdmin.mjs')
+  await buildAdminIfNeeded()
+
   // Fail all running jobs on server restart
   const knex = await initializeKnex()
   if (knex) {

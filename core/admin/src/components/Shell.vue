@@ -14,9 +14,9 @@
 <script>
 import Topbar from './Topbar.vue'
 import Navigator from './Navigator.vue'
-import json from '../../package.json'
+import json from '../../../../package.json'  // Use root package.json for version
 export default {
-    components: { 
+    components: {
         Topbar,
         Navigator
     },

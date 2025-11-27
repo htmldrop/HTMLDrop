@@ -490,6 +490,18 @@ class UpdateService {
       await this._runCommand('npm', ['run', 'seed'], 'Database seeding failed')
       console.log('[UpdateService] Database seeds completed')
 
+      await job.updateProgress(97, { status: 'Building admin UI...' })
+      console.log('[UpdateService] Building admin UI...')
+
+      // Build admin UI if needed (rebuilds if dist doesn't exist or after update)
+      const { buildAdminIfNeeded } = await import('../utils/buildAdmin.mjs')
+      const adminBuilt = await buildAdminIfNeeded(true)
+      if (adminBuilt) {
+        console.log('[UpdateService] Admin UI build completed')
+      } else {
+        console.warn('[UpdateService] Admin UI build was skipped or failed')
+      }
+
       await job.updateProgress(100, { status: 'Update complete!' })
 
       const newVersion = await this.getCurrentVersion()

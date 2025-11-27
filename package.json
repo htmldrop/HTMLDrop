@@ -1,6 +1,6 @@
 {
   "name": "htmldrop",
-  "version": "1.0.29",
+  "version": "1.0.30",
   "type": "module",
   "main": "core/index.mjs",
   "types": "core/types/index.d.ts",
@@ -21,7 +21,10 @@
     "wordpress"
   ],
   "scripts": {
-    "bundle": "node core/bundle.mjs",
+    "build": "npm run audit:admin; npm run install:admin; npm run build:admin",
+    "build:admin": "npm run build --prefix ./core/admin",
+    "install:admin": "npm install --prefix ./core/admin",
+    "audit:admin": "npm audit fix --prefix ./core/admin",
     "start": "node core/supervisor.mjs",
     "start:direct": "node core/index.mjs",
     "prod": "node core/supervisor.mjs",
