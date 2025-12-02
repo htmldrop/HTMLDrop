@@ -20,6 +20,8 @@ import ThemesController from '../controllers/v1/ThemesController.mjs'
 import JobsController from '../controllers/v1/JobsController.mjs'
 import UpdateController from '../controllers/v1/UpdateController.mjs'
 import BadgeCountController from '../controllers/v1/BadgeCountController.mjs'
+import RolesController from '../controllers/v1/RolesController.mjs'
+import CapabilitiesController from '../controllers/v1/CapabilitiesController.mjs'
 import TracingController from '../controllers/TracingController.mjs'
 import dbCheckMiddleware from '../middlewares/dbCheckMiddleware.mjs'
 import dbRequiredMiddleware from '../middlewares/dbRequiredMiddleware.mjs'
@@ -74,6 +76,8 @@ export default (context) => {
   router.use('/v1/jobs', jwtMiddleware(context), registryMiddleware(context), JobsController(context))
   router.use('/v1/updates', jwtMiddleware(context), registryMiddleware(context), UpdateController(context))
   router.use('/v1/badge-counts', jwtMiddleware(context), registryMiddleware(context), BadgeCountController(context))
+  router.use('/v1/roles', jwtMiddleware(context), registryMiddleware(context), RolesController(context))
+  router.use('/v1/capabilities', jwtMiddleware(context), registryMiddleware(context), CapabilitiesController(context))
   router.use('/v1/tracing', jwtMiddleware(context), registryMiddleware(context), TracingController)
   router.use('/v1/post-types', jwtMiddleware(context), registryMiddleware(context), PostTypesController(context))
   router.use(

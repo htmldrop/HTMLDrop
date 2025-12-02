@@ -193,6 +193,16 @@ export default async ({ req, res, next }) => {
       menu_title: translate('Home', locale)
     },
     {
+      capabilities: { manage_roles: 'manage_roles' },
+      badge: 0,
+      position: 1100,
+      file: 'Roles.vue',
+      parent_slug: 'users',
+      slug: 'roles',
+      page_title: translate('Roles & Capabilities', locale),
+      menu_title: translate('Roles', locale)
+    },
+    {
       capabilities: { manage_dashboard: 'manage_options' },
       badge: 0,
       position: 1000,

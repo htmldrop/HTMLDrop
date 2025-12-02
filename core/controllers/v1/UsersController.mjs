@@ -754,5 +754,79 @@ export default (context) => {
     res.json(deleted)
   })
 
+  /**
+   * @openapi
+   * /users/{idOrUsername}/roles:
+   *   get:
+   *     tags:
+   *       - Users
+   *     summary: Get roles for a user
+   *     security:
+   *       - bearerAuth: []
+   */
+  router.get('/:idOrUsername/roles', async (req, res) => {
+    const { knex, table } = context
+    const { idOrUsername } = req.params
+
+    const user = await knex(table('users'))
+      .where((builder) => builder.where('id', idOrUsername).orWhere('username', idOrUsername))
+      .first()
+    if (!user) return res.status(404).json({ error: 'User not found' })
+
+    const hasAccess = await req.guard.user({ canOneOf: ['manage_roles', 'read_user'], userId: req?.user?.id })
+    if (!hasAccess && user.id !== req.user?.id) return res.status(403).json({ error: 'Permission denied' })
+
+    const roles = await knex(table('user_roles'))
+      .join(table('roles'), `${table('user_roles')}.role_id`, '=', `${table('roles')}.id`)
+      .where(`${table('user_roles')}.user_id`, user.id)
+      .select(`${table('roles')}.id`, `${table('roles')}.name`, `${table('roles')}.slug`)
+
+    res.json(roles)
+  })
+
+  /**
+   * @openapi
+   * /users/{idOrUsername}/roles:
+   *   put:
+   *     tags:
+   *       - Users
+   *     summary: Set roles for a user (replaces all)
+   *     security:
+   *       - bearerAuth: []
+   */
+  router.put('/:idOrUsername/roles', async (req, res) => {
+    const { knex, table } = context
+    const { idOrUsername } = req.params
+    const { role_ids } = req.body
+
+    const hasAccess = await req.guard.user({ canOneOf: ['manage_roles'], userId: req?.user?.id })
+    if (!hasAccess) return res.status(403).json({ error: 'Permission denied' })
+
+    const user = await knex(table('users'))
+      .where((builder) => builder.where('id', idOrUsername).orWhere('username', idOrUsername))
+      .first()
+    if (!user) return res.status(404).json({ error: 'User not found' })
+
+    // Delete existing roles
+    await knex(table('user_roles')).where('user_id', user.id).delete()
+
+    // Insert new roles
+    if (role_ids && role_ids.length > 0) {
+      const inserts = role_ids.map(role_id => ({
+        user_id: user.id,
+        role_id
+      }))
+      await knex(table('user_roles')).insert(inserts)
+    }
+
+    // Get updated roles
+    const roles = await knex(table('user_roles'))
+      .join(table('roles'), `${table('user_roles')}.role_id`, '=', `${table('roles')}.id`)
+      .where(`${table('user_roles')}.user_id`, user.id)
+      .select(`${table('roles')}.id`, `${table('roles')}.name`, `${table('roles')}.slug`)
+
+    res.json({ success: true, roles })
+  })
+
   return router
 }

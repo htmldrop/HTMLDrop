@@ -23,6 +23,7 @@ export const seed = async (knex) => {
     { id: 16, name: 'Manage plugins', slug: 'manage_plugins' },
     { id: 17, name: 'Manage themes', slug: 'manage_themes' },
     { id: 18, name: 'Manage jobs', slug: 'manage_jobs' },
+    { id: 19, name: 'Manage roles', slug: 'manage_roles' },
 
     // Post types
     { id: 20, name: 'Read post type', slug: 'read_post_type' },

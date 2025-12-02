@@ -75,10 +75,20 @@
 
         <card>
           <template #header>
-            <h2>{{ translate('Categories') }}</h2>
+            <h2>{{ translate('Roles') }}</h2>
           </template>
-          
+          <div class="roles-list">
+            <label v-for="role in allRoles" :key="role.id" class="role-item">
+              <input
+                type="checkbox"
+                :checked="userRoles.some(r => r.id === role.id)"
+                @change="toggleRole(role, $event.target.checked)"
+              />
+              <span>{{ role.name }}</span>
+            </label>
+          </div>
           <template #footer>
+            <button @click="saveRoles" :disabled="!rolesChanged">{{ translate('Save roles') }}</button>
           </template>
         </card>
 
@@ -109,7 +119,10 @@ export default {
     title: '',
     newSlug: '',
     status: 'active',
-    obj: {}
+    obj: {},
+    allRoles: [],
+    userRoles: [],
+    userRolesOriginal: []
   }),
   created() {
     this.init()
@@ -125,6 +138,11 @@ export default {
     },
     picture() {
       return this.postTypeFields?.find(f => f.field.slug === 'picture' && f.field.type === 'media')
+    },
+    rolesChanged() {
+      const currentIds = this.userRoles.map(r => r.id).sort()
+      const originalIds = this.userRolesOriginal.map(r => r.id).sort()
+      return JSON.stringify(currentIds) !== JSON.stringify(originalIds)
     }
   },
   watch: {
@@ -314,8 +332,58 @@ export default {
       this.newSlug = ''
       this.status = 'active'
       this.obj = {}
-      await Promise.all([this.getPost()])
+      this.userRoles = []
+      this.userRolesOriginal = []
+      await Promise.all([this.getPost(), this.getAllRoles()])
+      if (!this.isCreating) {
+        await this.getUserRoles()
+      }
       if (this.isCreating) this.newSlug = ''
+    },
+    async getAllRoles() {
+      try {
+        const result = await this.apiFetch(`${this.apiBase}/api/v1/roles`)
+        this.allRoles = await result.json()
+      } catch (e) {
+        console.error('Failed to load roles:', e)
+        this.allRoles = []
+      }
+    },
+    async getUserRoles() {
+      if (!this.obj?.id) return
+      try {
+        const result = await this.apiFetch(`${this.apiBase}/api/v1/users/${this.obj.id}/roles`)
+        const roles = await result.json()
+        this.userRoles = roles
+        this.userRolesOriginal = JSON.parse(JSON.stringify(roles))
+      } catch (e) {
+        console.error('Failed to load user roles:', e)
+        this.userRoles = []
+        this.userRolesOriginal = []
+      }
+    },
+    toggleRole(role, checked) {
+      if (checked) {
+        if (!this.userRoles.some(r => r.id === role.id)) {
+          this.userRoles.push(role)
+        }
+      } else {
+        this.userRoles = this.userRoles.filter(r => r.id !== role.id)
+      }
+    },
+    async saveRoles() {
+      if (!this.obj?.id) return
+      try {
+        const roleIds = this.userRoles.map(r => r.id)
+        await this.apiFetch(`${this.apiBase}/api/v1/users/${this.obj.id}/roles`, {
+          method: 'PUT',
+          body: JSON.stringify({ role_ids: roleIds })
+        })
+        this.userRolesOriginal = JSON.parse(JSON.stringify(this.userRoles))
+      } catch (e) {
+        console.error('Failed to save roles:', e)
+        alert(`Failed to save roles: ${e.message}`)
+      }
     },
     async getPost() {
       if (!this.slug || this.isCreating) return
@@ -569,5 +637,36 @@ a:hover {
   .wrapper {
     flex-direction: column;
   }
+}
+
+.roles-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.role-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: #f8f9fa;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.role-item:hover {
+  background: #e9ecef;
+}
+
+.role-item input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+}
+
+.role-item span {
+  font-weight: 500;
 }
 </style>
