@@ -10,11 +10,22 @@ export default (context) => {
    *     tags:
    *       - Roles
    *     summary: List all roles
+   *     description: Returns all roles with their capabilities and user counts
    *     security:
    *       - bearerAuth: []
    *     responses:
    *       200:
-   *         description: List of roles with capabilities and user counts
+   *         description: List of roles
+   *         content:
+   *           application/json:
+   *             schema:
+   *               type: array
+   *               items:
+   *                 $ref: '#/components/schemas/Role'
+   *       401:
+   *         description: Unauthorized
+   *       403:
+   *         description: Forbidden - insufficient permissions
    */
   router.get('/', async (req, res) => {
     const { knex, table } = context
@@ -68,8 +79,30 @@ export default (context) => {
    *     tags:
    *       - Roles
    *     summary: Get a role by slug
+   *     description: Returns a single role with its capabilities and user count
    *     security:
    *       - bearerAuth: []
+   *     parameters:
+   *       - in: path
+   *         name: slug
+   *         required: true
+   *         schema:
+   *           type: string
+   *         description: Role slug
+   *         example: administrator
+   *     responses:
+   *       200:
+   *         description: Role details
+   *         content:
+   *           application/json:
+   *             schema:
+   *               $ref: '#/components/schemas/Role'
+   *       401:
+   *         description: Unauthorized
+   *       403:
+   *         description: Forbidden - insufficient permissions
+   *       404:
+   *         description: Role not found
    */
   router.get('/:slug', async (req, res) => {
     const { knex, table } = context
@@ -105,8 +138,43 @@ export default (context) => {
    *     tags:
    *       - Roles
    *     summary: Create a new role
+   *     description: Creates a new role with the specified name and optional description
    *     security:
    *       - bearerAuth: []
+   *     requestBody:
+   *       required: true
+   *       content:
+   *         application/json:
+   *           schema:
+   *             type: object
+   *             required:
+   *               - name
+   *             properties:
+   *               name:
+   *                 type: string
+   *                 description: Display name for the role
+   *                 example: Editor
+   *               slug:
+   *                 type: string
+   *                 description: URL-friendly identifier (auto-generated from name if not provided)
+   *                 example: editor
+   *               description:
+   *                 type: string
+   *                 description: Optional description of the role
+   *                 example: Can edit and publish content
+   *     responses:
+   *       200:
+   *         description: Role created successfully
+   *         content:
+   *           application/json:
+   *             schema:
+   *               $ref: '#/components/schemas/Role'
+   *       400:
+   *         description: Bad request - name required or slug already exists
+   *       401:
+   *         description: Unauthorized
+   *       403:
+   *         description: Forbidden - insufficient permissions
    */
   router.post('/', async (req, res) => {
     const { knex, table, normalizeSlug } = context
@@ -139,8 +207,45 @@ export default (context) => {
    *     tags:
    *       - Roles
    *     summary: Update a role
+   *     description: Updates the name and/or description of an existing role
    *     security:
    *       - bearerAuth: []
+   *     parameters:
+   *       - in: path
+   *         name: slug
+   *         required: true
+   *         schema:
+   *           type: string
+   *         description: Role slug
+   *         example: editor
+   *     requestBody:
+   *       required: true
+   *       content:
+   *         application/json:
+   *           schema:
+   *             type: object
+   *             properties:
+   *               name:
+   *                 type: string
+   *                 description: New display name for the role
+   *                 example: Senior Editor
+   *               description:
+   *                 type: string
+   *                 description: New description for the role
+   *                 example: Can edit, publish, and manage other editors
+   *     responses:
+   *       200:
+   *         description: Role updated successfully
+   *         content:
+   *           application/json:
+   *             schema:
+   *               $ref: '#/components/schemas/Role'
+   *       401:
+   *         description: Unauthorized
+   *       403:
+   *         description: Forbidden - insufficient permissions
+   *       404:
+   *         description: Role not found
    */
   router.patch('/:slug', async (req, res) => {
     const { knex, table } = context
@@ -186,8 +291,38 @@ export default (context) => {
    *     tags:
    *       - Roles
    *     summary: Delete a role
+   *     description: Permanently deletes a role and removes it from all users. The administrator role cannot be deleted.
    *     security:
    *       - bearerAuth: []
+   *     parameters:
+   *       - in: path
+   *         name: slug
+   *         required: true
+   *         schema:
+   *           type: string
+   *         description: Role slug
+   *         example: editor
+   *     responses:
+   *       200:
+   *         description: Role deleted successfully
+   *         content:
+   *           application/json:
+   *             schema:
+   *               type: object
+   *               properties:
+   *                 success:
+   *                   type: boolean
+   *                   example: true
+   *                 deleted:
+   *                   $ref: '#/components/schemas/Role'
+   *       400:
+   *         description: Bad request - cannot delete administrator role
+   *       401:
+   *         description: Unauthorized
+   *       403:
+   *         description: Forbidden - insufficient permissions
+   *       404:
+   *         description: Role not found
    */
   router.delete('/:slug', async (req, res) => {
     const { knex, table } = context
@@ -221,9 +356,54 @@ export default (context) => {
    *   put:
    *     tags:
    *       - Roles
-   *     summary: Set capabilities for a role (replaces all)
+   *     summary: Set capabilities for a role
+   *     description: Replaces all capabilities for a role with the provided list
    *     security:
    *       - bearerAuth: []
+   *     parameters:
+   *       - in: path
+   *         name: slug
+   *         required: true
+   *         schema:
+   *           type: string
+   *         description: Role slug
+   *         example: editor
+   *     requestBody:
+   *       required: true
+   *       content:
+   *         application/json:
+   *           schema:
+   *             type: object
+   *             required:
+   *               - capability_ids
+   *             properties:
+   *               capability_ids:
+   *                 type: array
+   *                 items:
+   *                   type: integer
+   *                 description: Array of capability IDs to assign to the role
+   *                 example: [1, 2, 3, 5, 7]
+   *     responses:
+   *       200:
+   *         description: Capabilities updated successfully
+   *         content:
+   *           application/json:
+   *             schema:
+   *               type: object
+   *               properties:
+   *                 success:
+   *                   type: boolean
+   *                   example: true
+   *                 capabilities:
+   *                   type: array
+   *                   items:
+   *                     $ref: '#/components/schemas/Capability'
+   *       401:
+   *         description: Unauthorized
+   *       403:
+   *         description: Forbidden - insufficient permissions
+   *       404:
+   *         description: Role not found
    */
   router.put('/:slug/capabilities', async (req, res) => {
     const { knex, table } = context

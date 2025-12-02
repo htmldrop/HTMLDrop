@@ -36,7 +36,7 @@ export default (context) => {
   router.use(
     express.json({
       type: (req) => {
-        
+
         const contentType = req.headers['content-type'] || ''
         return contentType === '' || contentType.includes('json') || contentType.includes('text/plain')
       }

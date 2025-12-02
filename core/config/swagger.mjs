@@ -174,6 +174,67 @@ const options = {
             value: { type: 'string' },
             autoload: { type: 'boolean' }
           }
+        },
+        Role: {
+          type: 'object',
+          description: 'User role with associated capabilities',
+          properties: {
+            id: { type: 'integer' },
+            name: { type: 'string', example: 'Administrator' },
+            slug: { type: 'string', example: 'administrator' },
+            description: { type: 'string', example: 'Full access to all features' },
+            created_at: { type: 'string', format: 'date-time' },
+            updated_at: { type: 'string', format: 'date-time' },
+            capabilities: {
+              type: 'array',
+              items: { $ref: '#/components/schemas/Capability' },
+              description: 'List of capabilities assigned to this role'
+            },
+            user_count: {
+              type: 'integer',
+              description: 'Number of users with this role',
+              example: 5
+            }
+          }
+        },
+        Capability: {
+          type: 'object',
+          description: 'Permission capability that can be assigned to roles',
+          properties: {
+            id: { type: 'integer' },
+            name: { type: 'string', example: 'Manage posts' },
+            slug: { type: 'string', example: 'manage_posts' },
+            created_at: { type: 'string', format: 'date-time' },
+            updated_at: { type: 'string', format: 'date-time' }
+          }
+        },
+        Job: {
+          type: 'object',
+          description: 'Background job for async processing',
+          properties: {
+            id: { type: 'integer' },
+            jobId: { type: 'string', description: 'Unique job identifier', example: 'job_abc123' },
+            name: { type: 'string', example: 'Import Users' },
+            description: { type: 'string', example: 'Importing users from CSV' },
+            type: { type: 'string', example: 'import' },
+            status: {
+              type: 'string',
+              enum: ['pending', 'running', 'completed', 'failed'],
+              example: 'running'
+            },
+            progress: { type: 'integer', minimum: 0, maximum: 100, example: 45 },
+            iconSvg: { type: 'string', description: 'SVG icon markup' },
+            source: { type: 'string', description: 'Source plugin or module', example: 'user-import-plugin' },
+            metadata: {
+              type: 'object',
+              description: 'Additional job-specific data',
+              additionalProperties: true
+            },
+            createdAt: { type: 'string', format: 'date-time' },
+            startedAt: { type: 'string', format: 'date-time', nullable: true },
+            completedAt: { type: 'string', format: 'date-time', nullable: true },
+            error: { type: 'string', nullable: true, description: 'Error message if job failed' }
+          }
         }
       }
     },
@@ -183,6 +244,8 @@ const options = {
       { name: 'Authentication', description: 'User authentication and authorization' },
       { name: 'OAuth', description: 'OAuth provider authentication' },
       { name: 'Users', description: 'User management' },
+      { name: 'Roles', description: 'Role management' },
+      { name: 'Capabilities', description: 'Capability management' },
       { name: 'Posts', description: 'Content posts' },
       { name: 'Post Types', description: 'Post type management' },
       { name: 'Post Type Fields', description: 'Custom fields for post types' },
@@ -192,6 +255,8 @@ const options = {
       { name: 'Options', description: 'Site options and settings' },
       { name: 'Plugins', description: 'Plugin management' },
       { name: 'Themes', description: 'Theme management' },
+      { name: 'Jobs', description: 'Background job management' },
+      { name: 'Updates', description: 'CMS update management' },
       { name: 'Dashboard', description: 'Admin dashboard data' },
       { name: 'Translations', description: 'Translation and localization' }
     ]

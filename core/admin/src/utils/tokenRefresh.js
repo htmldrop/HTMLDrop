@@ -135,7 +135,7 @@ export default function createTokenRefreshManager(callback) {
 
     // Intercept localStorage.setItem for same-window updates
     originalSetItem = localStorage.setItem
-    localStorage.setItem = function(key, value) {
+    localStorage.setItem = function (key, value) {
       const oldValue = localStorage.getItem(key)
       originalSetItem.apply(this, arguments)
 

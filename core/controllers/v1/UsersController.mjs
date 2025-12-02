@@ -761,8 +761,32 @@ export default (context) => {
    *     tags:
    *       - Users
    *     summary: Get roles for a user
+   *     description: Returns all roles assigned to a specific user
    *     security:
    *       - bearerAuth: []
+   *     parameters:
+   *       - in: path
+   *         name: idOrUsername
+   *         required: true
+   *         schema:
+   *           type: string
+   *         description: User ID or username
+   *         example: johndoe
+   *     responses:
+   *       200:
+   *         description: List of roles assigned to the user
+   *         content:
+   *           application/json:
+   *             schema:
+   *               type: array
+   *               items:
+   *                 $ref: '#/components/schemas/Role'
+   *       401:
+   *         description: Unauthorized
+   *       403:
+   *         description: Forbidden - insufficient permissions
+   *       404:
+   *         description: User not found
    */
   router.get('/:idOrUsername/roles', async (req, res) => {
     const { knex, table } = context
@@ -790,9 +814,54 @@ export default (context) => {
    *   put:
    *     tags:
    *       - Users
-   *     summary: Set roles for a user (replaces all)
+   *     summary: Set roles for a user
+   *     description: Replaces all roles for a user with the provided list of role IDs
    *     security:
    *       - bearerAuth: []
+   *     parameters:
+   *       - in: path
+   *         name: idOrUsername
+   *         required: true
+   *         schema:
+   *           type: string
+   *         description: User ID or username
+   *         example: johndoe
+   *     requestBody:
+   *       required: true
+   *       content:
+   *         application/json:
+   *           schema:
+   *             type: object
+   *             required:
+   *               - role_ids
+   *             properties:
+   *               role_ids:
+   *                 type: array
+   *                 items:
+   *                   type: integer
+   *                 description: Array of role IDs to assign to the user
+   *                 example: [1, 2]
+   *     responses:
+   *       200:
+   *         description: Roles updated successfully
+   *         content:
+   *           application/json:
+   *             schema:
+   *               type: object
+   *               properties:
+   *                 success:
+   *                   type: boolean
+   *                   example: true
+   *                 roles:
+   *                   type: array
+   *                   items:
+   *                     $ref: '#/components/schemas/Role'
+   *       401:
+   *         description: Unauthorized
+   *       403:
+   *         description: Forbidden - insufficient permissions
+   *       404:
+   *         description: User not found
    */
   router.put('/:idOrUsername/roles', async (req, res) => {
     const { knex, table } = context

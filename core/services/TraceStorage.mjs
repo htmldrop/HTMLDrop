@@ -217,7 +217,7 @@ export default class TraceStorage {
       p50Duration: durations[p50Index] || 0,
       p95Duration: durations[p95Index] || 0,
       p99Duration: durations[p99Index] || 0,
-      errorRate: errorRate.toFixed(2) + '%',
+      errorRate: `${errorRate.toFixed(2)  }%`,
       byCategory,
       byPath,
       storage: {

@@ -351,7 +351,7 @@ export default class TraceStorageDB {
         p50Duration: p50,
         p95Duration: p95,
         p99Duration: p99,
-        errorRate: statsResult.trace_count > 0 ? ((statsResult.error_trace_count / statsResult.trace_count) * 100).toFixed(2) + '%' : '0%',
+        errorRate: statsResult.trace_count > 0 ? `${((statsResult.error_trace_count / statsResult.trace_count) * 100).toFixed(2)  }%` : '0%',
         byPath: byPathMap,
         storage: {
           totalStored: this.stats.totalStored,
@@ -421,7 +421,7 @@ export default class TraceStorageDB {
       p50Duration: this._percentile(durations, 50),
       p95Duration: this._percentile(durations, 95),
       p99Duration: this._percentile(durations, 99),
-      errorRate: ((recent.filter((t) => t.summary?.errorCount > 0).length / recent.length) * 100).toFixed(2) + '%',
+      errorRate: `${((recent.filter((t) => t.summary?.errorCount > 0).length / recent.length) * 100).toFixed(2)  }%`,
       byPath: {},
       storage: {
         memoryCacheSize: this.recentTraces.length
@@ -491,7 +491,7 @@ export default class TraceStorageDB {
 
       // Write compressed archive
       const tracesJson = JSON.stringify(traces.map((row) => this._rowToTrace(row)), null, 2)
-      const tempFile = archiveFile + '.tmp'
+      const tempFile = `${archiveFile  }.tmp`
 
       await pipeline(
         Readable.from([tracesJson]),

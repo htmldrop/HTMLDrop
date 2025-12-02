@@ -114,7 +114,7 @@ export const seed = async (knex) => {
     { id: 81, name: 'Create jobs', slug: 'create_jobs' },
     { id: 82, name: 'Edit job', slug: 'edit_job' },
     { id: 83, name: 'Edit jobs', slug: 'edit_jobs' },
-    { id: 84, name: 'Delete jobs', slug: 'delete_jobs' },
+    { id: 84, name: 'Delete jobs', slug: 'delete_jobs' }
   ]
 
   for (const seed of seeds) {

@@ -31,7 +31,7 @@ export default [
     rules: {
       'indent': ['error', 2],
       'linebreak-style': ['error', 'unix'],
-      'quotes': ['error', 'single', { avoidEscape: true }],
+      'quotes': ['error', 'single', { avoidEscape: true, allowTemplateLiterals: true }],
       'semi': ['error', 'never'],
       'no-console': 'off',
       'no-unused-vars': 'off',

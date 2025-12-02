@@ -13,8 +13,47 @@ export default (context) => {
   const updateService = new UpdateService(context)
 
   /**
-   * GET /api/v1/updates/check
-   * Check for available updates
+   * @openapi
+   * /updates/check:
+   *   get:
+   *     tags:
+   *       - Updates
+   *     summary: Check for updates
+   *     description: Checks if a newer version of the CMS is available on GitHub
+   *     security:
+   *       - bearerAuth: []
+   *     responses:
+   *       200:
+   *         description: Update check completed
+   *         content:
+   *           application/json:
+   *             schema:
+   *               type: object
+   *               properties:
+   *                 success:
+   *                   type: boolean
+   *                   example: true
+   *                 data:
+   *                   type: object
+   *                   properties:
+   *                     hasUpdate:
+   *                       type: boolean
+   *                       description: Whether an update is available
+   *                     currentVersion:
+   *                       type: string
+   *                       example: "1.0.35"
+   *                     latestVersion:
+   *                       type: string
+   *                       example: "1.0.36"
+   *                     releaseNotes:
+   *                       type: string
+   *                       description: Release notes for the latest version
+   *       401:
+   *         description: Unauthorized
+   *       403:
+   *         description: Forbidden - requires manage_dashboard capability
+   *       500:
+   *         description: Server error
    */
   router.get('/check', async (req, res) => {
     try {
@@ -51,8 +90,42 @@ export default (context) => {
   })
 
   /**
-   * GET /api/v1/updates/current
-   * Get current version
+   * @openapi
+   * /updates/current:
+   *   get:
+   *     tags:
+   *       - Updates
+   *     summary: Get current version
+   *     description: Returns the current installed version and commit SHA of the CMS
+   *     security:
+   *       - bearerAuth: []
+   *     responses:
+   *       200:
+   *         description: Current version info
+   *         content:
+   *           application/json:
+   *             schema:
+   *               type: object
+   *               properties:
+   *                 success:
+   *                   type: boolean
+   *                   example: true
+   *                 data:
+   *                   type: object
+   *                   properties:
+   *                     version:
+   *                       type: string
+   *                       example: "1.0.35"
+   *                     commit:
+   *                       type: string
+   *                       description: Git commit SHA
+   *                       example: "a1b2c3d4e5f6"
+   *       401:
+   *         description: Unauthorized
+   *       403:
+   *         description: Forbidden - requires manage_dashboard capability
+   *       500:
+   *         description: Server error
    */
   router.get('/current', async (req, res) => {
     try {
@@ -85,8 +158,55 @@ export default (context) => {
   })
 
   /**
-   * POST /api/v1/updates/pull
-   * Pull latest changes from GitHub
+   * @openapi
+   * /updates/pull:
+   *   post:
+   *     tags:
+   *       - Updates
+   *     summary: Pull latest update
+   *     description: Pulls the latest changes from GitHub and restarts the server. The server will restart automatically after a successful pull.
+   *     security:
+   *       - bearerAuth: []
+   *     requestBody:
+   *       content:
+   *         application/json:
+   *           schema:
+   *             type: object
+   *             properties:
+   *               branch:
+   *                 type: string
+   *                 default: main
+   *                 description: Git branch to pull from
+   *                 example: main
+   *     responses:
+   *       200:
+   *         description: Update pulled successfully. Server will restart.
+   *         content:
+   *           application/json:
+   *             schema:
+   *               type: object
+   *               properties:
+   *                 success:
+   *                   type: boolean
+   *                   example: true
+   *                 data:
+   *                   type: object
+   *                   properties:
+   *                     message:
+   *                       type: string
+   *                       example: "Update pulled successfully"
+   *                     previousVersion:
+   *                       type: string
+   *                       example: "1.0.35"
+   *                     newVersion:
+   *                       type: string
+   *                       example: "1.0.36"
+   *       401:
+   *         description: Unauthorized
+   *       403:
+   *         description: Forbidden - requires manage_dashboard capability
+   *       500:
+   *         description: Server error
    */
   router.post('/pull', async (req, res) => {
     try {
@@ -132,8 +252,50 @@ export default (context) => {
   })
 
   /**
-   * GET /api/v1/updates/status
-   * Get update status (combines check and current)
+   * @openapi
+   * /updates/status:
+   *   get:
+   *     tags:
+   *       - Updates
+   *     summary: Get full update status
+   *     description: Returns combined update check and current version information in a single request
+   *     security:
+   *       - bearerAuth: []
+   *     responses:
+   *       200:
+   *         description: Full update status
+   *         content:
+   *           application/json:
+   *             schema:
+   *               type: object
+   *               properties:
+   *                 success:
+   *                   type: boolean
+   *                   example: true
+   *                 data:
+   *                   type: object
+   *                   properties:
+   *                     hasUpdate:
+   *                       type: boolean
+   *                       description: Whether an update is available
+   *                     currentVersion:
+   *                       type: string
+   *                       example: "1.0.35"
+   *                     latestVersion:
+   *                       type: string
+   *                       example: "1.0.36"
+   *                     releaseNotes:
+   *                       type: string
+   *                     commit:
+   *                       type: string
+   *                       description: Current git commit SHA
+   *                       example: "a1b2c3d4e5f6"
+   *       401:
+   *         description: Unauthorized
+   *       403:
+   *         description: Forbidden - requires manage_dashboard capability
+   *       500:
+   *         description: Server error
    */
   router.get('/status', async (req, res) => {
     try {

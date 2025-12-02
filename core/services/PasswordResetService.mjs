@@ -88,7 +88,7 @@ export default class PasswordResetService {
 
         if (typeof storedDate === 'string' && !storedDate.includes('T') && !storedDate.includes('Z')) {
           // Format is "YYYY-MM-DD HH:MM:SS.mmm" - add 'Z' to parse as UTC
-          expiresAt = new Date(storedDate.replace(' ', 'T') + 'Z')
+          expiresAt = new Date(`${storedDate.replace(' ', 'T')  }Z`)
         } else {
           // ISO format or already has timezone info
           expiresAt = new Date(storedDate)
@@ -164,7 +164,7 @@ export default class PasswordResetService {
 
       if (typeof storedDate === 'string' && !storedDate.includes('T') && !storedDate.includes('Z')) {
         // Format is "YYYY-MM-DD HH:MM:SS.mmm" - add 'Z' to parse as UTC
-        expiresAt = new Date(storedDate.replace(' ', 'T') + 'Z')
+        expiresAt = new Date(`${storedDate.replace(' ', 'T')  }Z`)
       } else {
         // ISO format or already has timezone info
         expiresAt = new Date(storedDate)

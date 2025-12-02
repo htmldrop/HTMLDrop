@@ -462,7 +462,7 @@ describe('SharedSSRCache', () => {
       const module = await import('./SharedSSRCache.mjs')
 
       // Create 1MB of content
-      const largeHtml = '<html>' + 'x'.repeat(1024 * 1024) + '</html>'
+      const largeHtml = `<html>${  'x'.repeat(1024 * 1024)  }</html>`
       module.setCachedSSR('/large', largeHtml)
       const result = await module.getCachedSSR('/large', 5000)
 

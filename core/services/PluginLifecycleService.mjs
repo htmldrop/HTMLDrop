@@ -277,7 +277,7 @@ class PluginLifecycleService {
         })
 
         npmProcess.on('error', (error) => {
-          console.error(`npm install process error:`, error)
+          console.error('npm install process error:', error)
           reject(new Error(`Failed to start npm install: ${error.message}`))
         })
       })

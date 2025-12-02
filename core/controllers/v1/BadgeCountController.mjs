@@ -5,9 +5,55 @@ export default (context) => {
   const router = express.Router()
 
   /**
-   * POST /api/v1/badge-counts/refresh
-   * Triggers a refresh of badge counts (forces immediate update, bypassing cache TTL)
-   * Requires: manage_dashboard capability
+   * @openapi
+   * /badge-counts/refresh:
+   *   post:
+   *     tags:
+   *       - Dashboard
+   *     summary: Refresh badge counts
+   *     description: Triggers a refresh of badge counts, forcing an immediate update and bypassing the cache TTL
+   *     security:
+   *       - bearerAuth: []
+   *     responses:
+   *       200:
+   *         description: Badge counts refreshed successfully
+   *         content:
+   *           application/json:
+   *             schema:
+   *               type: object
+   *               properties:
+   *                 success:
+   *                   type: boolean
+   *                   example: true
+   *                 counts:
+   *                   type: object
+   *                   description: Badge count values keyed by menu slug
+   *                   additionalProperties:
+   *                     type: integer
+   *                   example:
+   *                     posts: 5
+   *                     comments: 12
+   *                     users: 3
+   *                 updated_at:
+   *                   type: string
+   *                   format: date-time
+   *                   description: Timestamp when counts were last updated
+   *       401:
+   *         description: Unauthorized
+   *       403:
+   *         description: Forbidden - requires manage_dashboard capability
+   *       500:
+   *         description: Server error
+   *         content:
+   *           application/json:
+   *             schema:
+   *               type: object
+   *               properties:
+   *                 success:
+   *                   type: boolean
+   *                   example: false
+   *                 message:
+   *                   type: string
    */
   router.post('/refresh', async (req, res) => {
     try {
@@ -38,9 +84,55 @@ export default (context) => {
   })
 
   /**
-   * GET /api/v1/badge-counts
-   * Get current badge counts from cache
-   * Requires: manage_dashboard capability
+   * @openapi
+   * /badge-counts:
+   *   get:
+   *     tags:
+   *       - Dashboard
+   *     summary: Get badge counts
+   *     description: Returns current badge counts from cache. Badge counts are used to display notification badges in the admin menu.
+   *     security:
+   *       - bearerAuth: []
+   *     responses:
+   *       200:
+   *         description: Badge counts retrieved successfully
+   *         content:
+   *           application/json:
+   *             schema:
+   *               type: object
+   *               properties:
+   *                 success:
+   *                   type: boolean
+   *                   example: true
+   *                 counts:
+   *                   type: object
+   *                   description: Badge count values keyed by menu slug
+   *                   additionalProperties:
+   *                     type: integer
+   *                   example:
+   *                     posts: 5
+   *                     comments: 12
+   *                     users: 3
+   *                 updated_at:
+   *                   type: string
+   *                   format: date-time
+   *                   description: Timestamp when counts were last updated
+   *       401:
+   *         description: Unauthorized
+   *       403:
+   *         description: Forbidden - requires manage_dashboard capability
+   *       500:
+   *         description: Server error
+   *         content:
+   *           application/json:
+   *             schema:
+   *               type: object
+   *               properties:
+   *                 success:
+   *                   type: boolean
+   *                   example: false
+   *                 message:
+   *                   type: string
    */
   router.get('/', async (req, res) => {
     try {

@@ -10,11 +10,22 @@ export default (context) => {
    *     tags:
    *       - Capabilities
    *     summary: List all capabilities
+   *     description: Returns all available capabilities that can be assigned to roles
    *     security:
    *       - bearerAuth: []
    *     responses:
    *       200:
-   *         description: List of all capabilities
+   *         description: List of capabilities
+   *         content:
+   *           application/json:
+   *             schema:
+   *               type: array
+   *               items:
+   *                 $ref: '#/components/schemas/Capability'
+   *       401:
+   *         description: Unauthorized
+   *       403:
+   *         description: Forbidden - insufficient permissions
    */
   router.get('/', async (req, res) => {
     const { knex, table } = context
@@ -34,8 +45,30 @@ export default (context) => {
    *     tags:
    *       - Capabilities
    *     summary: Get a capability by slug
+   *     description: Returns a single capability by its slug
    *     security:
    *       - bearerAuth: []
+   *     parameters:
+   *       - in: path
+   *         name: slug
+   *         required: true
+   *         schema:
+   *           type: string
+   *         description: Capability slug
+   *         example: manage_posts
+   *     responses:
+   *       200:
+   *         description: Capability details
+   *         content:
+   *           application/json:
+   *             schema:
+   *               $ref: '#/components/schemas/Capability'
+   *       401:
+   *         description: Unauthorized
+   *       403:
+   *         description: Forbidden - insufficient permissions
+   *       404:
+   *         description: Capability not found
    */
   router.get('/:slug', async (req, res) => {
     const { knex, table } = context

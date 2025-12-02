@@ -391,7 +391,7 @@ export default class SchedulerService {
    * Stop all scheduled tasks
    */
   stopAll() {
-    console.log(`[Scheduler] Stopping all scheduled tasks...`)
+    console.log('[Scheduler] Stopping all scheduled tasks...')
 
     for (const task of this.tasks) {
       try {

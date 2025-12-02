@@ -134,7 +134,7 @@ function setupWatcher(folderPath, customIgnorePatterns = []) {
   try {
     // Build ignore patterns array
     const ignorePatterns = [
-      /(^|[\/\\])(\.|node_modules)/, // Default: hidden files and node_modules
+      /(^|[/\\])(\.|node_modules)/, // Default: hidden files and node_modules
       ...customIgnorePatterns
     ]
 

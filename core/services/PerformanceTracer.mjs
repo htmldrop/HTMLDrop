@@ -209,16 +209,16 @@ export class TraceSpan {
         },
         end: this.endMemory
           ? {
-              heapUsed: this.endMemory.heapUsed,
-              heapTotal: this.endMemory.heapTotal,
-              rss: this.endMemory.rss
-            }
+            heapUsed: this.endMemory.heapUsed,
+            heapTotal: this.endMemory.heapTotal,
+            rss: this.endMemory.rss
+          }
           : null,
         delta: this.endMemory
           ? {
-              heapUsed: this.endMemory.heapUsed - this.startMemory.heapUsed,
-              rss: this.endMemory.rss - this.startMemory.rss
-            }
+            heapUsed: this.endMemory.heapUsed - this.startMemory.heapUsed,
+            rss: this.endMemory.rss - this.startMemory.rss
+          }
           : null
       },
       children: this.children.map((c) => c.toJSON())
@@ -516,13 +516,13 @@ export default class PerformanceTracer {
     output += `Request: ${this.request?.method} ${this.request?.url}\n`
     output += `Total Duration: ${summary.totalDuration}ms\n`
     output += `Spans: ${summary.spanCount} (${summary.errorCount} errors)\n`
-    output += `\nSlowest Operations:\n`
+    output += '\nSlowest Operations:\n'
 
     for (const span of summary.slowestSpans) {
       output += `  - ${span.name} (${span.category}): ${span.duration?.toFixed(2)}ms\n`
     }
 
-    output += `\nBy Category:\n`
+    output += '\nBy Category:\n'
     for (const [cat, data] of Object.entries(summary.byCategory)) {
       output += `  ${cat}: ${data.count} spans, ${data.totalDuration.toFixed(2)}ms total\n`
     }

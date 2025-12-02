@@ -37,7 +37,7 @@ export default (context) => {
       'read_post_type',
       'edit_post_types',
       'delete_post_types',
-      'create_post_types',
+      'create_post_types'
     ]
 
     const validCaps = resolvedCapabilities.filter((c) => routeCaps.includes(c))

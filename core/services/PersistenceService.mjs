@@ -247,7 +247,7 @@ class PersistenceService {
         await fs.promises.rm(backupDir, { recursive: true, force: true })
         console.log(`[PersistenceService] Cleaned up backup directory: ${backupDir}`)
       } catch (error) {
-        console.error(`[PersistenceService] Failed to clean up backup:`, error.message)
+        console.error('[PersistenceService] Failed to clean up backup:', error.message)
       }
     }
   }

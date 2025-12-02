@@ -12,9 +12,65 @@ export default (context) => {
   }
 
   /**
-   * GET /api/v1/jobs
-   * Get all jobs with optional filters
-   * Requires: manage_jobs or read_jobs capability
+   * @openapi
+   * /jobs:
+   *   get:
+   *     tags:
+   *       - Jobs
+   *     summary: List all jobs
+   *     description: Returns all background jobs with optional filters for status, type, and source
+   *     security:
+   *       - bearerAuth: []
+   *     parameters:
+   *       - in: query
+   *         name: status
+   *         schema:
+   *           type: string
+   *           enum: [pending, running, completed, failed]
+   *         description: Filter by job status
+   *       - in: query
+   *         name: type
+   *         schema:
+   *           type: string
+   *         description: Filter by job type (e.g., import, export, backup)
+   *       - in: query
+   *         name: source
+   *         schema:
+   *           type: string
+   *         description: Filter by source plugin or module
+   *       - in: query
+   *         name: limit
+   *         schema:
+   *           type: integer
+   *           default: 100
+   *         description: Maximum number of jobs to return
+   *       - in: query
+   *         name: offset
+   *         schema:
+   *           type: integer
+   *           default: 0
+   *         description: Number of jobs to skip for pagination
+   *     responses:
+   *       200:
+   *         description: List of jobs
+   *         content:
+   *           application/json:
+   *             schema:
+   *               type: object
+   *               properties:
+   *                 success:
+   *                   type: boolean
+   *                   example: true
+   *                 data:
+   *                   type: array
+   *                   items:
+   *                     $ref: '#/components/schemas/Job'
+   *       401:
+   *         description: Unauthorized
+   *       403:
+   *         description: Forbidden - requires manage_jobs or read_jobs capability
+   *       500:
+   *         description: Server error
    */
   router.get('/', async (req, res) => {
     try {
@@ -48,9 +104,44 @@ export default (context) => {
   })
 
   /**
-   * GET /api/v1/jobs/:jobId
-   * Get a specific job by ID
-   * Requires: manage_jobs or read_jobs capability
+   * @openapi
+   * /jobs/{jobId}:
+   *   get:
+   *     tags:
+   *       - Jobs
+   *     summary: Get a job by ID
+   *     description: Returns a single job by its unique job ID
+   *     security:
+   *       - bearerAuth: []
+   *     parameters:
+   *       - in: path
+   *         name: jobId
+   *         required: true
+   *         schema:
+   *           type: string
+   *         description: Unique job identifier
+   *         example: job_abc123
+   *     responses:
+   *       200:
+   *         description: Job details
+   *         content:
+   *           application/json:
+   *             schema:
+   *               type: object
+   *               properties:
+   *                 success:
+   *                   type: boolean
+   *                   example: true
+   *                 data:
+   *                   $ref: '#/components/schemas/Job'
+   *       401:
+   *         description: Unauthorized
+   *       403:
+   *         description: Forbidden - requires manage_jobs or read_job capability
+   *       404:
+   *         description: Job not found
+   *       500:
+   *         description: Server error
    */
   router.get('/:jobId', async (req, res) => {
     try {
@@ -85,9 +176,70 @@ export default (context) => {
   })
 
   /**
-   * POST /api/v1/jobs
-   * Create a new job
-   * Requires: manage_jobs capability
+   * @openapi
+   * /jobs:
+   *   post:
+   *     tags:
+   *       - Jobs
+   *     summary: Create a new job
+   *     description: Creates a new background job that can be processed asynchronously
+   *     security:
+   *       - bearerAuth: []
+   *     requestBody:
+   *       required: true
+   *       content:
+   *         application/json:
+   *           schema:
+   *             type: object
+   *             required:
+   *               - name
+   *               - type
+   *             properties:
+   *               name:
+   *                 type: string
+   *                 description: Display name for the job
+   *                 example: Import Users
+   *               description:
+   *                 type: string
+   *                 description: Detailed description of what the job does
+   *                 example: Importing users from CSV file
+   *               type:
+   *                 type: string
+   *                 description: Job type category
+   *                 example: import
+   *               iconSvg:
+   *                 type: string
+   *                 description: SVG icon markup for the job
+   *               metadata:
+   *                 type: object
+   *                 description: Additional job-specific data
+   *                 example: { items: 100, source_file: "users.csv" }
+   *               source:
+   *                 type: string
+   *                 description: Source plugin or module that created the job
+   *                 default: api
+   *                 example: user-import-plugin
+   *     responses:
+   *       201:
+   *         description: Job created successfully
+   *         content:
+   *           application/json:
+   *             schema:
+   *               type: object
+   *               properties:
+   *                 success:
+   *                   type: boolean
+   *                   example: true
+   *                 data:
+   *                   $ref: '#/components/schemas/Job'
+   *       400:
+   *         description: Bad request - name and type are required
+   *       401:
+   *         description: Unauthorized
+   *       403:
+   *         description: Forbidden - requires manage_jobs or create_jobs capability
+   *       500:
+   *         description: Server error
    */
   router.post('/', async (req, res) => {
     try {
@@ -142,9 +294,42 @@ export default (context) => {
   })
 
   /**
-   * DELETE /api/v1/jobs/cleanup
-   * Cleanup old completed/failed jobs
-   * Requires: manage_jobs capability
+   * @openapi
+   * /jobs/cleanup:
+   *   delete:
+   *     tags:
+   *       - Jobs
+   *     summary: Cleanup old jobs
+   *     description: Deletes old completed and failed jobs that are older than the specified number of days
+   *     security:
+   *       - bearerAuth: []
+   *     parameters:
+   *       - in: query
+   *         name: daysOld
+   *         schema:
+   *           type: integer
+   *           default: 30
+   *         description: Delete jobs older than this many days
+   *     responses:
+   *       200:
+   *         description: Jobs cleaned up successfully
+   *         content:
+   *           application/json:
+   *             schema:
+   *               type: object
+   *               properties:
+   *                 success:
+   *                   type: boolean
+   *                   example: true
+   *                 message:
+   *                   type: string
+   *                   example: Deleted 5 old jobs
+   *       401:
+   *         description: Unauthorized
+   *       403:
+   *         description: Forbidden - requires manage_jobs or delete_jobs capability
+   *       500:
+   *         description: Server error
    */
   router.delete('/cleanup', async (req, res) => {
     try {
