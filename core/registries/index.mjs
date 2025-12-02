@@ -8,6 +8,7 @@ import RegisterThemes from './RegisterThemes.mjs'
 import RegisterPlugins from './RegisterPlugins.mjs'
 import RegisterJobs from './RegisterJobs.mjs'
 import RegisterEmailProviders from './RegisterEmailProviders.mjs'
+import RegisterAdminBarButtons from './RegisterAdminBarButtons.mjs'
 import * as emailHelper from '../utils/email-helper.mjs'
 import { TraceCategory } from '../services/PerformanceTracer.mjs'
 
@@ -41,7 +42,8 @@ export default class Registry {
       taxonomies: new RegisterTaxonomies(req, res, next),
       plugins: new RegisterPlugins(req, res, next),
       jobs: new RegisterJobs(req.context),
-      emailProviders: new RegisterEmailProviders(req.context)
+      emailProviders: new RegisterEmailProviders(req.context),
+      adminBarButtons: new RegisterAdminBarButtons(req, res, next)
     }
 
     // Attach registry objects for direct access
@@ -50,8 +52,9 @@ export default class Registry {
     }
 
     // Attach registry methods
-    for (const registry of Object.values(this.registries)) {
-      for (const key of Object.getOwnPropertyNames(Object.getPrototypeOf(registry))) {
+    for (const [name, registry] of Object.entries(this.registries)) {
+      const methods = Object.getOwnPropertyNames(Object.getPrototypeOf(registry))
+      for (const key of methods) {
         if (key !== 'constructor' && typeof registry[key] === 'function') {
           // Don't overwrite existing hooks
           if (!this.req.hooks[key]) {

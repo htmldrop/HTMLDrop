@@ -85,6 +85,12 @@ export default (context) => {
 
       // Call theme with context + request router
       const themeInstance = await theme({ req, res, router: tempRouter })
+
+      // Initialize theme (registers hooks, admin buttons, etc.)
+      if (themeInstance?.init) {
+        await themeInstance.init()
+      }
+
       const html = await themeInstance?.render()
 
       themeRenderSpan?.addTag('htmlLength', html?.length || 0)

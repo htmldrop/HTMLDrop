@@ -17,7 +17,8 @@ const loadAdminBarAssets = async () => {
 }
 
 // Helper to inject admin bar into HTML
-const injectAdminBar = (html) => {
+const injectAdminBar = (html, customButtons = [], customScripts = '') => {
+
   // Convert Buffer to string if needed
   let htmlString = html
   if (Buffer.isBuffer(html)) {
@@ -29,14 +30,23 @@ const injectAdminBar = (html) => {
     return html
   }
 
+  // Serialize custom buttons as JSON (escape backticks and dollar signs for template literal safety)
+  const buttonsJSON = JSON.stringify(customButtons)
+    .replace(/`/g, '\\`')
+    .replace(/\$/g, '\\$')
+
   const injection = `
 <style>${adminBarCSS}</style>
 <script type="module">
   ${adminBarJS}
 
   const html = \`${adminBarHTML}\`
+  const customButtons = ${buttonsJSON}
 
-  init(html)
+  // Execute custom scripts from plugins/themes
+  ${customScripts}
+
+  init(html, customButtons)
 </script>
 </head>`
 
@@ -44,6 +54,24 @@ const injectAdminBar = (html) => {
 
   // Return in the same format as input (Buffer or string)
   return Buffer.isBuffer(html) ? Buffer.from(result, 'utf-8') : result
+}
+
+// Helper to check if content is HTML
+const isHtmlContent = (contentType, chunk) => {
+  // Check Content-Type header
+  if (contentType && contentType.includes('text/html')) {
+    return true
+  }
+
+  // Check if content looks like HTML
+  if (chunk) {
+    const str = Buffer.isBuffer(chunk) ? chunk.toString('utf-8') : chunk
+    if (typeof str === 'string' && (str.includes('<!DOCTYPE html>') || str.includes('<body'))) {
+      return true
+    }
+  }
+
+  return false
 }
 
 // Middleware to inject admin bar into HTML responses
@@ -57,43 +85,46 @@ export default async (req, res, next) => {
   }
   res._adminBarIntercepted = true
 
+  // Track if we've already injected to prevent double injection
+  let injected = false
+
   // Store original response methods
   const originalSend = res.send
   const originalEnd = res.end
 
+  // Helper to perform injection
+  const performInjection = (data) => {
+    if (injected) return data
+
+    try {
+      const buttons = req.hooks?.adminBarButtons?.getButtons() || []
+      const scripts = req.hooks?.adminBarButtons?.getCombinedScripts() || ''
+      injected = true
+      return injectAdminBar(data, buttons, scripts)
+    } catch (e) {
+      console.error('[AdminBar] Injection failed:', e)
+      return data
+    }
+  }
+
   // Override res.send()
   res.send = function (data) {
-    // Only inject into HTML responses
     const contentType = res.get('Content-Type')
-    if (contentType && contentType.includes('text/html')) {
-      data = injectAdminBar(data)
+    if (isHtmlContent(contentType, data)) {
+      data = performInjection(data)
     }
     return originalSend.call(this, data)
   }
 
   // Override res.end()
   res.end = function (chunk, encoding) {
-    // Skip if already sent
     if (res.headersSent && arguments.length === 0) {
       return originalEnd.call(this)
     }
 
-    // Check if it's an HTML response
     const contentType = res.get('Content-Type')
-    const isHtml = contentType && contentType.includes('text/html')
-
-    // Also check if chunk looks like HTML (has <!DOCTYPE html> or <body> tag)
-    let chunkString = chunk
-    if (Buffer.isBuffer(chunk)) {
-      chunkString = chunk.toString('utf-8')
-    }
-
-    const looksLikeHtml =
-      typeof chunkString === 'string' && (chunkString.includes('<!DOCTYPE html>') || chunkString.includes('<body'))
-
-    // Inject if content-type is HTML OR if it looks like HTML
-    if (chunk && (isHtml || looksLikeHtml)) {
-      chunk = injectAdminBar(chunk)
+    if (chunk && isHtmlContent(contentType, chunk)) {
+      chunk = performInjection(chunk)
     }
 
     return originalEnd.call(this, chunk, encoding)

@@ -172,7 +172,8 @@ export default (context) => async (req, res, next) => {
 
     // Provide minimal hooks for themes that use createContext()
     // These are lightweight stubs - the full registry is not initialized
-    req.hooks = req.hooks || {
+    req.hooks = req.hooks || {}
+    Object.assign(req.hooks, {
       // Core hook methods (no-op for SSR)
       addAction: () => {},
       addFilter: () => {},
@@ -222,7 +223,14 @@ export default (context) => async (req, res, next) => {
       startSpan: tracer.startSpan.bind(tracer),
       trace: tracer.trace.bind(tracer),
       getCurrentSpan: tracer.getCurrentSpan.bind(tracer)
-    }
+    })
+
+    // Admin bar buttons registry - functional on SSR routes (appears on all pages)
+    const RegisterAdminBarButtons = (await import('../registries/RegisterAdminBarButtons.mjs')).default
+    const adminBarButtons = new RegisterAdminBarButtons(req, res, next)
+    req.hooks.adminBarButtons = adminBarButtons
+    req.hooks.registerButton = adminBarButtons.registerButton.bind(adminBarButtons)
+    req.hooks.unregisterButton = adminBarButtons.unregisterButton.bind(adminBarButtons)
 
     // Guard stub - SSR pages are typically public
     req.guard = req.guard || {
