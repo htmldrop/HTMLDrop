@@ -1,9 +1,9 @@
 import express from 'express'
 import jwt from 'jsonwebtoken'
 import crypto from 'crypto'
-import { hash, validate as validatePassword, verify } from '../../utils/password.mjs'
-import { validate as validateEmail } from '../../utils/email.mjs'
-import { buildPayload } from '../../utils/payload.mjs'
+import { hash, validate as validatePassword, verify } from '../../utils/password.ts'
+import { validate as validateEmail } from '../../utils/email.ts'
+import { buildPayload } from '../../utils/payload.ts'
 import PasswordResetService from '../../services/PasswordResetService.mjs'
 import EmailService from '../../services/EmailService.mjs'
 

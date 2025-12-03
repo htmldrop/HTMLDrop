@@ -4,7 +4,7 @@
  * Validates request data using Zod schemas
  */
 
-import { HTTP_STATUS, ERROR_CODES } from '../utils/constants.mjs'
+import { HTTP_STATUS, ERROR_CODES } from '../utils/constants.ts'
 
 /**
  * Create a validation middleware for a given schema

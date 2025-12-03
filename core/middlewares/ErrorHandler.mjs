@@ -4,7 +4,7 @@
  * Centralized error handling with structured logging
  */
 
-import { HTTP_STATUS, ERROR_CODES, ERROR_MESSAGES, IS_PRODUCTION } from '../utils/constants.mjs'
+import { HTTP_STATUS, ERROR_CODES, ERROR_MESSAGES, IS_PRODUCTION } from '../utils/constants.ts'
 
 /**
  * Custom Error Classes

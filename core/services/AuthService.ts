@@ -5,11 +5,51 @@
  */
 
 import jwt from 'jsonwebtoken'
+import type { SignOptions } from 'jsonwebtoken'
 import crypto from 'crypto'
+import type { Knex } from 'knex'
 import { TOKEN_EXPIRY } from '../utils/constants.ts'
 
+interface Context {
+  knex: Knex
+  table: (name: string) => string
+}
+
+interface User {
+  id: number
+  email: string
+  username: string
+}
+
+interface TokenPayload {
+  id: number
+  email?: string
+  username?: string
+  type?: string
+  iat?: number
+  exp?: number
+}
+
+interface RefreshTokenRecord {
+  id: number
+  user_id: number
+  token: string
+  expires_at: Date
+}
+
+interface ResetTokenData {
+  token: string
+  expires_at: string
+}
+
 class AuthService {
-  constructor(context) {
+  private context: Context
+  private knex: Knex
+  private table: (name: string) => string
+  private jwtSecret: string
+  private refreshSecret: string
+
+  constructor(context: Context) {
     this.context = context
     this.knex = context.knex
     this.table = context.table.bind(context)
@@ -19,59 +59,52 @@ class AuthService {
 
   /**
    * Generate access token
-   * @param {Object} user - User object
-   * @returns {string} JWT access token
    */
-  generateAccessToken(user) {
-    return jwt.sign({ id: user.id, email: user.email, username: user.username }, this.jwtSecret, {
-      expiresIn: TOKEN_EXPIRY.ACCESS_TOKEN
-    })
+  generateAccessToken(user: User): string {
+    return jwt.sign(
+      { id: user.id, email: user.email, username: user.username },
+      this.jwtSecret,
+      { expiresIn: TOKEN_EXPIRY.ACCESS_TOKEN } as SignOptions
+    )
   }
 
   /**
    * Generate refresh token
-   * @param {Object} user - User object
-   * @returns {string} JWT refresh token
    */
-  generateRefreshToken(user) {
-    return jwt.sign({ id: user.id, type: 'refresh' }, this.refreshSecret, {
-      expiresIn: TOKEN_EXPIRY.REFRESH_TOKEN
-    })
+  generateRefreshToken(user: User): string {
+    return jwt.sign(
+      { id: user.id, type: 'refresh' },
+      this.refreshSecret,
+      { expiresIn: TOKEN_EXPIRY.REFRESH_TOKEN } as SignOptions
+    )
   }
 
   /**
    * Verify access token
-   * @param {string} token - JWT token
-   * @returns {Object|null} Decoded token or null
    */
-  verifyAccessToken(token) {
+  verifyAccessToken(token: string): TokenPayload | null {
     try {
-      return jwt.verify(token, this.jwtSecret)
-    } catch (error) {
+      return jwt.verify(token, this.jwtSecret) as TokenPayload
+    } catch {
       return null
     }
   }
 
   /**
    * Verify refresh token
-   * @param {string} token - Refresh token
-   * @returns {Object|null} Decoded token or null
    */
-  verifyRefreshToken(token) {
+  verifyRefreshToken(token: string): TokenPayload | null {
     try {
-      return jwt.verify(token, this.refreshSecret)
-    } catch (error) {
+      return jwt.verify(token, this.refreshSecret) as TokenPayload
+    } catch {
       return null
     }
   }
 
   /**
    * Store refresh token in database
-   * @param {number} userId - User ID
-   * @param {string} token - Refresh token
-   * @returns {Promise<void>}
    */
-  async storeRefreshToken(userId, token) {
+  async storeRefreshToken(userId: number, token: string): Promise<void> {
     const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) // 7 days
 
     await this.knex(this.table('refresh_tokens')).insert({
@@ -83,10 +116,8 @@ class AuthService {
 
   /**
    * Validate refresh token from database
-   * @param {string} token - Refresh token
-   * @returns {Promise<Object|null>} Token record or null
    */
-  async validateRefreshToken(token) {
+  async validateRefreshToken(token: string): Promise<RefreshTokenRecord | null> {
     const record = await this.knex(this.table('refresh_tokens'))
       .where({ token })
       .where('expires_at', '>', new Date())
@@ -97,29 +128,22 @@ class AuthService {
 
   /**
    * Revoke refresh token
-   * @param {string} token - Refresh token
-   * @returns {Promise<void>}
    */
-  async revokeRefreshToken(token) {
+  async revokeRefreshToken(token: string): Promise<void> {
     await this.knex(this.table('refresh_tokens')).where({ token }).del()
   }
 
   /**
    * Revoke all user tokens
-   * @param {number} userId - User ID
-   * @returns {Promise<void>}
    */
-  async revokeAllUserTokens(userId) {
+  async revokeAllUserTokens(userId: number): Promise<void> {
     await this.knex(this.table('refresh_tokens')).where({ user_id: userId }).del()
   }
 
   /**
    * Add token to revoked list
-   * @param {string} token - Access token to revoke
-   * @param {Date} expiresAt - Token expiration date
-   * @returns {Promise<void>}
    */
-  async revokeAccessToken(token, expiresAt) {
+  async revokeAccessToken(token: string, expiresAt: Date): Promise<void> {
     await this.knex(this.table('revoked_tokens')).insert({
       token,
       expires_at: expiresAt
@@ -128,10 +152,8 @@ class AuthService {
 
   /**
    * Check if access token is revoked
-   * @param {string} token - Access token
-   * @returns {Promise<boolean>} True if revoked
    */
-  async isTokenRevoked(token) {
+  async isTokenRevoked(token: string): Promise<boolean> {
     const record = await this.knex(this.table('revoked_tokens')).where({ token }).first()
 
     return !!record
@@ -139,9 +161,8 @@ class AuthService {
 
   /**
    * Clean up expired tokens
-   * @returns {Promise<void>}
    */
-  async cleanupExpiredTokens() {
+  async cleanupExpiredTokens(): Promise<void> {
     const now = new Date()
 
     await this.knex(this.table('refresh_tokens')).where('expires_at', '<', now).del()
@@ -151,28 +172,22 @@ class AuthService {
 
   /**
    * Generate CSRF token
-   * @returns {string} CSRF token
    */
-  generateCSRFToken() {
+  generateCSRFToken(): string {
     return crypto.randomBytes(32).toString('hex')
   }
 
   /**
    * Validate CSRF token
-   * @param {string} token - CSRF token
-   * @param {string} sessionToken - Session CSRF token
-   * @returns {boolean} True if valid
    */
-  validateCSRFToken(token, sessionToken) {
+  validateCSRFToken(token: string, sessionToken: string): boolean {
     return token === sessionToken
   }
 
   /**
    * Generate password reset token
-   * @param {number} userId - User ID
-   * @returns {Promise<string>} Reset token
    */
-  async generatePasswordResetToken(userId) {
+  async generatePasswordResetToken(userId: number): Promise<string> {
     const token = crypto.randomBytes(32).toString('hex')
     const expiresAt = new Date(Date.now() + 60 * 60 * 1000) // 1 hour
 
@@ -187,11 +202,8 @@ class AuthService {
 
   /**
    * Validate password reset token
-   * @param {number} userId - User ID
-   * @param {string} token - Reset token
-   * @returns {Promise<boolean>} True if valid
    */
-  async validatePasswordResetToken(userId, token) {
+  async validatePasswordResetToken(userId: number, token: string): Promise<boolean> {
     const meta = await this.knex(this.table('usermeta'))
       .where({ user_id: userId, meta_key: 'password_reset_token' })
       .first()
@@ -199,7 +211,7 @@ class AuthService {
     if (!meta) return false
 
     try {
-      const { token: storedToken, expires_at } = JSON.parse(meta.meta_value)
+      const { token: storedToken, expires_at } = JSON.parse(meta.meta_value) as ResetTokenData
 
       if (storedToken !== token) return false
       if (new Date(expires_at) < new Date()) return false
@@ -212,10 +224,8 @@ class AuthService {
 
   /**
    * Clear password reset token
-   * @param {number} userId - User ID
-   * @returns {Promise<void>}
    */
-  async clearPasswordResetToken(userId) {
+  async clearPasswordResetToken(userId: number): Promise<void> {
     await this.knex(this.table('usermeta')).where({ user_id: userId, meta_key: 'password_reset_token' }).del()
   }
 }

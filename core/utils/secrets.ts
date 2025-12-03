@@ -5,16 +5,16 @@ import dotenv from 'dotenv'
 
 /**
  * Generate a random secret
- * @returns {string} A random 64-character hex string
+ * @returns A random 64-character hex string
  */
-const generateSecret = () => crypto.randomBytes(32).toString('hex')
+const generateSecret = (): string => crypto.randomBytes(32).toString('hex')
 
 /**
  * Initialize secrets for the application
  * Generates and persists secrets to .env file if they don't exist
  * Should only be called from the primary cluster process
  */
-export const initSecrets = () => {
+export const initSecrets = (): void => {
   // Use ENV_FILE_PATH if set (for Docker with persistent volume), otherwise use .env in current directory
   const envPath = process.env.ENV_FILE_PATH ? path.resolve(process.env.ENV_FILE_PATH) : path.resolve('.env')
 
@@ -34,7 +34,7 @@ export const initSecrets = () => {
     envContent = fs.readFileSync(envPath, 'utf-8')
   }
 
-  const secrets = {
+  const secrets: Record<string, string | undefined> = {
     JWT_SECRET: process.env.JWT_SECRET,
     JWT_REFRESH_SECRET: process.env.JWT_REFRESH_SECRET,
     SESSION_SECRET: process.env.SESSION_SECRET
@@ -79,13 +79,13 @@ export const initSecrets = () => {
  * Ensure secrets are available in worker processes
  * Workers inherit environment from primary, but we validate they exist
  */
-export const ensureSecrets = () => {
+export const ensureSecrets = (): void => {
   // Workers inherit environment variables from primary process
   // Just validate that secrets are present
   const requiredSecrets = ['JWT_SECRET', 'JWT_REFRESH_SECRET', 'SESSION_SECRET']
 
   for (const secret of requiredSecrets) {
-    if (!process.env[secret] || process.env[secret].trim() === '') {
+    if (!process.env[secret] || process.env[secret]!.trim() === '') {
       console.error(`❌ ${secret} is not set in worker process`)
       throw new Error(
         `${secret} is not available in worker process. This indicates the primary process failed to initialize secrets.`

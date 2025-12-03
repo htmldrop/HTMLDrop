@@ -494,7 +494,7 @@ class UpdateService {
       console.log('[UpdateService] Building admin UI...')
 
       // Build admin UI if needed (rebuilds if dist doesn't exist or after update)
-      const { buildAdminIfNeeded } = await import('../utils/buildAdmin.mjs')
+      const { buildAdminIfNeeded } = await import('../utils/buildAdmin.ts')
       const adminBuilt = await buildAdminIfNeeded(true)
       if (adminBuilt) {
         console.log('[UpdateService] Admin UI build completed')

@@ -1,8 +1,10 @@
+import type { Knex } from 'knex'
+
 /**
  * Validates table name to prevent SQL injection
  * Table names must contain only alphanumeric characters and underscores
  */
-function validateTableName(tableName) {
+function validateTableName(tableName: string): boolean {
   if (!tableName || typeof tableName !== 'string') {
     throw new Error('Table name must be a non-empty string')
   }
@@ -24,11 +26,11 @@ function validateTableName(tableName) {
   return true
 }
 
-export const up = async (knex, tableName) => {
+export const up = async (knex: Knex, tableName: string): Promise<void> => {
   // Validate table name to prevent SQL injection
   validateTableName(tableName)
 
-  const client = knex.client.config.client
+  const client = knex.client.config.client as string
   const isSQLite = ['sqlite3', 'better-sqlite3'].includes(client)
   const isMySQL = ['mysql', 'mysql2'].includes(client)
   const isPostgres = ['pg', 'postgres'].includes(client)
@@ -77,13 +79,12 @@ export const up = async (knex, tableName) => {
   }
 }
 
-export const down = async (knex, tableName) => {
+export const down = async (knex: Knex, tableName: string): Promise<void> => {
   // Validate table name to prevent SQL injection
   validateTableName(tableName)
 
-  const client = knex.client.config.client
+  const client = knex.client.config.client as string
   const isSQLite = ['sqlite3', 'better-sqlite3'].includes(client)
-  const isMySQL = ['mysql', 'mysql2'].includes(client)
   const isPostgres = ['pg', 'postgres'].includes(client)
 
   if (isSQLite) {

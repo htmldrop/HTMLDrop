@@ -1,16 +1,22 @@
 import bcrypt from 'bcrypt'
 
-export const hash = async (password) => {
-  const hash = await bcrypt.hash(password, parseInt(process.env.SALT_ROUNDS, 12) || 12)
-  return hash
+export interface ValidationResult {
+  valid: boolean
+  message?: string
 }
 
-export const verify = async (password, hash) => {
+export const hash = async (password: string): Promise<string> => {
+  const saltRounds = parseInt(process.env.SALT_ROUNDS || '12', 10)
+  const hashed = await bcrypt.hash(password, saltRounds)
+  return hashed
+}
+
+export const verify = async (password: string, hash: string): Promise<boolean> => {
   const match = await bcrypt.compare(password, hash)
   return match
 }
 
-export const validate = (password) => {
+export const validate = (password: string): ValidationResult => {
   const minLength = 8
   const hasUpperCase = /[A-Z]/.test(password)
   const hasLowerCase = /[a-z]/.test(password)

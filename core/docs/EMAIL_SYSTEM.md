@@ -17,7 +17,7 @@ The HTMLDrop email system provides a flexible, plugin-extensible email infrastru
 2. **[EmailService](../services/EmailService.mjs)** - Core email sending service
 3. **[PasswordResetService](../services/PasswordResetService.mjs)** - Password reset token management
 4. **[Email Templates](../templates/emails/)** - Reusable email templates
-5. **[Email Helpers](../utils/email-helper.mjs)** - Convenience functions for plugins
+5. **[Email Helpers](../utils/email-helper.ts)** - Convenience functions for plugins
 
 ### Database
 

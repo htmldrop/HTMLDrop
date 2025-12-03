@@ -1,7 +1,7 @@
 import express from 'express'
 import jwt from 'jsonwebtoken'
-import { hash } from '../../utils/password.mjs'
-import { buildPayload } from '../../utils/payload.mjs'
+import { hash } from '../../utils/password.ts'
+import { buildPayload } from '../../utils/payload.ts'
 import crypto from 'crypto'
 
 export default (context) => {

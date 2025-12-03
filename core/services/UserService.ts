@@ -5,10 +5,67 @@
  */
 
 import bcrypt from 'bcrypt'
+import type { Knex } from 'knex'
 import { BCRYPT_ROUNDS } from '../utils/constants.ts'
 
+interface Context {
+  knex: Knex
+  table: (name: string) => string
+}
+
+interface User {
+  id: number
+  username: string
+  email: string
+  password?: string
+  first_name: string
+  last_name: string
+  created_at: Date
+}
+
+interface Role {
+  id: number
+  name: string
+  slug: string
+  description?: string
+}
+
+interface UserMeta {
+  id: number
+  user_id: number
+  meta_key: string
+  meta_value: string
+}
+
+interface GetUsersOptions {
+  limit?: number | string
+  offset?: number | string
+  role?: string
+  search?: string
+}
+
+interface CreateUserData {
+  username: string
+  email: string
+  password: string
+  first_name?: string
+  last_name?: string
+}
+
+interface UpdateUserData {
+  username?: string
+  email?: string
+  password?: string
+  first_name?: string
+  last_name?: string
+}
+
 class UserService {
-  constructor(context) {
+  private context: Context
+  private knex: Knex
+  private table: (name: string) => string
+
+  constructor(context: Context) {
     this.context = context
     this.knex = context.knex
     this.table = context.table.bind(context)
@@ -16,10 +73,8 @@ class UserService {
 
   /**
    * Get all users with pagination
-   * @param {Object} options - Query options
-   * @returns {Promise<Array<Object>>} Array of users
    */
-  async getUsers(options = {}) {
+  async getUsers(options: GetUsersOptions = {}): Promise<Partial<User>[]> {
     const { limit = 10, offset = 0, role, search } = options
 
     let query = this.knex(this.table('users')).select('id', 'username', 'email', 'first_name', 'last_name', 'created_at')
@@ -41,15 +96,13 @@ class UserService {
       })
     }
 
-    return query.limit(parseInt(limit)).offset(parseInt(offset)).orderBy('created_at', 'desc')
+    return query.limit(parseInt(String(limit))).offset(parseInt(String(offset))).orderBy('created_at', 'desc')
   }
 
   /**
    * Get user by ID
-   * @param {number} id - User ID
-   * @returns {Promise<Object|null>} User object or null
    */
-  async getUserById(id) {
+  async getUserById(id: number): Promise<Partial<User> | undefined> {
     return this.knex(this.table('users'))
       .where({ id })
       .select('id', 'username', 'email', 'first_name', 'last_name', 'created_at')
@@ -58,28 +111,22 @@ class UserService {
 
   /**
    * Get user by email
-   * @param {string} email - User email
-   * @returns {Promise<Object|null>} User object or null
    */
-  async getUserByEmail(email) {
+  async getUserByEmail(email: string): Promise<User | undefined> {
     return this.knex(this.table('users')).where({ email }).first()
   }
 
   /**
    * Get user by username
-   * @param {string} username - Username
-   * @returns {Promise<Object|null>} User object or null
    */
-  async getUserByUsername(username) {
+  async getUserByUsername(username: string): Promise<User | undefined> {
     return this.knex(this.table('users')).where({ username }).first()
   }
 
   /**
    * Create a new user
-   * @param {Object} data - User data
-   * @returns {Promise<number>} Created user ID
    */
-  async createUser(data) {
+  async createUser(data: CreateUserData): Promise<number> {
     const { username, email, password, first_name, last_name } = data
 
     const hashedPassword = await bcrypt.hash(password, BCRYPT_ROUNDS)
@@ -107,14 +154,11 @@ class UserService {
 
   /**
    * Update user
-   * @param {number} id - User ID
-   * @param {Object} data - Update data
-   * @returns {Promise<void>}
    */
-  async updateUser(id, data) {
+  async updateUser(id: number, data: UpdateUserData): Promise<void> {
     const { username, email, first_name, last_name, password } = data
 
-    const updateData = {}
+    const updateData: Record<string, string> = {}
     if (username !== undefined) updateData.username = username
     if (email !== undefined) updateData.email = email
     if (first_name !== undefined) updateData.first_name = first_name
@@ -131,10 +175,8 @@ class UserService {
 
   /**
    * Delete user
-   * @param {number} id - User ID
-   * @returns {Promise<void>}
    */
-  async deleteUser(id) {
+  async deleteUser(id: number): Promise<void> {
     // Delete user relationships
     await this.knex(this.table('user_roles')).where({ user_id: id }).del()
     await this.knex(this.table('user_capabilities')).where({ user_id: id }).del()
@@ -147,20 +189,15 @@ class UserService {
 
   /**
    * Verify user password
-   * @param {string} password - Plain password
-   * @param {string} hash - Password hash
-   * @returns {Promise<boolean>} True if valid
    */
-  async verifyPassword(password, hash) {
+  async verifyPassword(password: string, hash: string): Promise<boolean> {
     return bcrypt.compare(password, hash)
   }
 
   /**
    * Get user roles
-   * @param {number} userId - User ID
-   * @returns {Promise<Array<Object>>} Array of roles
    */
-  async getUserRoles(userId) {
+  async getUserRoles(userId: number): Promise<Role[]> {
     return this.knex(this.table('roles'))
       .join(this.table('user_roles'), `${this.table('roles')}.id`, `${this.table('user_roles')}.role_id`)
       .where(`${this.table('user_roles')}.user_id`, userId)
@@ -169,11 +206,8 @@ class UserService {
 
   /**
    * Assign role to user
-   * @param {number} userId - User ID
-   * @param {number} roleId - Role ID
-   * @returns {Promise<void>}
    */
-  async assignRole(userId, roleId) {
+  async assignRole(userId: number, roleId: number): Promise<void> {
     const existing = await this.knex(this.table('user_roles')).where({ user_id: userId, role_id: roleId }).first()
 
     if (!existing) {
@@ -186,22 +220,16 @@ class UserService {
 
   /**
    * Remove role from user
-   * @param {number} userId - User ID
-   * @param {number} roleId - Role ID
-   * @returns {Promise<void>}
    */
-  async removeRole(userId, roleId) {
+  async removeRole(userId: number, roleId: number): Promise<void> {
     await this.knex(this.table('user_roles')).where({ user_id: userId, role_id: roleId }).del()
   }
 
   /**
    * Get user meta
-   * @param {number} userId - User ID
-   * @param {string} key - Meta key
-   * @returns {Promise<*>} Meta value
    */
-  async getUserMeta(userId, key) {
-    const meta = await this.knex(this.table('usermeta')).where({ user_id: userId, meta_key: key }).first()
+  async getUserMeta(userId: number, key: string): Promise<unknown> {
+    const meta = await this.knex(this.table('usermeta')).where({ user_id: userId, meta_key: key }).first() as UserMeta | undefined
 
     if (!meta) return null
 
@@ -214,13 +242,9 @@ class UserService {
 
   /**
    * Set user meta
-   * @param {number} userId - User ID
-   * @param {string} key - Meta key
-   * @param {*} value - Meta value
-   * @returns {Promise<void>}
    */
-  async setUserMeta(userId, key, value) {
-    const metaValue = typeof value === 'object' ? JSON.stringify(value) : value
+  async setUserMeta(userId: number, key: string, value: unknown): Promise<void> {
+    const metaValue = typeof value === 'object' ? JSON.stringify(value) : String(value)
 
     const existing = await this.knex(this.table('usermeta')).where({ user_id: userId, meta_key: key }).first()
 
@@ -239,10 +263,8 @@ class UserService {
 
   /**
    * Get user count
-   * @param {Object} options - Query options
-   * @returns {Promise<number>} User count
    */
-  async getUserCount(options = {}) {
+  async getUserCount(options: { role?: string } = {}): Promise<number> {
     const { role } = options
 
     let query = this.knex(this.table('users')).count('id as count')
@@ -254,7 +276,7 @@ class UserService {
         .where(`${this.table('roles')}.slug`, role)
     }
 
-    const result = await query.first()
+    const result = await query.first() as { count: number } | undefined
     return result?.count || 0
   }
 }

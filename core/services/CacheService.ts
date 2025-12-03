@@ -7,7 +7,25 @@
 
 import { CACHE_TTL } from '../utils/constants.ts'
 
+interface RedisClient {
+  get: (key: string) => Promise<string | null>
+  setEx: (key: string, ttl: number, value: string) => Promise<unknown>
+  del: (key: string | string[]) => Promise<unknown>
+  keys: (pattern: string) => Promise<string[]>
+  flushAll: () => Promise<unknown>
+  incrBy: (key: string, amount: number) => Promise<number>
+  exists: (key: string) => Promise<number>
+  quit: () => Promise<unknown>
+  on: (event: string, callback: (err: Error) => void) => void
+  connect: () => Promise<void>
+}
+
 class CacheService {
+  private enabled: boolean
+  private redis: RedisClient | null
+  private inMemoryCache: Map<string, unknown>
+  private inMemoryCacheTTL: Map<string, number>
+
   constructor() {
     this.enabled = process.env.CACHE_ENABLED === 'true'
     this.redis = null
@@ -17,9 +35,8 @@ class CacheService {
 
   /**
    * Initialize cache service (connects to Redis if configured)
-   * @returns {Promise<void>}
    */
-  async initialize() {
+  async initialize(): Promise<void> {
     if (!this.enabled) {
       console.log('Cache disabled')
       return
@@ -28,12 +45,14 @@ class CacheService {
     try {
       // Try to use Redis if available
       if (process.env.REDIS_URL) {
-        const redis = await import('redis')
+        // Dynamic import - redis types are optional
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const redis = await import('redis' as any) as any
         this.redis = redis.createClient({
           url: process.env.REDIS_URL
-        })
+        }) as unknown as RedisClient
 
-        this.redis.on('error', (err) => {
+        this.redis.on('error', (err: Error) => {
           console.error('Redis Client Error:', err)
           this.redis = null
         })
@@ -44,23 +63,22 @@ class CacheService {
         console.log('Using in-memory cache (Redis not configured)')
       }
     } catch (error) {
-      console.warn('Failed to initialize Redis, using in-memory cache:', error.message)
+      const errorMessage = error instanceof Error ? error.message : String(error)
+      console.warn('Failed to initialize Redis, using in-memory cache:', errorMessage)
       this.redis = null
     }
   }
 
   /**
    * Get value from cache
-   * @param {string} key - Cache key
-   * @returns {Promise<*>} Cached value or null
    */
-  async get(key) {
+  async get<T = unknown>(key: string): Promise<T | null> {
     if (!this.enabled) return null
 
     try {
       if (this.redis) {
         const value = await this.redis.get(key)
-        return value ? JSON.parse(value) : null
+        return value ? JSON.parse(value) as T : null
       }
 
       // Fallback to in-memory cache
@@ -71,7 +89,7 @@ class CacheService {
         return null
       }
 
-      return this.inMemoryCache.get(key) || null
+      return (this.inMemoryCache.get(key) as T) || null
     } catch (error) {
       console.error('Cache get error:', error)
       return null
@@ -80,12 +98,8 @@ class CacheService {
 
   /**
    * Set value in cache
-   * @param {string} key - Cache key
-   * @param {*} value - Value to cache
-   * @param {number} ttl - Time to live in seconds (optional)
-   * @returns {Promise<void>}
    */
-  async set(key, value, ttl = CACHE_TTL.DEFAULT) {
+  async set(key: string, value: unknown, ttl: number = CACHE_TTL.DEFAULT): Promise<void> {
     if (!this.enabled) return
 
     try {
@@ -103,10 +117,8 @@ class CacheService {
 
   /**
    * Delete value from cache
-   * @param {string} key - Cache key
-   * @returns {Promise<void>}
    */
-  async del(key) {
+  async del(key: string): Promise<void> {
     if (!this.enabled) return
 
     try {
@@ -123,10 +135,8 @@ class CacheService {
 
   /**
    * Delete multiple keys by pattern
-   * @param {string} pattern - Key pattern (e.g., 'posts:*')
-   * @returns {Promise<void>}
    */
-  async delPattern(pattern) {
+  async delPattern(pattern: string): Promise<void> {
     if (!this.enabled) return
 
     try {
@@ -152,9 +162,8 @@ class CacheService {
 
   /**
    * Clear all cache
-   * @returns {Promise<void>}
    */
-  async flush() {
+  async flush(): Promise<void> {
     if (!this.enabled) return
 
     try {
@@ -171,17 +180,13 @@ class CacheService {
 
   /**
    * Get or set cached value (retrieve from cache or compute and cache)
-   * @param {string} key - Cache key
-   * @param {Function} fn - Function to compute value if not cached
-   * @param {number} ttl - Time to live in seconds
-   * @returns {Promise<*>} Cached or computed value
    */
-  async remember(key, fn, ttl = CACHE_TTL.DEFAULT) {
+  async remember<T>(key: string, fn: () => T | Promise<T>, ttl: number = CACHE_TTL.DEFAULT): Promise<T> {
     if (!this.enabled) {
       return fn()
     }
 
-    const cached = await this.get(key)
+    const cached = await this.get<T>(key)
     if (cached !== null) {
       return cached
     }
@@ -194,11 +199,8 @@ class CacheService {
 
   /**
    * Increment a counter in cache
-   * @param {string} key - Cache key
-   * @param {number} amount - Amount to increment
-   * @returns {Promise<number>} New value
    */
-  async increment(key, amount = 1) {
+  async increment(key: string, amount: number = 1): Promise<number> {
     if (!this.enabled) return 0
 
     try {
@@ -206,7 +208,7 @@ class CacheService {
         return await this.redis.incrBy(key, amount)
       }
 
-      const current = this.inMemoryCache.get(key) || 0
+      const current = (this.inMemoryCache.get(key) as number) || 0
       const newValue = current + amount
       this.inMemoryCache.set(key, newValue)
       return newValue
@@ -218,10 +220,8 @@ class CacheService {
 
   /**
    * Check if key exists in cache
-   * @param {string} key - Cache key
-   * @returns {Promise<boolean>} True if exists
    */
-  async exists(key) {
+  async exists(key: string): Promise<boolean> {
     if (!this.enabled) return false
 
     try {
@@ -238,9 +238,8 @@ class CacheService {
 
   /**
    * Close Redis connection
-   * @returns {Promise<void>}
    */
-  async close() {
+  async close(): Promise<void> {
     if (this.redis) {
       await this.redis.quit()
     }
@@ -248,9 +247,8 @@ class CacheService {
 
   /**
    * Clean up expired in-memory cache entries
-   * @returns {void}
    */
-  cleanupExpired() {
+  cleanupExpired(): void {
     if (this.redis) return
 
     const now = Date.now()

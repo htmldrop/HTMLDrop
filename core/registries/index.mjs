@@ -9,7 +9,7 @@ import RegisterPlugins from './RegisterPlugins.mjs'
 import RegisterJobs from './RegisterJobs.mjs'
 import RegisterEmailProviders from './RegisterEmailProviders.mjs'
 import RegisterAdminBarButtons from './RegisterAdminBarButtons.mjs'
-import * as emailHelper from '../utils/email-helper.mjs'
+import * as emailHelper from '../utils/email-helper.ts'
 import { TraceCategory } from '../services/PerformanceTracer.mjs'
 
 export default class Registry {

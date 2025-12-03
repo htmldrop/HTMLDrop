@@ -1,5 +1,4 @@
-import { up as knexUp, down as knexDown } from '../../utils/knexCreateMigration.mjs'
-
+import { up as knexUp, down as knexDown } from '../../utils/knexCreateMigration.ts'
 const prefix = process.env.TABLE_PREFIX
 const tableName = `${prefix  }taxonomy_fields`
 

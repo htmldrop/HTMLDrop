@@ -11,11 +11,11 @@ import cors from 'cors'
 import { createServer } from 'http'
 import path from 'path'
 import net from 'net'
-import parseVue from './utils/parseVue.mjs'
-import UserGuard from './utils/UserGuard.mjs'
-import translate from './utils/translation.mjs'
-import createWsAuthMiddleware from './utils/wsAuthMiddleware.mjs'
-import { initSecrets, ensureSecrets } from './utils/secrets.mjs'
+import parseVue from './utils/parseVue.ts'
+import UserGuard from './utils/UserGuard.ts'
+import translate from './utils/translation.ts'
+import createWsAuthMiddleware from './utils/wsAuthMiddleware.ts'
+import { initSecrets, ensureSecrets } from './utils/secrets.ts'
 import SchedulerService from './services/SchedulerService.mjs'
 import BadgeCountService from './services/BadgeCountService.mjs'
 import TraceStorage from './services/TraceStorage.mjs'
@@ -91,7 +91,7 @@ if (cluster.isPrimary) {
 
   // Build admin UI if it doesn't exist
   try {
-    const { buildAdminIfNeeded } = await import('./utils/buildAdmin.mjs')
+    const { buildAdminIfNeeded } = await import('./utils/buildAdmin.ts')
     const buildResult = await buildAdminIfNeeded()
     console.log(`[Startup] Admin build result: ${buildResult}`)
   } catch (error) {

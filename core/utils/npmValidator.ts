@@ -3,11 +3,17 @@
  * Prevents command injection attacks in npm install commands
  */
 
+export interface NpmInstallOptions {
+  prefix?: string
+  noSave?: boolean
+  noPackageLock?: boolean
+}
+
 /**
  * Validates NPM package names according to npm naming rules
  * @see https://docs.npmjs.com/cli/v7/configuring-npm/package-json#name
  */
-export function validatePackageName(packageName) {
+export function validatePackageName(packageName: string): boolean {
   if (!packageName || typeof packageName !== 'string') {
     throw new Error('Package name must be a non-empty string')
   }
@@ -41,7 +47,7 @@ export function validatePackageName(packageName) {
  * Validates semantic version strings
  * Supports: 1.0.0, ^1.0.0, ~1.0.0, >=1.0.0, 1.x, latest, etc.
  */
-export function validateVersion(version) {
+export function validateVersion(version: string | undefined | null): boolean {
   if (!version) {
     return true // Version is optional
   }
@@ -81,7 +87,7 @@ export function validateVersion(version) {
  * Safely constructs npm install arguments
  * Returns an array of safe arguments for child_process.spawn
  */
-export function buildNpmInstallArgs(packageName, version, options = {}) {
+export function buildNpmInstallArgs(packageName: string, version?: string, options: NpmInstallOptions = {}): string[] {
   validatePackageName(packageName)
   if (version) {
     validateVersion(version)

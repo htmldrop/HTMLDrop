@@ -4,9 +4,9 @@ import path from 'path'
 
 /**
  * Build the admin UI if it doesn't exist
- * @returns {Promise<boolean>} True if build was successful or already exists
+ * @returns True if build was successful or already exists
  */
-export async function buildAdminIfNeeded(force = false) {
+export async function buildAdminIfNeeded(force = false): Promise<boolean> {
   const adminDistPath = path.resolve('./core/admin/dist')
   const adminPath = path.resolve('./core/admin')
 
@@ -48,10 +48,9 @@ export async function buildAdminIfNeeded(force = false) {
 
   return new Promise((resolve) => {
     // Run npm install first if node_modules doesn't exist
-    const nodeModulesPath = path.join(adminPath, 'node_modules')
     const needsInstall = true // !fs.existsSync(nodeModulesPath)
 
-    const runBuild = () => {
+    const runBuild = (): void => {
       console.log('🔨 Building admin UI...')
       const buildProcess = spawn('npm', ['run', 'build'], {
         cwd: adminPath,

@@ -1,4 +1,9 @@
-export const validate = (email) => {
+export interface ValidationResult {
+  valid: boolean
+  message?: string
+}
+
+export const validate = (email: string | undefined | null): ValidationResult => {
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
   if (!email) {

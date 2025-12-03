@@ -20,7 +20,7 @@ export const HTTP_STATUS = {
   UNPROCESSABLE_ENTITY: 422,
   INTERNAL_SERVER_ERROR: 500,
   SERVICE_UNAVAILABLE: 503
-}
+} as const
 
 // ============================================================================
 // Post Status
@@ -32,7 +32,7 @@ export const POST_STATUS = {
   PENDING: 'pending',
   PRIVATE: 'private',
   TRASH: 'trash'
-}
+} as const
 
 export const VALID_POST_STATUSES = Object.values(POST_STATUS)
 
@@ -47,7 +47,7 @@ export const USER_ROLES = {
   CONTRIBUTOR: 'contributor',
   SUBSCRIBER: 'subscriber',
   GUEST: 'guest'
-}
+} as const
 
 // ============================================================================
 // Capabilities
@@ -97,7 +97,7 @@ export const CAPABILITIES = {
   MANAGE_TAXONOMIES: 'manage_taxonomies',
   MANAGE_TERMS: 'manage_terms',
   UPLOAD_FILES: 'upload_files'
-}
+} as const
 
 // ============================================================================
 // File Upload
@@ -123,13 +123,13 @@ export const ALLOWED_FILE_EXTENSIONS = {
   DOCUMENTS: ['pdf', 'doc', 'docx', 'txt', 'rtf'],
   ARCHIVES: ['zip'],
   ALL: ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg', 'pdf', 'doc', 'docx', 'txt', 'rtf', 'zip']
-}
+} as const
 
 /**
  * Get allowed file extensions from environment or return null for no restrictions
- * @returns {string[] | null} Array of allowed extensions or null if all are allowed
+ * @returns Array of allowed extensions or null if all are allowed
  */
-export const getAllowedFileExtensions = () => {
+export const getAllowedFileExtensions = (): string[] | null => {
   const envValue = process.env.ALLOWED_FILE_EXTENSIONS
   if (!envValue || envValue.trim() === '') {
     return null // No restrictions
@@ -137,7 +137,7 @@ export const getAllowedFileExtensions = () => {
   return envValue.split(',').map(ext => ext.trim().toLowerCase())
 }
 
-export const MIME_TYPES = {
+export const MIME_TYPES: Record<string, string> = {
   // Images
   jpg: 'image/jpeg',
   jpeg: 'image/jpeg',
@@ -173,7 +173,7 @@ export const PASSWORD_REQUIREMENTS = {
   REQUIRE_LOWERCASE: false,
   REQUIRE_NUMBER: false,
   REQUIRE_SPECIAL: false
-}
+} as const
 
 export const BCRYPT_ROUNDS = parseInt(process.env.BCRYPT_ROUNDS || '12')
 
@@ -188,7 +188,7 @@ export const RATE_LIMITS = {
     WINDOW_MS: 15 * 60 * 1000, // 15 minutes
     MAX_REQUESTS: 5 // Stricter for auth endpoints
   }
-}
+} as const
 
 // ============================================================================
 // Pagination
@@ -198,7 +198,7 @@ export const PAGINATION = {
   DEFAULT_LIMIT: 10,
   MAX_LIMIT: 100,
   DEFAULT_OFFSET: 0
-}
+} as const
 
 // ============================================================================
 // Database
@@ -210,18 +210,19 @@ export const DB_DEFAULTS = {
     MIN: 2,
     MAX: 10
   }
-}
+} as const
 
 // ============================================================================
 // Cache
 // ============================================================================
 
 export const CACHE_TTL = {
+  DEFAULT: 1800, // 30 minutes (default)
   SHORT: 300, // 5 minutes
   MEDIUM: 1800, // 30 minutes
   LONG: 3600, // 1 hour
   VERY_LONG: 86400 // 24 hours
-}
+} as const
 
 export const CACHE_KEYS = {
   OPTIONS: 'options:all',
@@ -229,9 +230,9 @@ export const CACHE_KEYS = {
   ACTIVE_THEME: 'theme:active',
   POST_TYPES: 'post_types:all',
   TAXONOMIES: 'taxonomies:all',
-  USER_CAPABILITIES: (userId) => `user:${userId}:capabilities`,
-  POST: (idOrSlug) => `post:${idOrSlug}`,
-  TERM: (idOrSlug) => `term:${idOrSlug}`
+  USER_CAPABILITIES: (userId: number) => `user:${userId}:capabilities`,
+  POST: (idOrSlug: string | number) => `post:${idOrSlug}`,
+  TERM: (idOrSlug: string | number) => `term:${idOrSlug}`
 }
 
 // ============================================================================
@@ -243,7 +244,7 @@ export const CORE_POST_TYPES = {
   PAGE: 'pages',
   ATTACHMENT: 'attachments',
   COMMENT: 'comments'
-}
+} as const
 
 // ============================================================================
 // Taxonomies
@@ -252,7 +253,7 @@ export const CORE_POST_TYPES = {
 export const CORE_TAXONOMIES = {
   CATEGORY: 'categories',
   TAG: 'tags'
-}
+} as const
 
 // ============================================================================
 // Hooks & Filters
@@ -264,7 +265,7 @@ export const HOOK_PRIORITY = {
   DEFAULT: 10,
   LOW: 15,
   LOWEST: 20
-}
+} as const
 
 export const CORE_HOOKS = {
   // System hooks
@@ -302,7 +303,7 @@ export const CORE_HOOKS = {
   THEME_ACTIVATE: 'theme_activate',
   THEME_DEACTIVATE: 'theme_deactivate',
   THEME_UNINSTALL: 'theme_uninstall'
-}
+} as const
 
 export const CORE_FILTERS = {
   // Content filters
@@ -329,7 +330,7 @@ export const CORE_FILTERS = {
   // Authentication filters
   AUTHENTICATE: 'authenticate',
   AUTHORIZE: 'authorize'
-}
+} as const
 
 // ============================================================================
 // Field Types
@@ -349,7 +350,7 @@ export const FIELD_TYPES = {
   DATETIME: 'datetime',
   REPEATER: 'repeater',
   RELATIONSHIP: 'relationship'
-}
+} as const
 
 // ============================================================================
 // Meta Query Operators
@@ -365,7 +366,7 @@ export const META_QUERY_OPERATORS = {
   LIKE: 'LIKE',
   IN: 'IN',
   NOT_IN: 'NOT IN'
-}
+} as const
 
 // ============================================================================
 // Logging
@@ -376,7 +377,7 @@ export const LOG_LEVELS = {
   WARN: 'warn',
   INFO: 'info',
   DEBUG: 'debug'
-}
+} as const
 
 // ============================================================================
 // Errors
@@ -419,9 +420,9 @@ export const ERROR_CODES = {
   // Generic errors
   INTERNAL_ERROR: 'INTERNAL_ERROR',
   SERVICE_UNAVAILABLE: 'SERVICE_UNAVAILABLE'
-}
+} as const
 
-export const ERROR_MESSAGES = {
+export const ERROR_MESSAGES: Record<string, string> = {
   [ERROR_CODES.INVALID_CREDENTIALS]: 'Invalid email or password',
   [ERROR_CODES.TOKEN_EXPIRED]: 'Token has expired',
   [ERROR_CODES.TOKEN_INVALID]: 'Invalid token',
@@ -446,7 +447,7 @@ export const ENVIRONMENTS = {
   DEVELOPMENT: 'development',
   PRODUCTION: 'production',
   TEST: 'test'
-}
+} as const
 
 export const IS_PRODUCTION = process.env.NODE_ENV === ENVIRONMENTS.PRODUCTION
 export const IS_DEVELOPMENT = process.env.NODE_ENV === ENVIRONMENTS.DEVELOPMENT
@@ -465,7 +466,7 @@ export const PATHS = {
   LOGS_DIR: './logs',
   TEMP_DIR: './content/.temp',
   BACKUPS_DIR: './content/.backups'
-}
+} as const
 
 // ============================================================================
 // API Versions
@@ -473,7 +474,7 @@ export const PATHS = {
 
 export const API_VERSIONS = {
   V1: 'v1'
-}
+} as const
 
 export const CURRENT_API_VERSION = API_VERSIONS.V1
 
@@ -484,7 +485,7 @@ export const CURRENT_API_VERSION = API_VERSIONS.V1
 export const ADMIN = {
   PATH: process.env.ADMIN_PATH || '/admin',
   DEFAULT_ITEMS_PER_PAGE: 10
-}
+} as const
 
 // ============================================================================
 // Clustering
@@ -501,7 +502,7 @@ export const DATE_FORMATS = {
   ISO: 'YYYY-MM-DDTHH:mm:ss.sssZ',
   SHORT: 'YYYY-MM-DD',
   TIME: 'HH:mm:ss'
-}
+} as const
 
 // ============================================================================
 // Regex Patterns
@@ -513,7 +514,7 @@ export const REGEX_PATTERNS = {
   URL: /^https?:\/\/.+/,
   HEX_COLOR: /^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/,
   SEMVER: /^(\d+)\.(\d+)\.(\d+)(?:-([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?(?:\+([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?$/
-}
+} as const
 
 // ============================================================================
 // WebSocket Events
@@ -528,7 +529,7 @@ export const WS_EVENTS = {
   USER_ONLINE: 'user_online',
   USER_OFFLINE: 'user_offline',
   NOTIFICATION: 'notification'
-}
+} as const
 
 // ============================================================================
 // Export All

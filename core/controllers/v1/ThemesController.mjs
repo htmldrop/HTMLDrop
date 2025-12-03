@@ -4,7 +4,7 @@ import multer from 'multer'
 import express from 'express'
 import AdmZip from 'adm-zip'
 import { spawn } from 'child_process'
-import { validatePackageName, validateVersion, buildNpmInstallArgs } from '../../utils/npmValidator.mjs'
+import { validatePackageName, validateVersion, buildNpmInstallArgs } from '../../utils/npmValidator.ts'
 import ThemeLifecycleService from '../../services/ThemeLifecycleService.mjs'
 import PersistenceService from '../../services/PersistenceService.mjs'
 

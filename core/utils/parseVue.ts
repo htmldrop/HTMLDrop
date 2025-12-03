@@ -1,19 +1,19 @@
 import fs from 'fs'
 import { parse } from '@vue/compiler-sfc'
 
-export default (filePath) => {
+export default (filePath: string): string => {
   try {
     const content = fs.readFileSync(filePath, 'utf-8')
     const { descriptor } = parse(content)
-    const template = descriptor.template.content
+    const template = descriptor.template?.content
     const script = descriptor.script?.content
     const scriptSetup = descriptor.scriptSetup?.content // TODO
     const styles = descriptor.styles
 
     let obj = ''
     let imports = ''
-    let index
-    if (script.includes('export default')) {
+    let index: number
+    if (script?.includes('export default')) {
       const split = script.split('export default')
       imports = split[0]
       obj = split[1]
@@ -30,7 +30,7 @@ export default (filePath) => {
 
     let css = ''
     for (const style of styles) {
-      css += `${style.content  }\n`
+      css += `${style.content}\n`
     }
 
     return `
@@ -44,7 +44,7 @@ export default (filePath) => {
                 styleTag.textContent = \`${css}\`
                 document.head.appendChild(styleTag)
             }
-            
+
             export default {
                 template: \`${template?.trim()}\`,
                 ${setup}
@@ -52,10 +52,11 @@ export default (filePath) => {
             }
         `.trim()
   } catch (e) {
-    console.log(e)
+    const error = e as Error
+    console.log(error)
     return `
             export default {
-                template: \`${e.message}\`
+                template: \`${error.message}\`
             }
         `.trim()
   }

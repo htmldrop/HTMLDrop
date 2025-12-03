@@ -1,17 +1,37 @@
 import jwt from 'jsonwebtoken'
 import { parse as parseUrl } from 'url'
-import UserGuard from './UserGuard.mjs'
+import type { Knex } from 'knex'
+import type { IncomingMessage } from 'http'
+import type { WebSocket } from 'ws'
+import UserGuard from './UserGuard.js'
+
+interface Context {
+  knex: Knex
+  table: (name: string) => string
+}
+
+interface AuthenticatedWebSocket extends WebSocket {
+  userId?: number
+  authenticated?: boolean
+  capabilities?: string[]
+}
+
+interface JwtPayload {
+  sub?: number
+  id?: number
+  [key: string]: unknown
+}
 
 /**
  * WebSocket JWT Authentication Middleware
  * Authenticates WebSocket connections using JWT tokens
  */
-export default function createWsAuthMiddleware(context) {
-  return async (ws, req) => {
+export default function createWsAuthMiddleware(context: Context) {
+  return async (ws: AuthenticatedWebSocket, req: IncomingMessage): Promise<boolean> => {
     try {
       // Parse query string to get token
-      const { query } = parseUrl(req.url, true)
-      let token = query.token
+      const { query } = parseUrl(req.url || '', true)
+      let token = query.token as string | undefined
 
       // Also try to get token from upgrade headers
       if (!token && req.headers.authorization) {
@@ -31,7 +51,7 @@ export default function createWsAuthMiddleware(context) {
       }
 
       // Verify JWT token
-      const decoded = jwt.verify(token, process.env.JWT_SECRET)
+      const decoded = jwt.verify(token, process.env.JWT_SECRET!) as JwtPayload
 
       // Check if token is revoked
       const { knex, table } = context
@@ -51,7 +71,7 @@ export default function createWsAuthMiddleware(context) {
       // Fetch user capabilities using UserGuard
       const userId = decoded.sub || decoded.id
       const guard = new UserGuard(context, userId)
-      const capabilities = await guard.resolveUserCapabilities(userId)
+      const capabilities = await guard.resolveUserCapabilities(userId!)
       const capabilitySlugs = Array.from(capabilities)
 
       // Attach user info and capabilities to WebSocket
@@ -60,7 +80,7 @@ export default function createWsAuthMiddleware(context) {
       ws.capabilities = capabilitySlugs
 
       return true
-    } catch (error) {
+    } catch {
       ws.send(JSON.stringify({
         type: 'error',
         message: 'Invalid or expired token'

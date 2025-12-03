@@ -5,7 +5,7 @@
  */
 
 import rateLimit from 'express-rate-limit'
-import { RATE_LIMITS, HTTP_STATUS, ERROR_CODES } from '../utils/constants.mjs'
+import { RATE_LIMITS, HTTP_STATUS, ERROR_CODES } from '../utils/constants.ts'
 
 /**
  * Default rate limiter for general API endpoints

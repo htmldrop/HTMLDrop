@@ -1,8 +1,8 @@
 import { createApp, ref, computed } from 'vue'
 import App from './App.vue'
 import router from './router/router.js'
-import apiFetch from './utils/apiFetch.js'
-import createTokenRefreshManager from './utils/tokenRefresh.js'
+import apiFetch from './utils/apiFetch.ts'
+import createTokenRefreshManager from './utils/tokenRefresh.ts'
 
 const getUser = () => {
   try {

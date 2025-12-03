@@ -2,7 +2,7 @@ import fs from 'fs'
 import path from 'path'
 import multer from 'multer'
 import express from 'express'
-import { UPLOAD_LIMITS, getAllowedFileExtensions } from '../../utils/constants.mjs'
+import { UPLOAD_LIMITS, getAllowedFileExtensions } from '../../utils/constants.ts'
 
 const UPLOAD_BASE = path.resolve('./content/uploads')
 if (!fs.existsSync(UPLOAD_BASE)) fs.mkdirSync(UPLOAD_BASE, { recursive: true })

@@ -1,5 +1,5 @@
 import jwt from 'jsonwebtoken'
-import UserGuard from '../utils/UserGuard.mjs'
+import UserGuard from '../utils/UserGuard.ts'
 import crypto from 'crypto'
 
 export default (context) => async (req, res, next) => {

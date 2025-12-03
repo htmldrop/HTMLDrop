@@ -12,6 +12,7 @@
     "allowJs": true,
     "checkJs": false,
     "skipLibCheck": true,
+    "allowImportingTsExtensions": true,
 
     // Allow JS and TS to coexist
     "esModuleInterop": true,

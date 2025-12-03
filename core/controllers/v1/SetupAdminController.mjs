@@ -1,6 +1,6 @@
 import express from 'express'
-import { hash, validate as validatePassword } from '../../utils/password.mjs'
-import { validate as validateEmail } from '../../utils/email.mjs'
+import { hash, validate as validatePassword } from '../../utils/password.ts'
+import { validate as validateEmail } from '../../utils/email.ts'
 
 export default (context) => {
   const router = express.Router({ mergeParams: true })

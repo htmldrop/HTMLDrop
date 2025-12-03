@@ -5,7 +5,7 @@
  */
 
 import { z } from 'zod'
-import { POST_STATUS, VALID_POST_STATUSES, FIELD_TYPES, META_QUERY_OPERATORS } from '../utils/constants.mjs'
+import { POST_STATUS, VALID_POST_STATUSES, FIELD_TYPES, META_QUERY_OPERATORS } from '../utils/constants.ts'
 
 // ============================================================================
 // Common Schemas
