@@ -1,6 +1,6 @@
 {
   "name": "htmldrop",
-  "version": "1.0.43",
+  "version": "1.0.44",
   "type": "module",
   "main": "core/index.mjs",
   "types": "core/types/index.d.ts",
@@ -25,7 +25,7 @@
     "build:ts": "tsc --project core/config/tsconfig.json",
     "build:ts:watch": "tsc --project core/config/tsconfig.json --watch",
     "build:admin": "npm run build --prefix ./core/admin",
-    "install:admin": "npm install --prefix ./core/admin",
+    "install:admin": "npm install --prefix ./core/admin --include=dev",
     "audit:admin": "npm audit fix --prefix ./core/admin",
     "typecheck": "tsc --project core/config/tsconfig.json --noEmit",
     "start": "node core/supervisor.ts",
