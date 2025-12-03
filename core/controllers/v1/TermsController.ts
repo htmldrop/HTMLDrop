@@ -1,6 +1,7 @@
 import type { Router, Request, Response, NextFunction } from 'express'
 import express from 'express'
 import type { Knex } from 'knex'
+import type {} from '../../types/index.js'
 
 interface Term {
   id: number
@@ -24,12 +25,6 @@ interface TermMeta {
   value: string
 }
 
-interface Taxonomy {
-  id: number
-  slug: string
-  resolvedCapabilities?: string[]
-  [key: string]: unknown
-}
 
 interface FieldInfo {
   field: {
@@ -40,18 +35,8 @@ interface FieldInfo {
   [key: string]: unknown
 }
 
-interface RequestWithGuardAndHooks extends Request {
-  user?: { id: number }
-  guard: {
-    user: (options: { canOneOf?: string[]; termId?: number }) => Promise<boolean>
-  }
-  hooks: {
-    getTaxonomy: (postType: string, taxonomy: string) => Promise<Taxonomy | null>
-    getFields: (taxonomy: string) => Promise<FieldInfo[]>
-    applyFilters: <T>(hook: string, value: T, ...args: unknown[]) => T
-    doAction: (hook: string, data: Record<string, unknown>) => void
-  }
-  query: {
+interface TermsRequest extends HTMLDrop.ExtendedRequest {
+  query: HTMLDrop.ExtendedRequest['query'] & {
     parent_id?: string
     status?: string
     limit?: string
@@ -105,7 +90,7 @@ const normalizeObject = (val: unknown, root = true): unknown => {
 export default (context: HTMLDrop.Context): Router => {
   const router = express.Router({ mergeParams: true })
 
-  const withMetaMany = async (terms: Term[], req: RequestWithGuardAndHooks): Promise<Term[]> => {
+  const withMetaMany = async (terms: Term[], req: TermsRequest): Promise<Term[]> => {
     const { knex, table } = context
     const { applyFilters } = req.hooks
     const ids = terms.map((p) => p.id)
@@ -141,19 +126,19 @@ export default (context: HTMLDrop.Context): Router => {
   }
 
   // Helper: merge meta into a term object
-  const withMeta = async (term: Term, req: RequestWithGuardAndHooks): Promise<Term> => {
+  const withMeta = async (term: Term, req: TermsRequest): Promise<Term> => {
     const [result] = await withMetaMany([term], req)
     return result
   }
 
   // Helper: check route capability
   const checkCapability = async (
-    req: RequestWithGuardAndHooks,
+    req: TermsRequest,
     routeCaps: string[],
     postType: string,
     taxonomySlug: string,
     termId?: number
-  ): Promise<Taxonomy | null> => {
+  ): Promise<HTMLDrop.Taxonomy | null> => {
     const { getTaxonomy } = req.hooks
     const taxonomy = await getTaxonomy(postType, taxonomySlug)
     if (!taxonomy?.resolvedCapabilities?.length) return null
@@ -201,7 +186,7 @@ export default (context: HTMLDrop.Context): Router => {
    *         description: Paginated list of terms
    */
   router.get('/', async (req: Request, res: Response, next: NextFunction) => {
-    const guardReq = req as RequestWithGuardAndHooks
+    const guardReq = req as unknown as TermsRequest
     const { knex, table } = context
     const { postType, taxonomy } = req.params
 
@@ -442,7 +427,7 @@ export default (context: HTMLDrop.Context): Router => {
    *         description: Term not found
    */
   router.get('/:idOrSlug', async (req: Request, res: Response, next: NextFunction) => {
-    const guardReq = req as RequestWithGuardAndHooks
+    const guardReq = req as unknown as TermsRequest
     const { knex, table } = context
     const { postType, idOrSlug, taxonomy } = req.params
 
@@ -480,7 +465,7 @@ export default (context: HTMLDrop.Context): Router => {
    *         description: Permission denied
    */
   router.post('/', async (req: Request, res: Response, next: NextFunction) => {
-    const guardReq = req as RequestWithGuardAndHooks
+    const guardReq = req as unknown as TermsRequest
     const { knex, table, normalizeSlug } = context
     const { getFields, applyFilters, doAction } = guardReq.hooks
     const { parent_id, slug, status, title } = req.body
@@ -502,7 +487,7 @@ export default (context: HTMLDrop.Context): Router => {
     delete metaData.slug
     delete metaData.status
 
-    const fields = await getFields(taxonomy)
+    const fields = await getFields(taxonomy) as unknown as FieldInfo[]
     if (fields.some((field) => field.field.slug === 'authors')) {
       metaData.authors = [guardReq.user!.id]
     }
@@ -561,7 +546,7 @@ export default (context: HTMLDrop.Context): Router => {
    *         description: Term not found
    */
   router.patch('/:idOrSlug', async (req: Request, res: Response, next: NextFunction) => {
-    const guardReq = req as RequestWithGuardAndHooks
+    const guardReq = req as unknown as TermsRequest
     const { knex, table, normalizeSlug } = context
     const { getFields, doAction, applyFilters } = guardReq.hooks
     const { postType, idOrSlug, taxonomy } = req.params
@@ -583,7 +568,7 @@ export default (context: HTMLDrop.Context): Router => {
     let coreUpdates: Record<string, unknown> = {}
     let metaUpdates: Record<string, unknown> = {}
 
-    const fields = await getFields(taxonomy)
+    const fields = await getFields(taxonomy) as unknown as FieldInfo[]
     if (fields.some((field) => field.field.slug === 'authors')) {
       const meta = await knex(table('term_meta')).where('term_id', id).where('field_slug', 'authors').first() as TermMeta | undefined
       if (Array.isArray(meta?.value)) metaUpdates.authors = meta.value
@@ -747,7 +732,7 @@ export default (context: HTMLDrop.Context): Router => {
    *         description: Term not found
    */
   router.delete('/:idOrSlug', async (req: Request, res: Response, next: NextFunction) => {
-    const guardReq = req as RequestWithGuardAndHooks
+    const guardReq = req as unknown as TermsRequest
     const { knex, table, formatDate } = context
     const { postType, idOrSlug, taxonomy } = req.params
     const { doAction, applyFilters } = guardReq.hooks

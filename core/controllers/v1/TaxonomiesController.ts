@@ -1,5 +1,6 @@
 import type { Router, Request, Response } from 'express'
 import express from 'express'
+import type {} from '../../types/index.js'
 
 interface Taxonomy {
   id: number
@@ -16,18 +17,6 @@ interface PostType {
   id: number
   slug: string
   [key: string]: unknown
-}
-
-interface RequestWithGuardAndHooks extends Request {
-  user?: { id: number }
-  guard: {
-    user: (options: { canOneOf?: string[] }) => Promise<boolean>
-  }
-  hooks: {
-    getAllTaxonomies: (postType: string) => Promise<Taxonomy[]>
-    getPostType: (postType: string) => Promise<PostType | null>
-    getTaxonomy: (postType: string, idOrSlug: string) => Promise<Taxonomy | null>
-  }
 }
 
 const parseJSON = (value: unknown): unknown => {
@@ -50,9 +39,9 @@ export default (context: HTMLDrop.Context): Router => {
   // ------------------------
   // Helper: check route capability
   // ------------------------
-  const checkCapability = async (req: RequestWithGuardAndHooks, routeCaps: string[]): Promise<boolean> => {
+  const checkCapability = async (req: HTMLDrop.ExtendedRequest, routeCaps: string[]): Promise<boolean> => {
     const hasAccess = await req.guard.user({ canOneOf: routeCaps })
-    return hasAccess
+    return !!hasAccess
   }
 
   /**
@@ -87,7 +76,7 @@ export default (context: HTMLDrop.Context): Router => {
    *         description: Forbidden
    */
   router.get('/', async (req: Request, res: Response) => {
-    const guardReq = req as RequestWithGuardAndHooks
+    const guardReq = req as unknown as HTMLDrop.ExtendedRequest
     const { postType } = req.params
     const { getAllTaxonomies } = guardReq.hooks
     if (!(await checkCapability(guardReq, ['read', 'read_taxonomy']))) {
@@ -151,7 +140,7 @@ export default (context: HTMLDrop.Context): Router => {
    *         description: Post type not found
    */
   router.post('/', async (req: Request, res: Response) => {
-    const guardReq = req as RequestWithGuardAndHooks
+    const guardReq = req as unknown as HTMLDrop.ExtendedRequest
     const { normalizeSlug, knex, table } = context
     if (!(await checkCapability(guardReq, ['create', 'create_taxonomies']))) {
       return res.status(403).json({ error: 'Permission denied' })
@@ -218,7 +207,7 @@ export default (context: HTMLDrop.Context): Router => {
    *         description: Taxonomy not found
    */
   router.get('/:idOrSlug', async (req: Request, res: Response) => {
-    const guardReq = req as RequestWithGuardAndHooks
+    const guardReq = req as unknown as HTMLDrop.ExtendedRequest
     const { knex, table } = context
     const { getTaxonomy } = guardReq.hooks
     if (!(await checkCapability(guardReq, ['read', 'read_taxonomy']))) {
@@ -294,7 +283,7 @@ export default (context: HTMLDrop.Context): Router => {
    *         description: Taxonomy not found
    */
   router.patch('/:idOrSlug', async (req: Request, res: Response) => {
-    const guardReq = req as RequestWithGuardAndHooks
+    const guardReq = req as unknown as HTMLDrop.ExtendedRequest
     const { normalizeSlug, knex, table } = context
     if (!(await checkCapability(guardReq, ['edit', 'edit_taxonomies']))) {
       return res.status(403).json({ error: 'Permission denied' })
@@ -359,7 +348,7 @@ export default (context: HTMLDrop.Context): Router => {
    *         description: Taxonomy not found
    */
   router.delete('/:idOrSlug', async (req: Request, res: Response) => {
-    const guardReq = req as RequestWithGuardAndHooks
+    const guardReq = req as unknown as HTMLDrop.ExtendedRequest
     const { knex, table } = context
     if (!(await checkCapability(guardReq, ['delete', 'delete_taxonomies']))) {
       return res.status(403).json({ error: 'Permission denied' })

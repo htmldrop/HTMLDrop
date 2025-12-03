@@ -10,15 +10,6 @@ import { validatePackageName, validateVersion, buildNpmInstallArgs } from '../..
 import PluginLifecycleService from '../../services/PluginLifecycleService.ts'
 import PersistenceService from '../../services/PersistenceService.mjs'
 
-interface RequestWithGuardAndContext extends Request {
-  user?: { id: number }
-  guard: {
-    user: (options: { canOneOf?: string[]; userId?: number }) => Promise<boolean>
-  }
-  context: HTMLDrop.Context
-  file?: Express.Multer.File
-}
-
 interface BackupInfo {
   files: string[]
   directories: string[]
@@ -236,7 +227,7 @@ export default (context: HTMLDrop.Context): Router => {
    */
   router.get('/', async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const guardReq = req as RequestWithGuardAndContext
+      const guardReq = req as HTMLDrop.ExtendedRequest
       const hasAccess = await guardReq.guard.user({ canOneOf: ['read', 'read_plugin'], userId: guardReq?.user?.id })
 
       if (!hasAccess) {
@@ -315,7 +306,7 @@ export default (context: HTMLDrop.Context): Router => {
    */
   router.get('/:slug', async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const guardReq = req as RequestWithGuardAndContext
+      const guardReq = req as HTMLDrop.ExtendedRequest
       const hasAccess = await guardReq.guard.user({ canOneOf: ['read', 'read_plugin'], userId: guardReq?.user?.id })
       if (!hasAccess) return res.status(403).json({ error: 'Permission denied' })
 
@@ -378,7 +369,7 @@ export default (context: HTMLDrop.Context): Router => {
    */
   router.post('/:slug/activate', async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const guardReq = req as RequestWithGuardAndContext
+      const guardReq = req as HTMLDrop.ExtendedRequest
       const hasAccess = await guardReq.guard.user({ canOneOf: ['update', 'activate_plugins'], userId: guardReq?.user?.id })
       if (!hasAccess) return res.status(403).json({ error: 'Permission denied' })
 
@@ -445,7 +436,7 @@ export default (context: HTMLDrop.Context): Router => {
    */
   router.post('/:slug/deactivate', async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const guardReq = req as RequestWithGuardAndContext
+      const guardReq = req as HTMLDrop.ExtendedRequest
       const hasAccess = await guardReq.guard.user({ canOneOf: ['update', 'deactivate_plugins'], userId: guardReq?.user?.id })
       if (!hasAccess) return res.status(403).json({ error: 'Permission denied' })
 
@@ -508,7 +499,7 @@ export default (context: HTMLDrop.Context): Router => {
    */
   router.delete('/:slug', async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const guardReq = req as RequestWithGuardAndContext
+      const guardReq = req as HTMLDrop.ExtendedRequest
       const hasAccess = await guardReq.guard.user({ canOneOf: ['delete', 'delete_plugins'], userId: guardReq?.user?.id })
       if (!hasAccess) return res.status(403).json({ error: 'Permission denied' })
 
@@ -590,7 +581,7 @@ export default (context: HTMLDrop.Context): Router => {
    */
   router.post('/upload', upload.single('file'), async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const guardReq = req as RequestWithGuardAndContext
+      const guardReq = req as HTMLDrop.ExtendedRequest
       const hasAccess = await guardReq.guard.user({ canOneOf: ['create', 'upload_plugins'], userId: guardReq?.user?.id })
       if (!hasAccess) {
         // Clean up uploaded file if permission denied
@@ -666,7 +657,7 @@ export default (context: HTMLDrop.Context): Router => {
       })
     } catch (err) {
       // Clean up on error
-      const guardReq = req as RequestWithGuardAndContext
+      const guardReq = req as HTMLDrop.ExtendedRequest
       if (guardReq.file) {
         try {
           await fs.promises.unlink(guardReq.file.path)
@@ -726,7 +717,7 @@ export default (context: HTMLDrop.Context): Router => {
    */
   router.get('/search/npm', async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const guardReq = req as RequestWithGuardAndContext
+      const guardReq = req as HTMLDrop.ExtendedRequest
       const hasAccess = await guardReq.guard.user({ canOneOf: ['read', 'read_plugin'], userId: guardReq?.user?.id })
       if (!hasAccess) return res.status(403).json({ error: 'Permission denied' })
 
@@ -828,7 +819,7 @@ export default (context: HTMLDrop.Context): Router => {
    */
   router.get('/:slug/versions', async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const guardReq = req as RequestWithGuardAndContext
+      const guardReq = req as HTMLDrop.ExtendedRequest
       const hasAccess = await guardReq.guard.user({ canOneOf: ['read', 'read_plugin'], userId: guardReq?.user?.id })
       if (!hasAccess) return res.status(403).json({ error: 'Permission denied' })
 
@@ -953,7 +944,7 @@ export default (context: HTMLDrop.Context): Router => {
    */
   router.post('/:slug/change-version', async (req: Request, res: Response) => {
     try {
-      const guardReq = req as RequestWithGuardAndContext
+      const guardReq = req as HTMLDrop.ExtendedRequest
       const hasAccess = await guardReq.guard.user({ canOneOf: ['update', 'upload_plugins'], userId: guardReq?.user?.id })
       if (!hasAccess) return res.status(403).json({ error: 'Permission denied' })
 
@@ -1150,7 +1141,7 @@ export default (context: HTMLDrop.Context): Router => {
    */
   router.post('/install/npm', async (req: Request, res: Response) => {
     try {
-      const guardReq = req as RequestWithGuardAndContext
+      const guardReq = req as HTMLDrop.ExtendedRequest
       const hasAccess = await guardReq.guard.user({ canOneOf: ['create', 'upload_plugins'], userId: guardReq?.user?.id })
       if (!hasAccess) return res.status(403).json({ error: 'Permission denied' })
 

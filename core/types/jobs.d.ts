@@ -10,9 +10,15 @@ declare global {
     interface JobConfig {
       type: string
       name: string
+      description?: string
+      iconSvg?: string
       payload?: Record<string, any>
+      metadata?: Record<string, any>
       source?: string
       priority?: number
+      createdBy?: number | null
+      showNotification?: boolean
+      timeout?: number
     }
 
     /**
@@ -31,12 +37,15 @@ declare global {
      */
     interface Job {
       id: number
+      jobId: string
       type: string
       name: string
       status: 'pending' | 'running' | 'completed' | 'failed' | 'cancelled'
       payload: Record<string, any>
       result?: any
       error?: string
+      description?: string
+      icon_svg?: string
       progress: number
       metadata?: Record<string, any>
       source?: string

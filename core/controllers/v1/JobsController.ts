@@ -1,19 +1,6 @@
 import type { Router, Response } from 'express'
 import express from 'express'
-
-interface Job {
-  id: number
-  jobId: string
-  name: string
-  description?: string
-  type: string
-  status: string
-  progress: number
-  iconSvg?: string
-  metadata?: Record<string, unknown>
-  source: string
-  createdAt: Date
-}
+import type {} from '../../types/index.js'
 
 export default (_context: HTMLDrop.Context): Router => {
   const router = express.Router()
@@ -23,7 +10,7 @@ export default (_context: HTMLDrop.Context): Router => {
    */
   const checkCapability = async (req: HTMLDrop.ExtendedRequest, routeCaps: string[]): Promise<boolean> => {
     const hasAccess = await req.guard.user({ canOneOf: routeCaps })
-    return hasAccess
+    return !!hasAccess
   }
 
   /**
@@ -101,7 +88,7 @@ export default (_context: HTMLDrop.Context): Router => {
       const { status, type, source, limit = '100', offset = '0' } = queryParams
 
       const jobs = await typedReq.hooks.getJobs({
-        status,
+        status: status as 'pending' | 'running' | 'completed' | 'failed' | 'cancelled' | undefined,
         type,
         source,
         limit: parseInt(limit, 10),
@@ -269,7 +256,7 @@ export default (_context: HTMLDrop.Context): Router => {
         })
       }
 
-      const { name, description, type, iconSvg, metadata, source } = req.body
+      const { name, description, type, iconSvg, metadata, source, showNotification, timeout } = req.body
 
       if (!name || !type) {
         return res.status(400).json({
@@ -280,12 +267,14 @@ export default (_context: HTMLDrop.Context): Router => {
 
       const job = await typedReq.hooks.createJob({
         name,
-        description,
         type,
+        description,
         iconSvg,
         metadata,
         source: source || 'api',
-        createdBy: typedReq.user?.id || null
+        createdBy: typedReq.user?.id ?? null,
+        showNotification,
+        timeout
       })
 
       res.status(201).json({
@@ -298,10 +287,10 @@ export default (_context: HTMLDrop.Context): Router => {
           type: job.type,
           status: job.status,
           progress: job.progress,
-          iconSvg: job.iconSvg,
+          iconSvg: job.icon_svg,
           metadata: job.metadata,
           source: job.source,
-          createdAt: job.createdAt
+          createdAt: job.created_at
         }
       })
     } catch (error) {

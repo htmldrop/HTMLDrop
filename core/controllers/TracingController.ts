@@ -79,7 +79,8 @@ interface TracingRequest extends HTMLDrop.ExtendedRequest {
 router.get('/traces', async (req, res: Response) => {
   const contextReq = req as TracingRequest
   try {
-    const { limit = '20', offset = '0', path, minDuration, errorsOnly } = contextReq.query
+    const queryParams = req.query as Record<string, string | undefined>
+    const { limit = '20', offset = '0', path, minDuration, errorsOnly } = queryParams
     const traceStorage = contextReq.context.traceStorage
 
     if (!traceStorage) {
@@ -92,8 +93,8 @@ router.get('/traces', async (req, res: Response) => {
     // Support both sync (TraceStorage) and async (TraceStorageDB) methods
     const traces = await Promise.resolve(
       traceStorage.getRecent({
-        limit: parseInt(limit),
-        offset: parseInt(offset),
+        limit: parseInt(limit, 10),
+        offset: parseInt(offset, 10),
         path,
         minDuration: minDuration ? parseFloat(minDuration) : undefined,
         errorsOnly: errorsOnly === 'true'
@@ -113,8 +114,8 @@ router.get('/traces', async (req, res: Response) => {
         storedAt: t.storedAt
       })),
       pagination: {
-        limit: parseInt(limit),
-        offset: parseInt(offset),
+        limit: parseInt(limit, 10),
+        offset: parseInt(offset, 10),
         total
       }
     })
@@ -171,7 +172,8 @@ router.get('/traces/:traceId', async (req, res: Response) => {
 router.get('/slowest', async (req, res: Response) => {
   const contextReq = req as TracingRequest
   try {
-    const { limit = '10', hoursBack = '24' } = contextReq.query
+    const queryParams = req.query as Record<string, string | undefined>
+    const { limit = '10', hoursBack = '24' } = queryParams
     const traceStorage = contextReq.context.traceStorage
 
     if (!traceStorage) {
@@ -181,7 +183,7 @@ router.get('/slowest', async (req, res: Response) => {
       })
     }
 
-    const traces = await Promise.resolve(traceStorage.getSlowest(parseInt(limit), parseInt(hoursBack)))
+    const traces = await Promise.resolve(traceStorage.getSlowest(parseInt(limit, 10), parseInt(hoursBack, 10)))
 
     res.json({
       success: true,
@@ -210,7 +212,8 @@ router.get('/slowest', async (req, res: Response) => {
 router.get('/errors', async (req, res: Response) => {
   const contextReq = req as TracingRequest
   try {
-    const { limit = '20', hoursBack = '24' } = contextReq.query
+    const queryParams = req.query as Record<string, string | undefined>
+    const { limit = '20', hoursBack = '24' } = queryParams
     const traceStorage = contextReq.context.traceStorage
 
     if (!traceStorage) {
@@ -220,7 +223,7 @@ router.get('/errors', async (req, res: Response) => {
       })
     }
 
-    const traces = await Promise.resolve(traceStorage.getErrors(parseInt(limit), parseInt(hoursBack)))
+    const traces = await Promise.resolve(traceStorage.getErrors(parseInt(limit, 10), parseInt(hoursBack, 10)))
 
     res.json({
       success: true,
@@ -248,7 +251,8 @@ router.get('/errors', async (req, res: Response) => {
 router.get('/stats', async (req, res: Response) => {
   const contextReq = req as TracingRequest
   try {
-    const { timeWindow = '300000' } = contextReq.query
+    const queryParams = req.query as Record<string, string | undefined>
+    const { timeWindow = '300000' } = queryParams
     const traceStorage = contextReq.context.traceStorage
 
     if (!traceStorage) {
@@ -260,7 +264,7 @@ router.get('/stats', async (req, res: Response) => {
 
     const stats = await Promise.resolve(
       traceStorage.getStats({
-        timeWindowMs: parseInt(timeWindow)
+        timeWindowMs: parseInt(timeWindow, 10)
       })
     )
 
@@ -285,7 +289,8 @@ router.get('/stats', async (req, res: Response) => {
 router.get('/bottlenecks', async (req, res: Response) => {
   const contextReq = req as TracingRequest
   try {
-    const { limit = '10', timeWindow = '300000' } = contextReq.query
+    const queryParams = req.query as Record<string, string | undefined>
+    const { limit = '10', timeWindow = '300000' } = queryParams
     const traceStorage = contextReq.context.traceStorage
 
     if (!traceStorage) {
@@ -298,8 +303,8 @@ router.get('/bottlenecks', async (req, res: Response) => {
     // findBottlenecks only exists on memory storage, for DB we'd need different logic
     if (typeof traceStorage.findBottlenecks === 'function') {
       const bottlenecks = traceStorage.findBottlenecks({
-        limit: parseInt(limit),
-        timeWindowMs: parseInt(timeWindow)
+        limit: parseInt(limit, 10),
+        timeWindowMs: parseInt(timeWindow, 10)
       })
 
       res.json({

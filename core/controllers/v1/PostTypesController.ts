@@ -1,5 +1,6 @@
-import type { Router, Request, Response } from 'express'
+import type { Router, Response } from 'express'
 import express from 'express'
+import type {} from '../../types/index.js'
 
 interface PostType {
   id: number
@@ -11,17 +12,6 @@ interface PostType {
   capabilities?: unknown
   show_in_menu?: boolean | number
   [key: string]: unknown
-}
-
-interface RequestWithGuardAndHooks extends Request {
-  user?: { id: number }
-  guard: {
-    user: (options: { canOneOf?: string[] }) => Promise<boolean>
-  }
-  hooks: {
-    getAllPostTypes: () => Promise<PostType[]>
-    getPostType: (idOrSlug: string) => Promise<PostType | null>
-  }
 }
 
 const parseJSON = (value: unknown): unknown => {
@@ -48,9 +38,9 @@ export default (context: HTMLDrop.Context): Router => {
   // ------------------------
   // Helper: check route capability
   // ------------------------
-  const checkCapability = async (req: RequestWithGuardAndHooks, routeCaps: string[]): Promise<boolean> => {
+  const checkCapability = async (req: HTMLDrop.ExtendedRequest, routeCaps: string[]): Promise<boolean> => {
     const hasAccess = await req.guard.user({ canOneOf: routeCaps })
-    return hasAccess
+    return !!hasAccess
   }
 
   /**
@@ -77,8 +67,8 @@ export default (context: HTMLDrop.Context): Router => {
    *       403:
    *         description: Forbidden
    */
-  router.get('/', async (req: Request, res: Response) => {
-    const guardReq = req as RequestWithGuardAndHooks
+  router.get('/', async (req, res: Response) => {
+    const guardReq = req as unknown as HTMLDrop.ExtendedRequest
     const { getAllPostTypes } = guardReq.hooks
     if (!(await checkCapability(guardReq, ['read', 'read_post_type']))) {
       return res.status(403).json({ error: 'Permission denied' })
@@ -133,8 +123,8 @@ export default (context: HTMLDrop.Context): Router => {
    *       403:
    *         description: Forbidden or missing required fields
    */
-  router.post('/', async (req: Request, res: Response) => {
-    const guardReq = req as RequestWithGuardAndHooks
+  router.post('/', async (req, res: Response) => {
+    const guardReq = req as unknown as HTMLDrop.ExtendedRequest
     const { normalizeSlug, knex, table } = context
     if (!(await checkCapability(guardReq, ['create', 'create_post_types']))) {
       return res.status(403).json({ error: 'Permission denied' })
@@ -187,8 +177,8 @@ export default (context: HTMLDrop.Context): Router => {
    *       404:
    *         description: Post type not found
    */
-  router.get('/:idOrSlug', async (req: Request, res: Response) => {
-    const guardReq = req as RequestWithGuardAndHooks
+  router.get('/:idOrSlug', async (req, res: Response) => {
+    const guardReq = req as unknown as HTMLDrop.ExtendedRequest
     const { knex, table } = context
     const { getPostType } = guardReq.hooks
     if (!(await checkCapability(guardReq, ['read', 'read_post_type']))) {
@@ -201,7 +191,7 @@ export default (context: HTMLDrop.Context): Router => {
     else query.where('slug', idOrSlug)
 
     let entity = await query.first() as PostType | undefined
-    if (!entity) entity = await getPostType(idOrSlug) as PostType | undefined
+    if (!entity) entity = await getPostType(idOrSlug) as unknown as PostType | undefined
     if (!entity) return res.status(404).json({ error: 'Post type not found' })
 
     res.json(parseRow(entity))
@@ -257,8 +247,8 @@ export default (context: HTMLDrop.Context): Router => {
    *       404:
    *         description: Post type not found
    */
-  router.patch('/:idOrSlug', async (req: Request, res: Response) => {
-    const guardReq = req as RequestWithGuardAndHooks
+  router.patch('/:idOrSlug', async (req, res: Response) => {
+    const guardReq = req as unknown as HTMLDrop.ExtendedRequest
     const { normalizeSlug, knex, table } = context
     if (!(await checkCapability(guardReq, ['edit', 'edit_post_types']))) {
       return res.status(403).json({ error: 'Permission denied' })
@@ -317,8 +307,8 @@ export default (context: HTMLDrop.Context): Router => {
    *       404:
    *         description: Post type not found
    */
-  router.delete('/:idOrSlug', async (req: Request, res: Response) => {
-    const guardReq = req as RequestWithGuardAndHooks
+  router.delete('/:idOrSlug', async (req, res: Response) => {
+    const guardReq = req as unknown as HTMLDrop.ExtendedRequest
     const { knex, table } = context
     if (!(await checkCapability(guardReq, ['delete', 'delete_post_types']))) {
       return res.status(403).json({ error: 'Permission denied' })

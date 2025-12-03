@@ -38,7 +38,7 @@ interface Term {
 }
 
 interface PostType {
-  id: number
+  id?: number
   slug: string
   resolvedCapabilities?: string[]
   [key: string]: unknown
@@ -53,18 +53,8 @@ interface FieldInfo {
   [key: string]: unknown
 }
 
-interface RequestWithGuardAndContext extends Request {
-  user?: { id: number }
-  guard: {
-    user: (options: { canOneOf?: string[]; postId?: number }) => Promise<boolean>
-  }
-  hooks: {
-    getPostType: (postType: string) => Promise<PostType | null>
-    getFields: (postType: string) => Promise<FieldInfo[]>
-    applyFilters: <T>(hook: string, value: T, ...args: unknown[]) => T
-    doAction: (hook: string, data: Record<string, unknown>) => void
-  }
-  query: {
+interface PostsRequest extends HTMLDrop.ExtendedRequest {
+  query: HTMLDrop.ExtendedRequest['query'] & {
     status?: string
     limit?: string
     offset?: string
@@ -78,14 +68,17 @@ interface RequestWithGuardAndContext extends Request {
     trashed?: string
     permanently?: string
     comment?: string
-    [key: string]: string | undefined
   }
-  file?: Express.Multer.File
-  files?: Express.Multer.File[]
   params: {
     postType: string
     idOrSlug?: string
     fieldSlug?: string
+  }
+  body: Record<string, unknown> & {
+    slug?: string
+    status?: string
+    title?: string
+    terms?: Record<string, unknown>
   }
 }
 
@@ -214,7 +207,7 @@ export default (context: HTMLDrop.Context): Router => {
 
   const withTaxonomiesMany = async (
     posts: Post[],
-    req: RequestWithGuardAndContext
+    req: PostsRequest
   ): Promise<Record<string, unknown>[]> => {
     const { knex, table } = context
     const ids = posts.map((p) => p.id)
@@ -245,7 +238,7 @@ export default (context: HTMLDrop.Context): Router => {
     }))
   }
 
-  const withMetaMany = async (posts: Post[], req: RequestWithGuardAndContext): Promise<Record<string, unknown>[]> => {
+  const withMetaMany = async (posts: Post[], req: PostsRequest): Promise<Record<string, unknown>[]> => {
     const { knex, table } = context
     const { applyFilters } = req.hooks
     const ids = posts.map((p) => p.id)
@@ -272,7 +265,7 @@ export default (context: HTMLDrop.Context): Router => {
 
   const withTaxonomiesMetaMany = async (
     terms: Term[],
-    req: RequestWithGuardAndContext
+    req: PostsRequest
   ): Promise<Record<string, unknown>[]> => {
     const { knex, table } = context
     const { applyFilters } = req.hooks
@@ -315,7 +308,7 @@ export default (context: HTMLDrop.Context): Router => {
 
   const withMetaAndTaxonomiesMany = async (
     posts: Post[],
-    req: RequestWithGuardAndContext
+    req: PostsRequest
   ): Promise<Record<string, unknown>[]> => {
     const postsWithMeta = await withMetaMany(posts, req)
     return await withTaxonomiesMany(postsWithMeta as Post[], req)
@@ -323,7 +316,7 @@ export default (context: HTMLDrop.Context): Router => {
 
   const withMetaAndTaxonomies = async (
     post: Post,
-    req: RequestWithGuardAndContext
+    req: PostsRequest
   ): Promise<Record<string, unknown>> => {
     const [result] = await withMetaAndTaxonomiesMany([post], req)
     return result
@@ -333,7 +326,7 @@ export default (context: HTMLDrop.Context): Router => {
   // Helper: check route capability
   // ------------------------
   const checkCapability = async (
-    req: RequestWithGuardAndContext,
+    req: PostsRequest,
     routeCaps: string[],
     postTypeSlug: string,
     postId?: number
@@ -346,7 +339,7 @@ export default (context: HTMLDrop.Context): Router => {
     if (!validCaps.length) return null
 
     const hasAccess = await req.guard.user({ canOneOf: validCaps, postId })
-    return hasAccess ? type : null
+    return hasAccess ? (type as unknown as PostType) : null
   }
 
   /**
@@ -517,7 +510,7 @@ export default (context: HTMLDrop.Context): Router => {
    *         description: Forbidden - insufficient permissions
    */
   router.get('/', async (req: Request, res: Response, next: NextFunction) => {
-    const typedReq = req as RequestWithGuardAndContext
+    const typedReq = req as PostsRequest
     const { knex, table } = context
     const { postType } = typedReq.params
 
@@ -838,7 +831,7 @@ export default (context: HTMLDrop.Context): Router => {
    *         description: Post not found
    */
   router.get('/:idOrSlug', async (req: Request, res: Response, next: NextFunction) => {
-    const typedReq = req as RequestWithGuardAndContext
+    const typedReq = req as PostsRequest
     const { knex, table } = context
     const { idOrSlug, postType } = typedReq.params
 
@@ -914,7 +907,7 @@ export default (context: HTMLDrop.Context): Router => {
    *         description: Forbidden - insufficient permissions
    */
   router.post('/', async (req: Request, res: Response, next: NextFunction) => {
-    const typedReq = req as RequestWithGuardAndContext
+    const typedReq = req as PostsRequest
     const { knex, table, normalizeSlug } = context
     const { getFields, applyFilters, doAction } = typedReq.hooks
     const { slug, status, title } = typedReq.body
@@ -924,7 +917,7 @@ export default (context: HTMLDrop.Context): Router => {
     if (!type) return res.status(403).json({ error: 'Cannot create post for this type' })
 
     let coreData: Record<string, unknown> = {
-      slug: normalizeSlug(slug || title),
+      slug: normalizeSlug(slug || title || ''),
       post_type_slug: postType ? normalizeSlug(postType) : null,
       post_type_id: type.id ? Number(type.id) : null,
       status: status || 'draft'
@@ -934,7 +927,7 @@ export default (context: HTMLDrop.Context): Router => {
     delete metaData.slug
     delete metaData.status
 
-    const fields = await getFields(postType)
+    const fields = await getFields(postType) as unknown as FieldInfo[]
     if (fields.some((field) => field.field.slug === 'authors')) {
       metaData.authors = [typedReq.user!.id]
     }
@@ -1050,7 +1043,7 @@ export default (context: HTMLDrop.Context): Router => {
    *         description: Post not found
    */
   router.patch('/:idOrSlug', async (req: Request, res: Response, next: NextFunction) => {
-    const typedReq = req as RequestWithGuardAndContext
+    const typedReq = req as PostsRequest
     const { knex, table, normalizeSlug } = context
     const { getFields, doAction, applyFilters } = typedReq.hooks
     const { idOrSlug, postType } = typedReq.params
@@ -1072,7 +1065,7 @@ export default (context: HTMLDrop.Context): Router => {
     let coreUpdates: Record<string, unknown> = {}
     let metaUpdates: Record<string, unknown> = {}
 
-    const fields = await getFields(postType)
+    const fields = await getFields(postType) as unknown as FieldInfo[]
     if (fields.some((field) => field.field.slug === 'authors')) {
       const meta = (await knex(table('post_meta'))
         .where('post_id', id)
@@ -1259,7 +1252,7 @@ export default (context: HTMLDrop.Context): Router => {
    *         description: Post not found
    */
   router.delete('/:idOrSlug', async (req: Request, res: Response, next: NextFunction) => {
-    const typedReq = req as RequestWithGuardAndContext
+    const typedReq = req as PostsRequest
     const { knex, table, formatDate } = context
     const { idOrSlug, postType } = typedReq.params
     const { doAction, applyFilters } = typedReq.hooks
@@ -1427,7 +1420,7 @@ export default (context: HTMLDrop.Context): Router => {
    *         description: Forbidden - insufficient permissions
    */
   const uploadHandler = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
-    const typedReq = req as RequestWithGuardAndContext
+    const typedReq = req as PostsRequest
     const { knex, table, normalizeSlug, wss } = context
     try {
       const { postType, idOrSlug, fieldSlug } = typedReq.params
@@ -1452,7 +1445,7 @@ export default (context: HTMLDrop.Context): Router => {
       }
 
       // Pre-upload action
-      const abort = applyFilters<boolean | Express.Multer.File[]>('pre_upload', typedReq.files || [], typedReq)
+      const abort = applyFilters('pre_upload', typedReq.files || [], typedReq)
       if (abort === false) {
         res.status(400).json({ error: 'Upload aborted by filter' })
         return

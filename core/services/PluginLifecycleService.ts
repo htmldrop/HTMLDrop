@@ -13,8 +13,38 @@ import { invalidateCache, requestWatcherTeardown } from './FolderHashCache.mjs'
 // NPM logo SVG
 const NPM_LOGO_SVG = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 780 250"><path fill="#CB3837" d="M240,250h100v-50h100V0H240V250z M340,50h50v100h-50V50z M480,0v200h100V50h50v150h50V50h50v150h50V0H480z M0,200h100V50h50v150h50V0H0V200z"/></svg>'
 
+interface PluginMetadata {
+  name: string
+  version: string
+  description: string
+  author: string
+  htmldrop: Record<string, unknown>
+  dependencies: string[]
+}
+
+interface DependencyCheck {
+  met: boolean
+  missing: string[]
+}
+
+interface PluginState {
+  installed_at?: string
+  activated_at?: string
+  deactivated_at?: string
+  upgraded_at?: string
+  downgraded_at?: string
+  status?: string
+  version?: string
+  previous_version?: string
+  backup_path?: string
+}
+
 class PluginLifecycleService {
-  constructor(context) {
+  private context: HTMLDrop.Context
+  private PLUGINS_BASE: string
+  private migrationService: InstanceType<typeof PluginMigrationService>
+
+  constructor(context: HTMLDrop.Context) {
     this.context = context
     this.PLUGINS_BASE = path.resolve('./content/plugins')
     this.migrationService = new PluginMigrationService(context)
@@ -22,10 +52,8 @@ class PluginLifecycleService {
 
   /**
    * Load a plugin's lifecycle hooks from its index.mjs
-   * @param {string} pluginSlug - The plugin slug
-   * @returns {Promise<Object|null>} The plugin module with lifecycle hooks
    */
-  async loadPluginModule(pluginSlug) {
+  async loadPluginModule(pluginSlug: string): Promise<((...args: unknown[]) => unknown) | null> {
     try {
       const possibleFiles = ['index.mjs', 'index.js', 'index.ts']
       const pluginPath = possibleFiles
@@ -49,10 +77,8 @@ class PluginLifecycleService {
 
   /**
    * Get plugin metadata from package.json
-   * @param {string} pluginSlug - The plugin slug
-   * @returns {Promise<Object>} Plugin metadata
    */
-  async getPluginMetadata(pluginSlug) {
+  async getPluginMetadata(pluginSlug: string): Promise<PluginMetadata> {
     const packageJsonPath = path.join(this.PLUGINS_BASE, pluginSlug, 'package.json')
 
     try {
@@ -85,10 +111,8 @@ class PluginLifecycleService {
 
   /**
    * Check if plugin dependencies are met
-   * @param {string} pluginSlug - The plugin slug
-   * @returns {Promise<Object>} Result with met status and missing dependencies
    */
-  async checkDependencies(pluginSlug) {
+  async checkDependencies(pluginSlug: string): Promise<DependencyCheck> {
     const metadata = await this.getPluginMetadata(pluginSlug)
     const dependencies = metadata.dependencies || []
 
@@ -99,8 +123,8 @@ class PluginLifecycleService {
     const { knex, table } = this.context
     const optionRow = await knex(table('options')).where({ name: 'active_plugins' }).first()
 
-    const activePlugins = optionRow ? JSON.parse(optionRow.value) : []
-    const missing = dependencies.filter((dep) => !activePlugins.includes(dep))
+    const activePlugins: string[] = optionRow ? JSON.parse(optionRow.value) : []
+    const missing = dependencies.filter((dep: string) => !activePlugins.includes(dep))
 
     return {
       met: missing.length === 0,
@@ -110,10 +134,8 @@ class PluginLifecycleService {
 
   /**
    * Get plugins that depend on this plugin
-   * @param {string} pluginSlug - The plugin slug
-   * @returns {Promise<Array>} Array of dependent plugin slugs
    */
-  async getDependentPlugins(pluginSlug) {
+  async getDependentPlugins(pluginSlug: string): Promise<string[]> {
     const folders = await fs.promises.readdir(this.PLUGINS_BASE, { withFileTypes: true })
     const dependents = []
 
@@ -131,11 +153,8 @@ class PluginLifecycleService {
 
   /**
    * Run npm install for a plugin with job tracking
-   * @param {string} pluginSlug - The plugin slug
-   * @param {string} action - Action name (install, upgrade, downgrade)
-   * @returns {Promise<void>}
    */
-  async runNpmInstall(pluginSlug, action = 'install') {
+  async runNpmInstall(pluginSlug: string, action: string = 'install'): Promise<void> {
     const pluginPath = path.join(this.PLUGINS_BASE, pluginSlug)
     const packageJsonPath = path.join(pluginPath, 'package.json')
 
@@ -161,7 +180,7 @@ class PluginLifecycleService {
     }
 
     // Create a job for tracking
-    const jobs = this.context.registries?.jobs
+    const jobs = (this.context as HTMLDrop.Context & { registries?: { jobs?: { createJob: (config: HTMLDrop.JobConfig) => Promise<HTMLDrop.Job> } } }).registries?.jobs
     if (!jobs) {
       console.warn('Jobs registry not available, running npm install without tracking')
       await this._runNpmInstallDirect(pluginPath)
@@ -199,16 +218,15 @@ class PluginLifecycleService {
       invalidateCache(pluginPath)
       console.log(`Invalidated cache for ${pluginPath} after npm install`)
     } catch (error) {
-      await job.fail(error.message)
+      await job.fail(error instanceof Error ? error.message : String(error))
       throw error
     }
   }
 
   /**
    * Run npm install directly (without job tracking)
-   * @private
    */
-  async _runNpmInstallDirect(pluginPath, job = null) {
+  async _runNpmInstallDirect(pluginPath: string, job: HTMLDrop.Job | null = null): Promise<void> {
     console.log(`Running npm install in ${pluginPath}`)
 
     try {
@@ -275,7 +293,7 @@ class PluginLifecycleService {
             reject(new Error(`Failed to install dependencies: ${errorMsg}`))
           } else {
             console.log(`npm install completed for ${pluginPath}`)
-            resolve()
+            resolve(undefined)
           }
         })
 
@@ -290,16 +308,14 @@ class PluginLifecycleService {
       console.log(`Invalidated cache for ${pluginPath} after npm install`)
     } catch (error) {
       console.error(`npm install failed for ${pluginPath}:`, error)
-      throw new Error(`Failed to install dependencies: ${error.message}`)
+      throw new Error(`Failed to install dependencies: ${error instanceof Error ? error.message : String(error)}`)
     }
   }
 
   /**
    * Load plugin config.mjs and extract watch_ignore patterns
-   * @param {string} pluginSlug - The plugin slug
-   * @returns {Promise<Array<string>>} Array of ignore patterns
    */
-  async getWatchIgnorePatterns(pluginSlug) {
+  async getWatchIgnorePatterns(pluginSlug: string): Promise<Array<string | RegExp>> {
     try {
       const configPath = path.join(this.PLUGINS_BASE, pluginSlug, 'config.mjs')
 
@@ -313,7 +329,7 @@ class PluginLifecycleService {
       const watchIgnore = config.default?.watch_ignore || []
 
       // Convert string patterns to regex patterns for chokidar
-      return watchIgnore.map(pattern => {
+      return watchIgnore.map((pattern: string) => {
         // If pattern starts with /, treat as path from plugin root
         if (pattern.startsWith('/')) {
           const pluginPath = path.join(this.PLUGINS_BASE, pluginSlug)
@@ -323,19 +339,15 @@ class PluginLifecycleService {
         return pattern
       })
     } catch (error) {
-      console.warn(`Could not load watch_ignore config for plugin ${pluginSlug}:`, error.message)
+      console.warn(`Could not load watch_ignore config for plugin ${pluginSlug}:`, error instanceof Error ? error.message : String(error))
       return []
     }
   }
 
   /**
    * Call a lifecycle hook on a plugin
-   * @param {string} pluginSlug - The plugin slug
-   * @param {string} hookName - The lifecycle hook name (onInstall, onActivate, etc.)
-   * @param {Object} args - Additional arguments to pass to the hook
-   * @returns {Promise<any>} Result from the hook
    */
-  async callLifecycleHook(pluginSlug, hookName, args = {}) {
+  async callLifecycleHook(pluginSlug: string, hookName: string, args: Record<string, unknown> = {}): Promise<unknown> {
     try {
       const pluginModule = await this.loadPluginModule(pluginSlug)
 
@@ -367,12 +379,13 @@ class PluginLifecycleService {
         res: mockRes,
         next: mockNext,
         router: mockRouter
-      })
+      }) as Record<string, unknown>
 
       // Check if the lifecycle hook exists
       if (pluginInstance && typeof pluginInstance[hookName] === 'function') {
         console.log(`Calling ${hookName} for plugin: ${pluginSlug}`)
-        const result = await pluginInstance[hookName](args)
+        const hookFn = pluginInstance[hookName] as (args: Record<string, unknown>) => Promise<unknown>
+        const result = await hookFn(args)
         return result
       } else {
         console.log(`No ${hookName} hook found for plugin: ${pluginSlug}`)
@@ -387,10 +400,8 @@ class PluginLifecycleService {
   /**
    * Execute onInstall lifecycle hook
    * Called after plugin ZIP is extracted or NPM package is installed
-   * @param {string} pluginSlug - The plugin slug
-   * @returns {Promise<void>}
    */
-  async onInstall(pluginSlug) {
+  async onInstall(pluginSlug: string): Promise<void> {
     console.log(`Running onInstall for plugin: ${pluginSlug}`)
 
     try {
@@ -401,7 +412,7 @@ class PluginLifecycleService {
       const hasMigrations = await this.migrationService.hasPluginMigrations(pluginSlug)
       if (hasMigrations) {
         console.log(`Running migrations for plugin: ${pluginSlug}`)
-        const result = await this.migrationService.runPluginMigrations(pluginSlug)
+        const result = await this.migrationService.runPluginMigrations(pluginSlug) as { count: number }
         console.log(`Ran ${result.count} migrations`)
       }
 
@@ -429,10 +440,8 @@ class PluginLifecycleService {
   /**
    * Execute onActivate lifecycle hook
    * Called when plugin is activated
-   * @param {string} pluginSlug - The plugin slug
-   * @returns {Promise<void>}
    */
-  async onActivate(pluginSlug) {
+  async onActivate(pluginSlug: string): Promise<void> {
     console.log(`Running onActivate for plugin: ${pluginSlug}`)
 
     // Check dependencies
@@ -471,10 +480,8 @@ class PluginLifecycleService {
   /**
    * Execute onDeactivate lifecycle hook
    * Called when plugin is deactivated
-   * @param {string} pluginSlug - The plugin slug
-   * @returns {Promise<void>}
    */
-  async onDeactivate(pluginSlug) {
+  async onDeactivate(pluginSlug: string): Promise<void> {
     console.log(`Running onDeactivate for plugin: ${pluginSlug}`)
 
     // Check if any plugins depend on this one
@@ -519,10 +526,8 @@ class PluginLifecycleService {
   /**
    * Execute onUninstall lifecycle hook
    * Called before plugin is deleted
-   * @param {string} pluginSlug - The plugin slug
-   * @returns {Promise<void>}
    */
-  async onUninstall(pluginSlug) {
+  async onUninstall(pluginSlug: string): Promise<void> {
     console.log(`Running onUninstall for plugin: ${pluginSlug}`)
 
     // Check if plugin is active
@@ -562,12 +567,8 @@ class PluginLifecycleService {
   /**
    * Execute onUpgrade lifecycle hook
    * Called when plugin is upgraded to a new version
-   * @param {string} pluginSlug - The plugin slug
-   * @param {string} oldVersion - The old version
-   * @param {string} newVersion - The new version
-   * @returns {Promise<void>}
    */
-  async onUpgrade(pluginSlug, oldVersion, newVersion) {
+  async onUpgrade(pluginSlug: string, oldVersion: string, newVersion: string): Promise<void> {
     console.log(`Running onUpgrade for plugin: ${pluginSlug} (${oldVersion} -> ${newVersion})`)
 
     try {
@@ -581,10 +582,10 @@ class PluginLifecycleService {
         // Run any new migrations
         const hasMigrations = await this.migrationService.hasPluginMigrations(pluginSlug)
         if (hasMigrations) {
-          const pendingMigrations = await this.migrationService.getPendingMigrations(pluginSlug)
+          const pendingMigrations = await this.migrationService.getPendingMigrations(pluginSlug) as string[]
           if (pendingMigrations.length > 0) {
             console.log(`Running ${pendingMigrations.length} new migrations for plugin: ${pluginSlug}`)
-            const result = await this.migrationService.runPluginMigrations(pluginSlug)
+            const result = await this.migrationService.runPluginMigrations(pluginSlug) as { count: number }
             console.log(`Ran ${result.count} migrations`)
           }
         }
@@ -627,12 +628,8 @@ class PluginLifecycleService {
   /**
    * Execute onDowngrade lifecycle hook
    * Called when plugin is downgraded to a previous version
-   * @param {string} pluginSlug - The plugin slug
-   * @param {string} oldVersion - The old version
-   * @param {string} newVersion - The new version
-   * @returns {Promise<void>}
    */
-  async onDowngrade(pluginSlug, oldVersion, newVersion) {
+  async onDowngrade(pluginSlug: string, oldVersion: string, newVersion: string): Promise<void> {
     console.log(`Running onDowngrade for plugin: ${pluginSlug} (${oldVersion} -> ${newVersion})`)
 
     try {
@@ -665,11 +662,8 @@ class PluginLifecycleService {
 
   /**
    * Store plugin state in database
-   * @param {string} pluginSlug - The plugin slug
-   * @param {Object} state - The state data to store
-   * @returns {Promise<void>}
    */
-  async storePluginState(pluginSlug, state) {
+  async storePluginState(pluginSlug: string, state: Partial<PluginState>): Promise<void> {
     const { knex, table } = this.context
     const optionName = `plugin_state_${pluginSlug}`
 
@@ -694,10 +688,8 @@ class PluginLifecycleService {
 
   /**
    * Get plugin state from database
-   * @param {string} pluginSlug - The plugin slug
-   * @returns {Promise<Object>} The plugin state
    */
-  async getPluginState(pluginSlug) {
+  async getPluginState(pluginSlug: string): Promise<PluginState> {
     const { knex, table } = this.context
     const optionName = `plugin_state_${pluginSlug}`
 
@@ -708,10 +700,8 @@ class PluginLifecycleService {
 
   /**
    * Remove plugin state from database
-   * @param {string} pluginSlug - The plugin slug
-   * @returns {Promise<void>}
    */
-  async removePluginState(pluginSlug) {
+  async removePluginState(pluginSlug: string): Promise<void> {
     const { knex, table } = this.context
     const optionName = `plugin_state_${pluginSlug}`
 
@@ -720,10 +710,8 @@ class PluginLifecycleService {
 
   /**
    * Create a backup of plugin before upgrade/downgrade
-   * @param {string} pluginSlug - The plugin slug
-   * @returns {Promise<string>} Path to backup
    */
-  async createBackup(pluginSlug) {
+  async createBackup(pluginSlug: string): Promise<string> {
     const pluginPath = path.join(this.PLUGINS_BASE, pluginSlug)
     const backupPath = path.join(this.PLUGINS_BASE, '.backups', `${pluginSlug}_${Date.now()}`)
 
@@ -736,11 +724,8 @@ class PluginLifecycleService {
 
   /**
    * Restore plugin from backup
-   * @param {string} pluginSlug - The plugin slug
-   * @param {string} backupPath - Path to backup
-   * @returns {Promise<void>}
    */
-  async restoreBackup(pluginSlug, backupPath) {
+  async restoreBackup(pluginSlug: string, backupPath: string): Promise<void> {
     const pluginPath = path.join(this.PLUGINS_BASE, pluginSlug)
 
     // Remove current version
@@ -756,10 +741,8 @@ class PluginLifecycleService {
 
   /**
    * Clean up old backups (keep last 5)
-   * @param {string} pluginSlug - The plugin slug
-   * @returns {Promise<void>}
    */
-  async cleanupBackups(pluginSlug) {
+  async cleanupBackups(pluginSlug: string): Promise<void> {
     const backupsDir = path.join(this.PLUGINS_BASE, '.backups')
 
     if (!fs.existsSync(backupsDir)) return
@@ -770,7 +753,7 @@ class PluginLifecycleService {
       .map((f) => ({
         name: f.name,
         path: path.join(backupsDir, f.name),
-        timestamp: parseInt(f.name.split('_').pop())
+        timestamp: parseInt(f.name.split('_').pop() || '0')
       }))
       .sort((a, b) => b.timestamp - a.timestamp)
 
@@ -786,9 +769,8 @@ class PluginLifecycleService {
   /**
    * Refresh badge counts after plugin lifecycle changes
    * This triggers a background update of the badge counts cache
-   * @returns {Promise<void>}
    */
-  async refreshBadgeCounts() {
+  async refreshBadgeCounts(): Promise<void> {
     try {
       const badgeCountService = new BadgeCountService(this.context)
       // Force update to bypass cache TTL check

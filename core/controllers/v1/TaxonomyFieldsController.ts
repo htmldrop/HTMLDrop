@@ -1,12 +1,6 @@
 import type { Router, Request, Response } from 'express'
 import express from 'express'
-
-interface Taxonomy {
-  id: number
-  slug: string
-  resolvedCapabilities?: string[]
-  [key: string]: unknown
-}
+import type {} from '../../types/index.js'
 
 interface TaxonomyField {
   id: number
@@ -16,18 +10,6 @@ interface TaxonomyField {
   taxonomy_slug: string
   post_type_slug: string
   options?: unknown
-  [key: string]: unknown
-}
-
-interface RequestWithGuardAndHooks extends Request {
-  user?: { id: number }
-  guard: {
-    user: (options: { canOneOf?: string[] }) => Promise<boolean>
-  }
-  hooks: {
-    getTaxonomy: (postType: string, taxonomySlug: string) => Promise<Taxonomy | null>
-    getTaxonomyFields: (postType: string, taxonomy: string) => Promise<TaxonomyField[]>
-  }
 }
 
 const parseJSON = (value: unknown): unknown => {
@@ -41,7 +23,7 @@ const parseJSON = (value: unknown): unknown => {
   return value
 }
 
-const parseRow = <T extends Record<string, unknown>>(row: T): T =>
+const parseRow = <T extends object>(row: T): T =>
   Object.fromEntries(Object.entries(row).map(([k, v]) => [k, parseJSON(v)])) as T
 
 export default (context: HTMLDrop.Context): Router => {
@@ -51,11 +33,11 @@ export default (context: HTMLDrop.Context): Router => {
    * Helper: check route capability
    */
   const checkCapability = async (
-    req: RequestWithGuardAndHooks,
+    req: HTMLDrop.ExtendedRequest,
     postType: string,
     taxonomySlug: string,
     routeCaps: string[]
-  ): Promise<Taxonomy | null> => {
+  ): Promise<HTMLDrop.Taxonomy | null> => {
     const { getTaxonomy } = req.hooks
     const taxonomy = await getTaxonomy(postType, taxonomySlug)
 
@@ -91,11 +73,11 @@ export default (context: HTMLDrop.Context): Router => {
    *         required: true
    *         schema:
    *           type: string
-   *         description: Taxonomy slug
+   *         description: HTMLDrop.Taxonomy slug
    *         example: category
    *     responses:
    *       200:
-   *         description: Taxonomy fields retrieved successfully
+   *         description: HTMLDrop.Taxonomy fields retrieved successfully
    *         content:
    *           application/json:
    *             schema:
@@ -125,7 +107,7 @@ export default (context: HTMLDrop.Context): Router => {
    *               $ref: '#/components/schemas/Error'
    */
   router.get('/', async (req: Request, res: Response) => {
-    const guardReq = req as RequestWithGuardAndHooks
+    const guardReq = req as unknown as HTMLDrop.ExtendedRequest
     const { getTaxonomyFields } = guardReq.hooks
     const { postType, taxonomy } = req.params
     const canRead = await checkCapability(guardReq, postType, taxonomy, ['read', 'read_taxonomy', 'read_term'])
@@ -158,7 +140,7 @@ export default (context: HTMLDrop.Context): Router => {
    *         required: true
    *         schema:
    *           type: string
-   *         description: Taxonomy slug
+   *         description: HTMLDrop.Taxonomy slug
    *         example: category
    *     requestBody:
    *       required: true
@@ -186,7 +168,7 @@ export default (context: HTMLDrop.Context): Router => {
    *                 description: Field-specific options
    *               taxonomy_id:
    *                 type: integer
-   *                 description: Taxonomy ID (optional, validated against route)
+   *                 description: HTMLDrop.Taxonomy ID (optional, validated against route)
    *     responses:
    *       200:
    *         description: Field created successfully
@@ -211,7 +193,7 @@ export default (context: HTMLDrop.Context): Router => {
    *               $ref: '#/components/schemas/Error'
    */
   router.post('/', async (req: Request, res: Response) => {
-    const guardReq = req as RequestWithGuardAndHooks
+    const guardReq = req as unknown as HTMLDrop.ExtendedRequest
     const { normalizeSlug, knex, table } = context
     const { postType, taxonomy } = req.params
     const canCreate = await checkCapability(guardReq, postType, taxonomy, ['edit', 'edit_taxonomies'])
@@ -261,7 +243,7 @@ export default (context: HTMLDrop.Context): Router => {
    *         required: true
    *         schema:
    *           type: string
-   *         description: Taxonomy slug
+   *         description: HTMLDrop.Taxonomy slug
    *         example: category
    *       - in: path
    *         name: id
@@ -298,7 +280,7 @@ export default (context: HTMLDrop.Context): Router => {
    *         description: Field not found
    */
   router.get('/:id', async (req: Request, res: Response) => {
-    const guardReq = req as RequestWithGuardAndHooks
+    const guardReq = req as unknown as HTMLDrop.ExtendedRequest
     const { knex, table } = context
     const { postType, taxonomy, id } = req.params
     const canRead = await checkCapability(guardReq, postType, taxonomy, ['read', 'read_taxonomy', 'read_term'])
@@ -333,7 +315,7 @@ export default (context: HTMLDrop.Context): Router => {
    *         required: true
    *         schema:
    *           type: string
-   *         description: Taxonomy slug
+   *         description: HTMLDrop.Taxonomy slug
    *         example: category
    *       - in: path
    *         name: id
@@ -370,7 +352,7 @@ export default (context: HTMLDrop.Context): Router => {
    *         description: Field not found
    */
   router.patch('/:id', async (req: Request, res: Response) => {
-    const guardReq = req as RequestWithGuardAndHooks
+    const guardReq = req as unknown as HTMLDrop.ExtendedRequest
     const { normalizeSlug, knex, table } = context
     const { postType, taxonomy, id } = req.params
     const canEdit = await checkCapability(guardReq, postType, taxonomy, ['edit', 'edit_taxonomies'])
@@ -420,7 +402,7 @@ export default (context: HTMLDrop.Context): Router => {
    *         required: true
    *         schema:
    *           type: string
-   *         description: Taxonomy slug
+   *         description: HTMLDrop.Taxonomy slug
    *         example: category
    *       - in: path
    *         name: id
@@ -443,7 +425,7 @@ export default (context: HTMLDrop.Context): Router => {
    *         description: Field not found
    */
   router.delete('/:id', async (req: Request, res: Response) => {
-    const guardReq = req as RequestWithGuardAndHooks
+    const guardReq = req as unknown as HTMLDrop.ExtendedRequest
     const { knex, table } = context
     const { postType, taxonomy, id } = req.params
     const canDelete = await checkCapability(guardReq, postType, taxonomy, ['edit', 'edit_taxonomies'])

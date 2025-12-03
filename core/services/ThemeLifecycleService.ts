@@ -12,18 +12,45 @@ import { invalidateCache, requestWatcherTeardown } from './FolderHashCache.mjs'
 // NPM logo SVG
 const NPM_LOGO_SVG = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 780 250"><path fill="#CB3837" d="M240,250h100v-50h100V0H240V250z M340,50h50v100h-50V50z M480,0v200h100V50h50v150h50V50h50v150h50V0H480z M0,200h100V50h50v150h50V0H0V200z"/></svg>'
 
+interface ThemeMetadata {
+  name: string
+  version: string
+  description: string
+  author: string
+  htmldrop: Record<string, unknown>
+  dependencies: string[]
+}
+
+interface ThemeState {
+  installed_at?: string
+  activated_at?: string
+  deactivated_at?: string
+  upgraded_at?: string
+  downgraded_at?: string
+  status?: string
+  version?: string
+  previous_version?: string
+}
+
+interface ValidationResult {
+  valid: boolean
+  errors: string[]
+  warnings: string[]
+}
+
 class ThemeLifecycleService {
-  constructor(context) {
+  private context: HTMLDrop.Context
+  private THEMES_BASE: string
+
+  constructor(context: HTMLDrop.Context) {
     this.context = context
     this.THEMES_BASE = path.resolve('./content/themes')
   }
 
   /**
    * Load a theme's lifecycle hooks from its index.mjs
-   * @param {string} themeSlug - The theme slug
-   * @returns {Promise<Object|null>} The theme module with lifecycle hooks
    */
-  async loadThemeModule(themeSlug) {
+  async loadThemeModule(themeSlug: string): Promise<((...args: unknown[]) => unknown) | null> {
     try {
       const possibleFiles = ['index.mjs', 'index.js', 'index.ts']
       const themePath = possibleFiles
@@ -47,10 +74,8 @@ class ThemeLifecycleService {
 
   /**
    * Get theme metadata from package.json
-   * @param {string} themeSlug - The theme slug
-   * @returns {Promise<Object>} Theme metadata
    */
-  async getThemeMetadata(themeSlug) {
+  async getThemeMetadata(themeSlug: string): Promise<ThemeMetadata> {
     const packageJsonPath = path.join(this.THEMES_BASE, themeSlug, 'package.json')
 
     try {
@@ -83,9 +108,8 @@ class ThemeLifecycleService {
 
   /**
    * Get the currently active theme
-   * @returns {Promise<string|null>} Active theme slug
    */
-  async getActiveTheme() {
+  async getActiveTheme(): Promise<string | null> {
     const { knex, table } = this.context
     const optionRow = await knex(table('options')).where({ name: 'theme' }).first()
 
@@ -94,10 +118,8 @@ class ThemeLifecycleService {
 
   /**
    * Set the active theme
-   * @param {string} themeSlug - The theme slug
-   * @returns {Promise<void>}
    */
-  async setActiveTheme(themeSlug) {
+  async setActiveTheme(themeSlug: string): Promise<void> {
     const { knex, table } = this.context
 
     const existing = await knex(table('options')).where({ name: 'theme' }).first()
@@ -113,16 +135,13 @@ class ThemeLifecycleService {
     }
 
     // Notify workers of theme change
-    process.send({ type: 'options_updated' })
+    process.send?.({ type: 'options_updated' })
   }
 
   /**
    * Run npm install for a theme with job tracking
-   * @param {string} themeSlug - The theme slug
-   * @param {string} action - Action name (install, upgrade, downgrade)
-   * @returns {Promise<void>}
    */
-  async runNpmInstall(themeSlug, action = 'install') {
+  async runNpmInstall(themeSlug: string, action: string = 'install'): Promise<void> {
     const themePath = path.join(this.THEMES_BASE, themeSlug)
     const packageJsonPath = path.join(themePath, 'package.json')
 
@@ -148,7 +167,7 @@ class ThemeLifecycleService {
     }
 
     // Create a job for tracking
-    const jobs = this.context.registries?.jobs
+    const jobs = (this.context as HTMLDrop.Context & { registries?: { jobs?: { createJob: (config: HTMLDrop.JobConfig) => Promise<HTMLDrop.Job> } } }).registries?.jobs
     if (!jobs) {
       console.warn('Jobs registry not available, running npm install without tracking')
       await this._runNpmInstallDirect(themePath)
@@ -186,16 +205,15 @@ class ThemeLifecycleService {
       invalidateCache(themePath)
       console.log(`Invalidated cache for ${themePath} after npm install`)
     } catch (error) {
-      await job.fail(error.message)
+      await job.fail(error instanceof Error ? error.message : String(error))
       throw error
     }
   }
 
   /**
    * Run npm install directly (without job tracking)
-   * @private
    */
-  async _runNpmInstallDirect(themePath, job = null) {
+  async _runNpmInstallDirect(themePath: string, job: HTMLDrop.Job | null = null): Promise<void> {
     console.log(`Running npm install in ${themePath}`)
 
     try {
@@ -262,7 +280,7 @@ class ThemeLifecycleService {
             reject(new Error(`Failed to install dependencies: ${errorMsg}`))
           } else {
             console.log(`npm install completed for ${themePath}`)
-            resolve()
+            resolve(undefined)
           }
         })
 
@@ -277,16 +295,14 @@ class ThemeLifecycleService {
       console.log(`Invalidated cache for ${themePath} after npm install`)
     } catch (error) {
       console.error(`npm install failed for ${themePath}:`, error)
-      throw new Error(`Failed to install dependencies: ${error.message}`)
+      throw new Error(`Failed to install dependencies: ${error instanceof Error ? error.message : String(error)}`)
     }
   }
 
   /**
    * Load theme config.mjs and extract watch_ignore patterns
-   * @param {string} themeSlug - The theme slug
-   * @returns {Promise<Array<string>>} Array of ignore patterns
    */
-  async getWatchIgnorePatterns(themeSlug) {
+  async getWatchIgnorePatterns(themeSlug: string): Promise<Array<string | RegExp>> {
     try {
       const configPath = path.join(this.THEMES_BASE, themeSlug, 'config.mjs')
 
@@ -300,7 +316,7 @@ class ThemeLifecycleService {
       const watchIgnore = config.default?.watch_ignore || []
 
       // Convert string patterns to regex patterns for chokidar
-      return watchIgnore.map(pattern => {
+      return watchIgnore.map((pattern: string) => {
         // If pattern starts with /, treat as path from theme root
         if (pattern.startsWith('/')) {
           const themePath = path.join(this.THEMES_BASE, themeSlug)
@@ -310,19 +326,15 @@ class ThemeLifecycleService {
         return pattern
       })
     } catch (error) {
-      console.warn(`Could not load watch_ignore config for theme ${themeSlug}:`, error.message)
+      console.warn(`Could not load watch_ignore config for theme ${themeSlug}:`, error instanceof Error ? error.message : String(error))
       return []
     }
   }
 
   /**
    * Call a lifecycle hook on a theme
-   * @param {string} themeSlug - The theme slug
-   * @param {string} hookName - The lifecycle hook name (onInstall, onActivate, etc.)
-   * @param {Object} args - Additional arguments to pass to the hook
-   * @returns {Promise<any>} Result from the hook
    */
-  async callLifecycleHook(themeSlug, hookName, args = {}) {
+  async callLifecycleHook(themeSlug: string, hookName: string, args: Record<string, unknown> = {}): Promise<unknown> {
     try {
       const themeModule = await this.loadThemeModule(themeSlug)
 
@@ -354,12 +366,13 @@ class ThemeLifecycleService {
         res: mockRes,
         next: mockNext,
         router: mockRouter
-      })
+      }) as Record<string, unknown>
 
       // Check if the lifecycle hook exists
       if (themeInstance && typeof themeInstance[hookName] === 'function') {
         console.log(`Calling ${hookName} for theme: ${themeSlug}`)
-        const result = await themeInstance[hookName](args)
+        const hookFn = themeInstance[hookName] as (args: Record<string, unknown>) => Promise<unknown>
+        const result = await hookFn(args)
         return result
       } else {
         console.log(`No ${hookName} hook found for theme: ${themeSlug}`)
@@ -374,10 +387,8 @@ class ThemeLifecycleService {
   /**
    * Execute onInstall lifecycle hook
    * Called after theme ZIP is extracted or NPM package is installed
-   * @param {string} themeSlug - The theme slug
-   * @returns {Promise<void>}
    */
-  async onInstall(themeSlug) {
+  async onInstall(themeSlug: string): Promise<void> {
     console.log(`Running onInstall for theme: ${themeSlug}`)
 
     try {
@@ -407,10 +418,8 @@ class ThemeLifecycleService {
   /**
    * Execute onActivate lifecycle hook
    * Called when theme is activated
-   * @param {string} themeSlug - The theme slug
-   * @returns {Promise<void>}
    */
-  async onActivate(themeSlug) {
+  async onActivate(themeSlug: string): Promise<void> {
     console.log(`Running onActivate for theme: ${themeSlug}`)
 
     try {
@@ -456,10 +465,8 @@ class ThemeLifecycleService {
   /**
    * Execute onDeactivate lifecycle hook
    * Called when theme is deactivated
-   * @param {string} themeSlug - The theme slug
-   * @returns {Promise<void>}
    */
-  async onDeactivate(themeSlug) {
+  async onDeactivate(themeSlug: string): Promise<void> {
     console.log(`Running onDeactivate for theme: ${themeSlug}`)
 
     try {
@@ -491,10 +498,8 @@ class ThemeLifecycleService {
   /**
    * Execute onUninstall lifecycle hook
    * Called before theme is deleted
-   * @param {string} themeSlug - The theme slug
-   * @returns {Promise<void>}
    */
-  async onUninstall(themeSlug) {
+  async onUninstall(themeSlug: string): Promise<void> {
     console.log(`Running onUninstall for theme: ${themeSlug}`)
 
     // Check if theme is active
@@ -523,12 +528,8 @@ class ThemeLifecycleService {
   /**
    * Execute onUpgrade lifecycle hook
    * Called when theme is upgraded to a new version
-   * @param {string} themeSlug - The theme slug
-   * @param {string} oldVersion - The old version
-   * @param {string} newVersion - The new version
-   * @returns {Promise<void>}
    */
-  async onUpgrade(themeSlug, oldVersion, newVersion) {
+  async onUpgrade(themeSlug: string, oldVersion: string, newVersion: string): Promise<void> {
     console.log(`Running onUpgrade for theme: ${themeSlug} (${oldVersion} -> ${newVersion})`)
 
     try {
@@ -562,12 +563,8 @@ class ThemeLifecycleService {
   /**
    * Execute onDowngrade lifecycle hook
    * Called when theme is downgraded to a previous version
-   * @param {string} themeSlug - The theme slug
-   * @param {string} oldVersion - The old version
-   * @param {string} newVersion - The new version
-   * @returns {Promise<void>}
    */
-  async onDowngrade(themeSlug, oldVersion, newVersion) {
+  async onDowngrade(themeSlug: string, oldVersion: string, newVersion: string): Promise<void> {
     console.log(`Running onDowngrade for theme: ${themeSlug} (${oldVersion} -> ${newVersion})`)
 
     try {
@@ -600,11 +597,8 @@ class ThemeLifecycleService {
 
   /**
    * Store theme state in database
-   * @param {string} themeSlug - The theme slug
-   * @param {Object} state - The state data to store
-   * @returns {Promise<void>}
    */
-  async storeThemeState(themeSlug, state) {
+  async storeThemeState(themeSlug: string, state: Partial<ThemeState>): Promise<void> {
     const { knex, table } = this.context
     const optionName = `theme_state_${themeSlug}`
 
@@ -629,10 +623,8 @@ class ThemeLifecycleService {
 
   /**
    * Get theme state from database
-   * @param {string} themeSlug - The theme slug
-   * @returns {Promise<Object>} The theme state
    */
-  async getThemeState(themeSlug) {
+  async getThemeState(themeSlug: string): Promise<ThemeState> {
     const { knex, table } = this.context
     const optionName = `theme_state_${themeSlug}`
 
@@ -643,10 +635,8 @@ class ThemeLifecycleService {
 
   /**
    * Remove theme state from database
-   * @param {string} themeSlug - The theme slug
-   * @returns {Promise<void>}
    */
-  async removeThemeState(themeSlug) {
+  async removeThemeState(themeSlug: string): Promise<void> {
     const { knex, table } = this.context
     const optionName = `theme_state_${themeSlug}`
 
@@ -655,10 +645,8 @@ class ThemeLifecycleService {
 
   /**
    * Create a backup of theme before upgrade/downgrade
-   * @param {string} themeSlug - The theme slug
-   * @returns {Promise<string>} Path to backup
    */
-  async createBackup(themeSlug) {
+  async createBackup(themeSlug: string): Promise<string> {
     const themePath = path.join(this.THEMES_BASE, themeSlug)
     const backupPath = path.join(this.THEMES_BASE, '.backups', `${themeSlug}_${Date.now()}`)
 
@@ -671,11 +659,8 @@ class ThemeLifecycleService {
 
   /**
    * Restore theme from backup
-   * @param {string} themeSlug - The theme slug
-   * @param {string} backupPath - Path to backup
-   * @returns {Promise<void>}
    */
-  async restoreBackup(themeSlug, backupPath) {
+  async restoreBackup(themeSlug: string, backupPath: string): Promise<void> {
     const themePath = path.join(this.THEMES_BASE, themeSlug)
 
     // Remove current version
@@ -691,10 +676,8 @@ class ThemeLifecycleService {
 
   /**
    * Clean up old backups (keep last 5)
-   * @param {string} themeSlug - The theme slug
-   * @returns {Promise<void>}
    */
-  async cleanupBackups(themeSlug) {
+  async cleanupBackups(themeSlug: string): Promise<void> {
     const backupsDir = path.join(this.THEMES_BASE, '.backups')
 
     if (!fs.existsSync(backupsDir)) return
@@ -705,7 +688,7 @@ class ThemeLifecycleService {
       .map((f) => ({
         name: f.name,
         path: path.join(backupsDir, f.name),
-        timestamp: parseInt(f.name.split('_').pop())
+        timestamp: parseInt(f.name.split('_').pop() || '0')
       }))
       .sort((a, b) => b.timestamp - a.timestamp)
 
@@ -720,13 +703,11 @@ class ThemeLifecycleService {
 
   /**
    * Validate theme structure
-   * @param {string} themeSlug - The theme slug
-   * @returns {Promise<Object>} Validation result
    */
-  async validateTheme(themeSlug) {
+  async validateTheme(themeSlug: string): Promise<ValidationResult> {
     const themePath = path.join(this.THEMES_BASE, themeSlug)
-    const errors = []
-    const warnings = []
+    const errors: string[] = []
+    const warnings: string[] = []
 
     // Check if theme directory exists
     if (!fs.existsSync(themePath)) {
@@ -773,9 +754,8 @@ class ThemeLifecycleService {
   /**
    * Refresh badge counts after theme lifecycle changes
    * This triggers a background update of the badge counts cache
-   * @returns {Promise<void>}
    */
-  async refreshBadgeCounts() {
+  async refreshBadgeCounts(): Promise<void> {
     try {
       const badgeCountService = new BadgeCountService(this.context)
       // Force update to bypass cache TTL check

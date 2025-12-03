@@ -1,18 +1,30 @@
 import path from 'path'
 import fs from 'fs'
+import type { Response, NextFunction } from 'express'
 import express from 'express'
 import ThemeLifecycleService from '../services/ThemeLifecycleService.ts'
 import { TraceCategory } from '../services/PerformanceTracer.mjs'
 import { getFolderHash, invalidateCache, requestWatcherSetup, requestWatcherTeardown } from '../services/FolderHashCache.mjs'
 
+interface ThemeModule {
+  module: (args: { req: HTMLDrop.ExtendedRequest; res: Response; next: NextFunction; router: ReturnType<typeof express.Router> }) => Promise<{ init?: () => Promise<void> }>
+  hash: string
+}
+
 // Worker-level cache for imported theme module
-const themeModuleCache = new Map()
-let lastActiveTheme = null
+const themeModuleCache = new Map<string, ThemeModule>()
+let lastActiveTheme: string | null = null
 let themeActivationCalled = false
-let watchedTheme = null // Track which theme has a watcher
+let watchedTheme: string | null = null // Track which theme has a watcher
 
 export default class RegisterThemes {
-  constructor(req, res, next) {
+  private req: HTMLDrop.ExtendedRequest
+  private res: Response
+  private next: NextFunction
+  private context: HTMLDrop.Context
+  private hooks: HTMLDrop.Hooks
+
+  constructor(req: HTMLDrop.ExtendedRequest, res: Response, next: NextFunction) {
     this.req = req
     this.res = res
     this.next = next
@@ -156,7 +168,7 @@ export default class RegisterThemes {
           }
         } catch (err) {
           console.error(`Failed to initialize theme "${themeSlug}":`, err)
-          themeRegistrySpan?.addTag('initError', err.message)
+          themeRegistrySpan?.addTag('initError', err instanceof Error ? err.message : String(err))
         }
       }
 
@@ -186,10 +198,10 @@ export default class RegisterThemes {
             lifecycleSpan?.end()
           } catch (err) {
             // Don't fail server startup if lifecycle hook fails
-            console.warn(`Failed to call onActivate for theme "${themeSlug}" on startup:`, err.message)
+            console.warn(`Failed to call onActivate for theme "${themeSlug}" on startup:`, err instanceof Error ? err.message : String(err))
             // Set flag even on error to prevent repeated attempts on every request
             themeActivationCalled = true
-            lifecycleSpan?.end({ error: err })
+            lifecycleSpan?.end({ error: err instanceof Error ? err : new Error(String(err)) })
           }
         }
       }
@@ -197,7 +209,7 @@ export default class RegisterThemes {
       themeRegistrySpan?.end()
     } catch (e) {
       console.error('Theme could not load:', e)
-      themeRegistrySpan?.end({ error: e })
+      themeRegistrySpan?.end({ error: e instanceof Error ? e : new Error(String(e)) })
     }
   }
 }

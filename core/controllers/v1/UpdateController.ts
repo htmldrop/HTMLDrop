@@ -6,19 +6,9 @@
 
 import type { Router, Request, Response } from 'express'
 import express from 'express'
+import type {} from '../../types/index.js'
 import UpdateService from '../../services/UpdateService.mjs'
 import BadgeCountService from '../../services/BadgeCountService.mjs'
-
-interface RequestWithGuardAndContext extends Request {
-  user?: { id: number }
-  guard?: {
-    user: (options: { canOneOf?: Record<string, string> }) => Promise<boolean>
-  }
-  context: HTMLDrop.Context
-  body: {
-    branch?: string
-  }
-}
 
 interface UpdateStatus {
   available: boolean
@@ -87,7 +77,7 @@ export default (context: HTMLDrop.Context): Router => {
    *         description: Server error
    */
   router.get('/check', async (req: Request, res: Response) => {
-    const guardReq = req as RequestWithGuardAndContext
+    const guardReq = req as unknown as HTMLDrop.ExtendedRequest
     try {
       // Check if user has permission
       if (!(await guardReq.guard?.user({ canOneOf: { manage_dashboard: 'manage_dashboard' } }))) {
@@ -160,7 +150,7 @@ export default (context: HTMLDrop.Context): Router => {
    *         description: Server error
    */
   router.get('/current', async (req: Request, res: Response) => {
-    const guardReq = req as RequestWithGuardAndContext
+    const guardReq = req as unknown as HTMLDrop.ExtendedRequest
     try {
       // Check if user has permission
       if (!(await guardReq.guard?.user({ canOneOf: { manage_dashboard: 'manage_dashboard' } }))) {
@@ -242,7 +232,7 @@ export default (context: HTMLDrop.Context): Router => {
    *         description: Server error
    */
   router.post('/pull', async (req: Request, res: Response) => {
-    const guardReq = req as RequestWithGuardAndContext
+    const guardReq = req as unknown as HTMLDrop.ExtendedRequest
     try {
       // Check if user has permission (manage_dashboard capability)
       if (!(await guardReq.guard?.user({ canOneOf: { manage_dashboard: 'manage_dashboard' } }))) {
@@ -332,7 +322,7 @@ export default (context: HTMLDrop.Context): Router => {
    *         description: Server error
    */
   router.get('/status', async (req: Request, res: Response) => {
-    const guardReq = req as RequestWithGuardAndContext
+    const guardReq = req as unknown as HTMLDrop.ExtendedRequest
     try {
       // Check if user has permission
       if (!(await guardReq.guard?.user({ canOneOf: { manage_dashboard: 'manage_dashboard' } }))) {

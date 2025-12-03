@@ -1,12 +1,13 @@
 import dotenv from 'dotenv'
-import express from 'express'
+import express, { Request, Response, NextFunction } from 'express'
 import Knex from 'knex'
-import { WebSocketServer } from 'ws'
+import type { Knex as KnexType } from 'knex'
+import { WebSocketServer, WebSocket } from 'ws'
 import webRoutes from './routes/web.mjs'
 import adminRoutes from './routes/admin.mjs'
 import apiRoutes from './routes/api.mjs'
 import { cpus } from 'os'
-import cluster from 'cluster'
+import cluster, { Worker } from 'cluster'
 import cors from 'cors'
 import { createServer } from 'http'
 import path from 'path'
@@ -21,6 +22,41 @@ import BadgeCountService from './services/BadgeCountService.mjs'
 import TraceStorage from './services/TraceStorage.mjs'
 import TraceStorageDB from './services/TraceStorageDB.mjs'
 import { initSharedSSRCache } from './services/SharedSSRCache.mjs'
+
+// Extended WebSocket with auth properties
+interface AuthenticatedWebSocket extends WebSocket {
+  authenticated?: boolean
+  capabilities?: string[]
+  uploadId?: string
+}
+
+// Options type
+interface SiteOptions {
+  theme?: string
+  active_plugins?: string[]
+  tracing?: {
+    persist?: boolean
+    maxTraces?: number
+    maxAgeMs?: number
+    retentionDays?: number
+    archiveAfterDays?: number
+    archivePath?: string
+    cleanupIntervalMs?: number
+  }
+  [key: string]: unknown
+}
+
+// Worker message types
+interface WorkerMessage {
+  type?: string
+  action?: string
+  workerId?: number
+  canExecute?: boolean
+  loaded?: string[]
+  failed?: string[]
+  jobData?: Record<string, unknown>
+  error?: string
+}
 
 // Load .env from custom path if ENV_FILE_PATH is set, otherwise use default location
 const envPath = process.env.ENV_FILE_PATH || '.env'
@@ -49,8 +85,9 @@ const initializeKnex = async () => {
       migrations: {
         directory: path.resolve('./core/database/migrations'),
         loadExtensions: ['.mjs'],
-        tableName: `${process.env.TABLE_PREFIX  }migrations`,
-        lockTableName: `${process.env.TABLE_PREFIX  }migrations_lock`
+        tableName: `${process.env.TABLE_PREFIX}migrations`,
+        // lockTableName is a valid Knex option but not in the type definitions
+        ...({ lockTableName: `${process.env.TABLE_PREFIX}migrations_lock` } as Record<string, string>)
       },
       seeds: {
         directory: path.resolve('./core/database/seeds'),
@@ -65,15 +102,15 @@ const initializeKnex = async () => {
   }
 }
 
-const initializeOptions = async (knex, table) => {
+const initializeOptions = async (knex: KnexType | null, table: (name: string) => string): Promise<SiteOptions | undefined> => {
   if (!knex) return
   const options = await knex(table('options')).where('autoload', true)
-  const obj = {}
+  const obj: SiteOptions = {}
   for (const opt of options || []) {
     try {
-      obj[opt.name] = JSON.parse(opt.value)
+      obj[opt.name as string] = JSON.parse(opt.value)
     } catch (e) {
-      obj[opt.name] = opt.value
+      obj[opt.name as string] = opt.value
     }
   }
   return obj
@@ -95,14 +132,14 @@ if (cluster.isPrimary) {
     const buildResult = await buildAdminIfNeeded()
     console.log(`[Startup] Admin build result: ${buildResult}`)
   } catch (error) {
-    console.error('[Startup] Failed to build admin UI:', error.message)
-    console.error('[Startup] Error stack:', error.stack)
+    console.error('[Startup] Failed to build admin UI:', error instanceof Error ? error.message : String(error))
+    console.error('[Startup] Error stack:', error instanceof Error ? error.stack : '')
   }
 
   // Fail all running jobs on server restart
   const knex = await initializeKnex()
   if (knex) {
-    const table = (name) => `${process.env.TABLE_PREFIX || ''}${name}`
+    const table = (name: string) => `${process.env.TABLE_PREFIX || ''}${name}`
 
     try {
       // Find all running jobs
@@ -169,7 +206,7 @@ if (cluster.isPrimary) {
         }
       }
     } catch (error) {
-      console.error('Failed to cleanup running jobs on restart:', error.message)
+      console.error('Failed to cleanup running jobs on restart:', error instanceof Error ? error.message : String(error))
     }
   }
 
@@ -178,21 +215,21 @@ if (cluster.isPrimary) {
   // This block sets them up eagerly on startup instead of waiting for first request
   const { requestWatcherSetup } = await import('./services/FolderHashCache.mjs')
   const fs = await import('fs')
-  const options = await initializeOptions(knex, (name) => `${process.env.TABLE_PREFIX || ''}${name}`)
+  const options = await initializeOptions(knex, (name: string) => `${process.env.TABLE_PREFIX || ''}${name}`)
 
   // Helper to load watch_ignore patterns from config.mjs
-  const loadWatchIgnorePatterns = async (folderPath) => {
+  const loadWatchIgnorePatterns = async (folderPath: string): Promise<string[]> => {
     try {
       const configPath = path.join(folderPath, 'config.mjs')
       if (!fs.existsSync(configPath)) return []
 
       const config = await import(`${configPath}?t=${Date.now()}`)
-      const watchIgnore = config.default?.watch_ignore || []
+      const watchIgnore: string[] = config.default?.watch_ignore || []
 
-      // Convert string patterns to regex patterns
-      return watchIgnore.map(pattern => {
+      // Convert relative paths to absolute paths
+      return watchIgnore.map((pattern: string) => {
         if (pattern.startsWith('/')) {
-          return new RegExp(path.join(folderPath, pattern.slice(1)).replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
+          return path.join(folderPath, pattern.slice(1))
         }
         return pattern
       })
@@ -222,7 +259,7 @@ if (cluster.isPrimary) {
   }
 
   // Fork workers
-  const workers = []
+  const workers: Worker[] = []
   for (let i = 0; i < numCPUs; i++) {
     const worker = cluster.fork()
     workers.push(worker)
@@ -233,7 +270,7 @@ if (cluster.isPrimary) {
     console.log('🔄 Zero-downtime reload requested, replacing workers one by one...')
 
     // Get current workers as array
-    const currentWorkers = Object.values(cluster.workers)
+    const currentWorkers = Object.values(cluster.workers || {}).filter((w): w is Worker => w !== undefined)
     let replacedCount = 0
 
     // Replace workers one at a time (PM2-style reload)
@@ -292,7 +329,7 @@ if (cluster.isPrimary) {
 
   // Listen for restart requests from supervisor
   if (process.send) {
-    process.on('message', (message) => {
+    process.on('message', (message: WorkerMessage) => {
       if (message.type === 'restart_workers') {
         console.log('[Primary] Supervisor requested worker reload')
         reloadWorkers()
@@ -320,17 +357,17 @@ if (cluster.isPrimary) {
   })
 
   // Track worker responses for consolidated logging
-  const workerResponses = new Map()
-  const pluginLoadResponses = new Map()
-  const schedulerInitResponses = new Map()
+  const workerResponses = new Map<number, WorkerMessage>()
+  const pluginLoadResponses = new Map<number, WorkerMessage>()
+  const schedulerInitResponses = new Map<number, WorkerMessage>()
 
-  cluster.on('message', async (worker, message) => {
+  cluster.on('message', async (worker: Worker, message: WorkerMessage) => {
     if (message.type === 'scheduler_initialized') {
       // Collect scheduler initialization responses
       schedulerInitResponses.set(worker.id, message)
 
       // When all workers have reported, log consolidated result
-      if (schedulerInitResponses.size === Object.keys(cluster.workers).length) {
+      if (schedulerInitResponses.size === Object.keys(cluster.workers || {}).length) {
         const executionWorker = Array.from(schedulerInitResponses.values()).find(m => m.canExecute)
 
         if (executionWorker) {
@@ -350,34 +387,34 @@ if (cluster.isPrimary) {
         .then(() => {
           console.log('Migrations + seeds complete, reinitializing workers...')
           workerResponses.clear()
-          for (const id in cluster.workers) cluster.workers[id].send({ type: 'reinitialize_knex' })
+          for (const id in cluster.workers) cluster.workers[id]?.send({ type: 'reinitialize_knex' })
         })
         .catch(console.error)
     } else if (message.type === 'options_updated') {
       console.log('Options updated, reinitializing workers...')
       workerResponses.clear()
-      for (const id in cluster.workers) cluster.workers[id].send({ type: 'reinitialize_options' })
+      for (const id in cluster.workers) cluster.workers[id]?.send({ type: 'reinitialize_options' })
     } else if (message.type === 'plugins_loaded') {
       // Collect plugin load responses from all workers
       pluginLoadResponses.set(worker.id, message)
 
       // When all workers have reported, log consolidated result
-      if (pluginLoadResponses.size === Object.keys(cluster.workers).length) {
-        const allLoaded = new Set()
-        const allFailed = new Set()
+      if (pluginLoadResponses.size === Object.keys(cluster.workers || {}).length) {
+        const allLoaded = new Set<string>()
+        const allFailed = new Set<string>()
 
         for (const response of pluginLoadResponses.values()) {
-          response.loaded?.forEach(p => allLoaded.add(p))
-          response.failed?.forEach(p => allFailed.add(p))
+          response.loaded?.forEach((p: string) => allLoaded.add(p))
+          response.failed?.forEach((p: string) => allFailed.add(p))
         }
 
         if (allLoaded.size > 0) {
-          const pluginList = Array.from(allLoaded).map(p => `"${p}"`).join(', ')
+          const pluginList = Array.from(allLoaded).map((p: string) => `"${p}"`).join(', ')
           console.log(`✓ Loaded ${allLoaded.size} plugin${allLoaded.size > 1 ? 's' : ''} on ${pluginLoadResponses.size} worker node${pluginLoadResponses.size > 1 ? 's' : ''}: ${pluginList}`)
         }
 
         if (allFailed.size > 0) {
-          const failedList = Array.from(allFailed).map(p => `"${p}"`).join(', ')
+          const failedList = Array.from(allFailed).map((p: string) => `"${p}"`).join(', ')
           console.log(`✗ Failed to load plugin${allFailed.size > 1 ? 's' : ''}: ${failedList}`)
         }
 
@@ -388,9 +425,9 @@ if (cluster.isPrimary) {
       workerResponses.set(worker.id, message)
 
       // When all workers have responded, log consolidated result
-      if (workerResponses.size === Object.keys(cluster.workers).length) {
-        const succeeded = []
-        const failed = []
+      if (workerResponses.size === Object.keys(cluster.workers || {}).length) {
+        const succeeded: number[] = []
+        const failed: number[] = []
 
         for (const [workerId, response] of workerResponses.entries()) {
           if (response.type === 'worker_ready') {
@@ -414,8 +451,9 @@ if (cluster.isPrimary) {
     } else if (message.type === 'job_broadcast') {
       // Forward job broadcast to all other workers
       for (const id in cluster.workers) {
-        if (cluster.workers[id].id !== worker.id) {
-          cluster.workers[id].send(message)
+        const targetWorker = cluster.workers[id]
+        if (targetWorker && targetWorker.id !== worker.id) {
+          targetWorker.send(message)
         }
       }
     } else if (message.type === 'restart_server') {
@@ -434,7 +472,7 @@ if (cluster.isPrimary) {
 
         // Disconnect all workers gracefully
         for (const id in cluster.workers) {
-          cluster.workers[id].disconnect()
+          cluster.workers[id]?.disconnect()
         }
 
         // Give workers time to finish, then exit primary process
@@ -455,9 +493,27 @@ if (cluster.isPrimary) {
   initSharedSSRCache()
 
   // Trace storage will be initialized after options are loaded
-  let traceStorage = null
+  let traceStorage: InstanceType<typeof TraceStorage> | InstanceType<typeof TraceStorageDB> | null = null
 
-  const context = {
+  // Worker context type - extends the core HTMLDrop.Context
+  interface WorkerContext {
+    app: ReturnType<typeof express>
+    port: string | number
+    server: ReturnType<typeof createServer>
+    wss: WebSocketServer
+    knex: KnexType | null
+    options: SiteOptions | null
+    parseVue: typeof parseVue
+    scheduler: HTMLDrop.SchedulerService | null
+    traceStorage: InstanceType<typeof TraceStorage> | InstanceType<typeof TraceStorageDB> | null
+    formatDate(date?: Date): string
+    table(name: string): string
+    normalizeSlug(val: string): string
+    translate: typeof translate
+    onPluginsInitialized?: () => void
+  }
+
+  const context: WorkerContext = {
     app,
     port,
     server,
@@ -470,10 +526,10 @@ if (cluster.isPrimary) {
     formatDate(date = new Date()) {
       return date.toISOString().replace('Z', '').replace('T', ' ')
     },
-    table(name) {
+    table(name: string) {
       return process.env.TABLE_PREFIX + name
     },
-    normalizeSlug(val) {
+    normalizeSlug(val: string) {
       if (!val) return ''
       return String(val)
         .toLowerCase()
@@ -493,23 +549,24 @@ if (cluster.isPrimary) {
   // Initialize knex and attach dynamically
   initializeKnex().then(async (knex) => {
     context.knex = knex
-    context.options = await initializeOptions(context.knex, context.table)
+    context.options = await initializeOptions(context.knex, context.table) ?? null
 
     // Initialize trace storage for performance tracing
     // Use options if available, otherwise fall back to environment variables
     const tracingConfig = context.options?.tracing || {}
     const useDBStorage = tracingConfig.persist ?? (process.env.HD_TRACING_PERSIST === 'true')
-    const maxTraces = tracingConfig.maxTraces ?? (parseInt(process.env.HD_TRACING_MAX_TRACES) || 100)
-    const maxAgeMs = tracingConfig.maxAgeMs ?? (parseInt(process.env.HD_TRACING_MAX_AGE_MS) || 3600000)
+    const maxTraces = tracingConfig.maxTraces ?? (parseInt(process.env.HD_TRACING_MAX_TRACES || '100'))
+    const maxAgeMs = tracingConfig.maxAgeMs ?? (parseInt(process.env.HD_TRACING_MAX_AGE_MS || '3600000'))
 
     if (useDBStorage) {
       // DB-backed storage with retention and archiving
       traceStorage = new TraceStorageDB({
-        retentionDays: tracingConfig.retentionDays ?? (parseInt(process.env.HD_TRACING_RETENTION_DAYS) || 30),
-        archiveAfterDays: tracingConfig.archiveAfterDays ?? (parseInt(process.env.HD_TRACING_ARCHIVE_AFTER_DAYS) || 7),
+        context,
+        retentionDays: tracingConfig.retentionDays ?? (parseInt(process.env.HD_TRACING_RETENTION_DAYS || '30')),
+        archiveAfterDays: tracingConfig.archiveAfterDays ?? (parseInt(process.env.HD_TRACING_ARCHIVE_AFTER_DAYS || '7')),
         archivePath: tracingConfig.archivePath ?? (process.env.HD_TRACING_ARCHIVE_PATH || './content/traces'),
         memoryCacheSize: maxTraces,
-        cleanupIntervalMs: tracingConfig.cleanupIntervalMs ?? (parseInt(process.env.HD_TRACING_CLEANUP_INTERVAL_MS) || 3600000)
+        cleanupIntervalMs: tracingConfig.cleanupIntervalMs ?? (parseInt(process.env.HD_TRACING_CLEANUP_INTERVAL_MS || '3600000'))
       })
     } else {
       // Memory-only storage (faster, but lost on restart)
@@ -523,13 +580,13 @@ if (cluster.isPrimary) {
     context.traceStorage = traceStorage
 
     // Initialize DB-backed trace storage if enabled (needs context with knex)
-    if (traceStorage.init && typeof traceStorage.init === 'function') {
-      traceStorage.context = context
+    if (traceStorage && 'init' in traceStorage && typeof traceStorage.init === 'function') {
       await traceStorage.init()
     }
 
     // Initialize scheduler on all workers, but only worker 1 will execute tasks
-    context.scheduler = new SchedulerService(context, cluster.worker.id === 1)
+    const workerId = cluster.worker?.id ?? 1
+    context.scheduler = new SchedulerService(context as unknown as HTMLDrop.Context, workerId === 1) as unknown as HTMLDrop.SchedulerService
 
     // Register core scheduled tasks (only once at startup)
     context.scheduler
@@ -540,7 +597,7 @@ if (cluster.isPrimary) {
       .everyMinute()
 
     // Run initial badge count update on worker 1 (after startup delay)
-    if (cluster.worker.id === 1) {
+    if (workerId === 1) {
       setTimeout(async () => {
         try {
           const badgeCountService = new BadgeCountService(context)
@@ -556,7 +613,7 @@ if (cluster.isPrimary) {
     // Helper to mark plugins as initialized and start scheduler if not already started
     context.onPluginsInitialized = () => {
       pluginsInitialized = true
-      if (!schedulerStarted) {
+      if (!schedulerStarted && context.scheduler) {
         context.scheduler.startAll()
         schedulerStarted = true
       }
@@ -565,24 +622,24 @@ if (cluster.isPrimary) {
     // If no plugins need to be loaded, start scheduler immediately after a short delay
     // This ensures scheduler starts even if no API requests are made
     setTimeout(() => {
-      if (!pluginsInitialized && !schedulerStarted) {
+      if (!pluginsInitialized && !schedulerStarted && context.scheduler) {
         context.scheduler.startAll()
         schedulerStarted = true
       }
     }, 2000)
 
     // Send scheduler initialization message to primary for consolidated logging
-    process.send({
+    process.send?.({
       type: 'scheduler_initialized',
-      workerId: cluster.worker.id,
-      canExecute: cluster.worker.id === 1
+      workerId: workerId,
+      canExecute: workerId === 1
     })
   })
 
   // WebSocket authentication and connection handling
-  const wsAuth = createWsAuthMiddleware(context)
+  const wsAuth = createWsAuthMiddleware(context as unknown as HTMLDrop.Context)
 
-  wss.on('connection', async (ws, req) => {
+  wss.on('connection', async (ws: AuthenticatedWebSocket, req) => {
     // Authenticate WebSocket connection
     const authenticated = await wsAuth(ws, req)
 
@@ -599,7 +656,7 @@ if (cluster.isPrimary) {
     // Handle incoming messages
     ws.on('message', (message) => {
       try {
-        const data = JSON.parse(message)
+        const data = JSON.parse(message.toString())
 
         // Handle ping/pong for keepalive
         if (data.type === 'ping') {
@@ -616,7 +673,7 @@ if (cluster.isPrimary) {
   })
 
   app.set('json spaces', 2)
-  app.use((req, res, next) => {
+  app.use((req: Request & { context?: WorkerContext }, res: Response, next: NextFunction) => {
     req.context = context
     if (req.method) req.method = req.method.toUpperCase()
     next()
@@ -655,8 +712,8 @@ if (cluster.isPrimary) {
     })
   )
 
-  app.use(async (req, res, next) => {
-    req.guard = new UserGuard(context, null, req, res, next)
+  app.use(async (req: Request & { guard?: InstanceType<typeof UserGuard> }, res: Response, next: NextFunction) => {
+    req.guard = new UserGuard(context as unknown as HTMLDrop.Context, null)
     next()
   })
 
@@ -665,38 +722,39 @@ if (cluster.isPrimary) {
   app.use('/', webRoutes(context))
 
   // Receive sockets from the master
-  process.on('message', async (msg, socket) => {
+  process.on('message', async (msg: string | WorkerMessage, socket: net.Socket | undefined) => {
     if (msg === 'sticky-session:connection' && socket) {
       server.emit('connection', socket)
       socket.resume()
       return
     }
 
-    if (msg?.type === 'reinitialize_knex') {
+    const typedMsg = msg as WorkerMessage
+    if (typedMsg?.type === 'reinitialize_knex') {
       try {
         dotenv.config({ quiet: true, override: true })
         context.knex = await initializeKnex()
-        context.options = await initializeOptions(context.knex, context.table)
-        process.send({ type: 'worker_ready', action: 'Knex reinitialization' })
+        context.options = await initializeOptions(context.knex, context.table) ?? null
+        process.send?.({ type: 'worker_ready', action: 'Knex reinitialization' })
       } catch (error) {
         console.error(`Worker ${process.pid} failed to reinitialize Knex:`, error)
-        process.send({ type: 'worker_error', action: 'Knex reinitialization', error: error.message })
+        process.send?.({ type: 'worker_error', action: 'Knex reinitialization', error: error instanceof Error ? error.message : String(error) })
       }
     }
 
-    if (msg?.type === 'reinitialize_options') {
+    if (typedMsg?.type === 'reinitialize_options') {
       try {
-        context.options = await initializeOptions(context.knex, context.table)
-        process.send({ type: 'worker_ready', action: 'Options reinitialization' })
+        context.options = await initializeOptions(context.knex, context.table) ?? null
+        process.send?.({ type: 'worker_ready', action: 'Options reinitialization' })
       } catch (error) {
         console.error(`Worker ${process.pid} failed to reinitialize options:`, error)
-        process.send({ type: 'worker_error', action: 'Options reinitialization', error: error.message })
+        process.send?.({ type: 'worker_error', action: 'Options reinitialization', error: error instanceof Error ? error.message : String(error) })
       }
     }
 
     // Handle job broadcast messages from other workers
-    if (msg?.type === 'job_broadcast') {
-      const { jobData } = msg
+    if (typedMsg?.type === 'job_broadcast') {
+      const jobData = typedMsg.jobData
       const message = JSON.stringify({
         type: 'job_update',
         job: jobData
@@ -704,15 +762,16 @@ if (cluster.isPrimary) {
 
       // Broadcast to all WebSocket clients on this worker
       wss.clients.forEach((client) => {
-        if (client.readyState === 1 && client.authenticated) {
+        const authClient = client as AuthenticatedWebSocket
+        if (authClient.readyState === 1 && authClient.authenticated) {
           // Only send to clients with appropriate capabilities
-          const hasCapability = client.capabilities &&
-            (client.capabilities.includes('manage_jobs') ||
-             client.capabilities.includes('read_job') ||
-             client.capabilities.includes('read_jobs'))
+          const hasCapability = authClient.capabilities &&
+            (authClient.capabilities.includes('manage_jobs') ||
+             authClient.capabilities.includes('read_job') ||
+             authClient.capabilities.includes('read_jobs'))
 
           if (hasCapability) {
-            client.send(message)
+            authClient.send(message)
           }
         }
       })

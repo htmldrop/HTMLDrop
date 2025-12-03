@@ -7,14 +7,14 @@
  * Similar to PM2 but built-in and minimal.
  */
 
-import { spawn } from 'child_process'
+import { spawn, ChildProcess } from 'child_process'
 import path from 'path'
 import { fileURLToPath } from 'url'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const APP_PATH = path.join(__dirname, 'index.ts')
 
-let child = null
+let child: ChildProcess | null = null
 let isRestarting = false
 
 /**
@@ -28,7 +28,7 @@ function startApp() {
     env: process.env
   })
 
-  child.on('message', (message) => {
+  child.on('message', (message: { type?: string }) => {
     // Listen for restart requests from the app
     if (message.type === 'request_supervisor_restart') {
       console.log('[Supervisor] Restart requested by application')

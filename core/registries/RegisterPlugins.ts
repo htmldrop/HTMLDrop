@@ -1,18 +1,30 @@
 import path from 'path'
 import fs from 'fs'
+import type { Request, Response, NextFunction } from 'express'
 import express from 'express'
 import PluginLifecycleService from '../services/PluginLifecycleService.ts'
 import { TraceCategory } from '../services/PerformanceTracer.mjs'
 import { getFolderHash, invalidateCache, requestWatcherSetup, requestWatcherTeardown } from '../services/FolderHashCache.mjs'
 
+interface PluginModule {
+  module: (args: { req: HTMLDrop.ExtendedRequest; res: Response; next: NextFunction; router: ReturnType<typeof express.Router> }) => Promise<{ init?: () => Promise<void> }>
+  hash: string
+}
+
 // Worker-level cache for imported plugin modules
-const pluginModuleCache = new Map()
-let lastActivePlugins = null
+const pluginModuleCache = new Map<string, PluginModule>()
+let lastActivePlugins: string | null = null
 let isFirstLoad = true
-let watchedPlugins = new Set() // Track which plugins have watchers
+let watchedPlugins = new Set<string>() // Track which plugins have watchers
 
 export default class RegisterPlugins {
-  constructor(req, res, next) {
+  private req: HTMLDrop.ExtendedRequest
+  private res: Response
+  private next: NextFunction
+  private context: HTMLDrop.Context
+  private hooks: HTMLDrop.Hooks
+
+  constructor(req: HTMLDrop.ExtendedRequest, res: Response, next: NextFunction) {
     this.req = req
     this.res = res
     this.next = next
@@ -167,7 +179,7 @@ export default class RegisterPlugins {
       } catch (err) {
         console.error(`Worker ${process.pid} failed to load plugin "${pluginSlug}":`, err)
         failedPlugins.push(pluginSlug)
-        pluginSpan?.end({ error: err })
+        pluginSpan?.end({ error: err instanceof Error ? err : new Error(String(err)) })
       }
     }
 
@@ -196,15 +208,16 @@ export default class RegisterPlugins {
             lifecycleSpan?.end()
           } catch (err) {
             // Don't fail server startup if lifecycle hook fails
-            console.warn(`Failed to call onActivate for plugin "${pluginSlug}" on startup:`, err.message)
-            lifecycleSpan?.end({ error: err })
+            console.warn(`Failed to call onActivate for plugin "${pluginSlug}" on startup:`, err instanceof Error ? err.message : String(err))
+            lifecycleSpan?.end({ error: err instanceof Error ? err : new Error(String(err)) })
           }
         }
       }
 
       // Notify scheduler that plugins are initialized (all workers)
-      if (this.context.onPluginsInitialized) {
-        this.context.onPluginsInitialized()
+      const contextWithHooks = this.context as HTMLDrop.Context & { onPluginsInitialized?: () => void }
+      if (contextWithHooks.onPluginsInitialized) {
+        contextWithHooks.onPluginsInitialized()
       }
     }
 

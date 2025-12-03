@@ -135,9 +135,9 @@ declare global {
       getJobs(options?: JobQueryOptions): Promise<Job[]>
 
       /**
-       * Get a single job by ID
+       * Get a single job by jobId (slug)
        */
-      getJob(jobId: number): Promise<Job | null>
+      getJob(jobId: string): Promise<Job | null>
 
       /**
        * Cleanup old completed/failed jobs
