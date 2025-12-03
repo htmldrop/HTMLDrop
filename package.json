@@ -1,6 +1,6 @@
 {
   "name": "htmldrop",
-  "version": "1.0.42",
+  "version": "1.0.43",
   "type": "module",
   "main": "core/index.mjs",
   "types": "core/types/index.d.ts",
@@ -21,7 +21,7 @@
     "wordpress"
   ],
   "scripts": {
-    "build": "npm run build:ts && npm run audit:admin; npm run install:admin; npm run build:admin",
+    "build": "npm run audit:admin; npm run install:admin; npm run build:admin",
     "build:ts": "tsc --project core/config/tsconfig.json",
     "build:ts:watch": "tsc --project core/config/tsconfig.json --watch",
     "build:admin": "npm run build --prefix ./core/admin",
