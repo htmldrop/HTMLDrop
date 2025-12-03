@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  A powerful, extensible, and developer-friendly CMS built with Node.js, Vue 3, and modern JavaScript.
+  A powerful, extensible, and developer-friendly CMS built with Node.js, TypeScript & Vue 3.
 </p>
 
 <p align="center">
