@@ -5,7 +5,7 @@
 </p>
 
 <p align="center">
-  <strong>The Modern WordPress Alternative for Node.js</strong>
+  <strong>The Modern CMS Alternative for Node.js</strong>
 </p>
 
 <p align="center">
