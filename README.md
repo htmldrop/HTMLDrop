@@ -1,7 +1,5 @@
 # HTMLDrop CMS
 
-> **Disclaimer:** HTMLDrop is an independent open-source project and has no affiliation with Automattic, WordPress, or any related entities. This project is inspired by WordPress's plugin/theme architecture but is a completely separate implementation built for Node.js.
-
 <p align="center">
   <img src="core/admin/src/assets/logo.png" alt="HTMLDrop Logo" width="200"/>
 </p>
