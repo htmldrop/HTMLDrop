@@ -1,0 +1,66 @@
+{
+  "compilerOptions": {
+    // Output settings
+    "target": "ES2022",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "outDir": "../../dist",
+    "rootDir": "../..",
+
+    // Type checking - gradual adoption (checkJs off by default, use @ts-check in files you want checked)
+    "strict": true,
+    "allowJs": true,
+    "checkJs": false,
+    "skipLibCheck": true,
+
+    // Allow JS and TS to coexist
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+
+    // Type definitions - include our custom types
+    "declaration": true,
+    "declarationDir": "../types/generated",
+    "declarationMap": true,
+    "typeRoots": ["../../node_modules/@types", "../types"],
+
+    // Source maps for debugging
+    "sourceMap": true,
+
+    // Paths and base
+    "baseUrl": "../..",
+    "paths": {
+      "@core/*": ["./core/*"],
+      "@services/*": ["./core/services/*"],
+      "@controllers/*": ["./core/controllers/*"],
+      "@models/*": ["./core/models/*"]
+    },
+
+    // Node.js types
+    "types": ["node"],
+
+    // Emit settings - noEmit for now since we run JS directly
+    "noEmit": true
+  },
+  "include": [
+    "../../core/**/*.ts",
+    "../../core/**/*.mts",
+    "../../core/types/**/*.d.ts"
+  ],
+  "exclude": [
+    "../../node_modules",
+    "../../dist",
+    "../../core/admin",
+    "../../content/plugins",
+    "../../content/themes",
+    "**/*.test.ts",
+    "**/*.test.mts",
+    "**/*.spec.ts",
+    "**/*.spec.mts"
+  ],
+  "ts-node": {
+    "esm": true,
+    "experimentalSpecifierResolution": "node"
+  }
+}

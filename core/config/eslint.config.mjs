@@ -68,7 +68,7 @@ export default [
     }
   },
   {
-    files: ['**/*.spec.mjs', '**/*.test.mjs'],
+    files: ['**/*.spec.mjs', '**/*.test.mjs', '**/*.spec.ts', '**/*.test.ts'],
     languageOptions: {
       globals: {
         describe: 'readonly',
@@ -83,6 +83,6 @@ export default [
     }
   },
   {
-    ignores: ['**/admin/dist/**', '**/node_modules/**', '**/coverage/**']
+    ignores: ['**/admin/dist/**', '**/node_modules/**', '**/coverage/**', '**/dist/**', '**/types/generated/**']
   }
 ]

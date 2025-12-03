@@ -1,6 +1,9 @@
 # Node modules
 node_modules
 
+# Distribution folder
+dist
+
 # User content
 content/plugins/*
 content/themes/*
@@ -15,7 +18,7 @@ content/config/*
 !content/config/README.md
 
 # Config overrides
+config/local.json
 .env
 .claude
-config/local.json
 .DS_Store
