@@ -43,16 +43,16 @@ htmldrop/
 │   ├── knexfile.mjs               # Database configuration
 │   │
 │   ├── controllers/v1/            # REST API controllers (24 controllers)
-│   │   ├── AuthController.mjs     # Authentication (login, register, refresh)
-│   │   ├── PostsController.mjs    # Post CRUD operations
-│   │   ├── UsersController.mjs    # User management
-│   │   ├── RolesController.mjs    # Role management
+│   │   ├── AuthController.ts      # Authentication (login, register, refresh)
+│   │   ├── PostsController.ts     # Post CRUD operations
+│   │   ├── UsersController.ts     # User management
+│   │   ├── RolesController.ts     # Role management
 │   │   └── ...
 │   │
 │   ├── services/                  # Business logic (14 services)
 │   │   ├── AuthService.mjs        # JWT authentication
-│   │   ├── PluginLifecycleService.mjs
-│   │   ├── ThemeLifecycleService.mjs
+│   │   ├── PluginLifecycleService.ts
+│   │   ├── ThemeLifecycleService.ts
 │   │   ├── SchedulerService.mjs   # Cron job scheduler
 │   │   └── ...
 │   │

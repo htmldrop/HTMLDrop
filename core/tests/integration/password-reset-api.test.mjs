@@ -2,7 +2,7 @@ import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest'
 import knex from 'knex'
 import express from 'express'
 import request from 'supertest'
-import AuthController from '../../controllers/v1/AuthController.mjs'
+import AuthController from '../../controllers/v1/AuthController.ts'
 import bcrypt from 'bcrypt'
 
 describe('Password Reset API Integration', () => {

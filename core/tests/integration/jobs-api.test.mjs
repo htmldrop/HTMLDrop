@@ -2,7 +2,7 @@ import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest'
 import knex from 'knex'
 import express from 'express'
 import request from 'supertest'
-import JobsController from '../../controllers/v1/JobsController.mjs'
+import JobsController from '../../controllers/v1/JobsController.ts'
 import RegisterJobs from '../../registries/RegisterJobs.mjs'
 
 describe('Jobs API Integration', () => {

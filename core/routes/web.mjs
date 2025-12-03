@@ -1,7 +1,8 @@
 import express from 'express'
 import path from 'path'
-import adminBarMiddleware from '../middlewares/adminBarMiddleware.mjs'
-import registryMiddleware from '../middlewares/registryMiddleware.mjs'
+import fs from 'fs'
+import adminBarMiddleware from '../middlewares/adminBarMiddleware.ts'
+import registryMiddleware from '../middlewares/registryMiddleware.ts'
 import { TraceCategory } from '../services/PerformanceTracer.mjs'
 import { getFolderHash } from '../services/FolderHashCache.mjs'
 
@@ -48,7 +49,10 @@ export default (context) => {
 
       // Trace folder hash computation
       const themeFolder = path.resolve(`./content/themes/${themeSlug}`)
-      const themeIndex = path.join(themeFolder, 'index.mjs')
+      const possibleFiles = ['index.mjs', 'index.js', 'index.ts']
+      const themeIndex = possibleFiles
+        .map(file => path.join(themeFolder, file))
+        .find(fullPath => fs.existsSync(fullPath))
 
       // Use file-watcher-based cached hash (only recomputes when files actually change)
       const { hash: folderHash, cached: hashWasCached } = await getFolderHash(themeFolder)

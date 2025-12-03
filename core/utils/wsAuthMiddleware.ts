@@ -1,14 +1,8 @@
 import jwt from 'jsonwebtoken'
 import { parse as parseUrl } from 'url'
-import type { Knex } from 'knex'
 import type { IncomingMessage } from 'http'
 import type { WebSocket } from 'ws'
-import UserGuard from './UserGuard.js'
-
-interface Context {
-  knex: Knex
-  table: (name: string) => string
-}
+import UserGuard from './UserGuard.ts'
 
 interface AuthenticatedWebSocket extends WebSocket {
   userId?: number
@@ -16,17 +10,11 @@ interface AuthenticatedWebSocket extends WebSocket {
   capabilities?: string[]
 }
 
-interface JwtPayload {
-  sub?: number
-  id?: number
-  [key: string]: unknown
-}
-
 /**
  * WebSocket JWT Authentication Middleware
  * Authenticates WebSocket connections using JWT tokens
  */
-export default function createWsAuthMiddleware(context: Context) {
+export default function createWsAuthMiddleware(context: HTMLDrop.Context) {
   return async (ws: AuthenticatedWebSocket, req: IncomingMessage): Promise<boolean> => {
     try {
       // Parse query string to get token
@@ -51,7 +39,7 @@ export default function createWsAuthMiddleware(context: Context) {
       }
 
       // Verify JWT token
-      const decoded = jwt.verify(token, process.env.JWT_SECRET!) as JwtPayload
+      const decoded = jwt.verify(token, process.env.JWT_SECRET!) as HTMLDrop.JwtPayload
 
       // Check if token is revoked
       const { knex, table } = context

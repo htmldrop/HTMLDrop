@@ -67,6 +67,18 @@ declare global {
       iat: number
       exp: number
     }
+
+    /**
+     * Decoded JWT payload from jwt.verify()
+     * Used for token verification, not creation
+     */
+    interface JwtPayload {
+      sub?: number
+      id?: number
+      exp?: number
+      iat?: number
+      [key: string]: unknown
+    }
   }
 }
 

@@ -132,40 +132,48 @@ htmldrop/
 │   │
 │   ├── controllers/            # Request handlers (business logic)
 │   │   ├── v1/
-│   │   │   ├── AuthController.mjs
-│   │   │   ├── PostsController.mjs
-│   │   │   ├── PostTypesController.mjs
-│   │   │   ├── TaxonomiesController.mjs
-│   │   │   ├── TermsController.mjs
-│   │   │   ├── UsersController.mjs
-│   │   │   ├── PluginsController.mjs
-│   │   │   ├── ThemesController.mjs
-│   │   │   └── OptionsController.mjs
+│   │   │   ├── AuthController.ts
+│   │   │   ├── PostsController.ts
+│   │   │   ├── PostTypesController.ts
+│   │   │   ├── TaxonomiesController.ts
+│   │   │   ├── TermsController.ts
+│   │   │   ├── UsersController.ts
+│   │   │   ├── PluginsController.ts
+│   │   │   ├── ThemesController.ts
+│   │   │   └── OptionsController.ts
 │   │
 │   ├── middlewares/            # Express middlewares
-│   │   ├── Authenticate.mjs    # JWT authentication
-│   │   ├── Guard.mjs           # Capability-based authorization
-│   │   ├── Context.mjs         # Request context setup
-│   │   ├── Registries.mjs      # Load plugins/themes/post-types
-│   │   └── Cors.mjs            # CORS configuration
+│   │   ├── Authenticate.ts     # JWT authentication
+│   │   ├── Guard.ts            # Capability-based authorization
+│   │   ├── Context.ts          # Request context setup
+│   │   ├── Registries.ts       # Load plugins/themes/post-types
+│   │   └── Cors.ts             # CORS configuration
 │   │
 │   ├── registries/             # Dynamic registration systems
-│   │   ├── PluginsRegistry.mjs # Plugin loader
-│   │   ├── ThemesRegistry.mjs  # Theme loader
-│   │   ├── PostTypesRegistry.mjs
-│   │   ├── TaxonomiesRegistry.mjs
-│   │   └── HooksRegistry.mjs   # Hooks & filters system
+│   │   ├── RegisterPlugins.ts  # Plugin loader
+│   │   ├── RegisterThemes.ts   # Theme loader
+│   │   ├── RegisterPostTypes.mjs
+│   │   ├── RegisterTaxonomies.mjs
+│   │   ├── RegisterJobs.mjs
+│   │   ├── RegisterEmailProviders.mjs
+│   │   ├── RegisterControls.mjs
+│   │   ├── RegisterAdminMenu.mjs
+│   │   └── RegisterAdminBarButtons.mjs
 │   │
 │   ├── utils/                  # Shared utilities
-│   │   ├── UserGuard.mjs       # Permission checker
-│   │   ├── FolderHash.mjs      # Cache-busting hashes
-│   │   ├── PostMeta.mjs        # Post meta helpers
-│   │   ├── TermMeta.mjs        # Term meta helpers
-│   │   └── Translate.mjs       # i18n utilities
+│   │   ├── UserGuard.ts        # Permission checker
+│   │   ├── FolderHash.ts       # Cache-busting hashes
+│   │   ├── PostMeta.ts         # Post meta helpers
+│   │   ├── TermMeta.ts         # Term meta helpers
+│   │   └── Translate.ts        # i18n utilities
 │   │
 │   ├── database/               # Database management
 │   │   ├── migrations/         # Knex migrations
 │   │   └── seeds/              # Seed data
+│   │
+│   ├── services/               # Services
+│   │   ├── AuthService.mjs     # Authentication service
+│   │   └── ...
 │   │
 │   ├── providers/              # Core functionality providers
 │   │   ├── dashboard-provider/ # Dashboard setup

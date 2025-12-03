@@ -2,8 +2,8 @@ import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest'
 import knex from 'knex'
 import express from 'express'
 import request from 'supertest'
-import RolesController from '../../controllers/v1/RolesController.mjs'
-import CapabilitiesController from '../../controllers/v1/CapabilitiesController.mjs'
+import RolesController from '../../controllers/v1/RolesController.ts'
+import CapabilitiesController from '../../controllers/v1/CapabilitiesController.ts'
 
 describe('Roles & Capabilities API Integration', () => {
   let db

@@ -4,8 +4,8 @@ import RegisterAdminMenu from './RegisterAdminMenu.mjs'
 import RegisterControls from './RegisterControls.mjs'
 import RegisterPostTypes from './RegisterPostTypes.mjs'
 import RegisterTaxonomies from './RegisterTaxonomies.mjs'
-import RegisterThemes from './RegisterThemes.mjs'
-import RegisterPlugins from './RegisterPlugins.mjs'
+import RegisterThemes from './RegisterThemes.ts'
+import RegisterPlugins from './RegisterPlugins.ts'
 import RegisterJobs from './RegisterJobs.mjs'
 import RegisterEmailProviders from './RegisterEmailProviders.mjs'
 import RegisterAdminBarButtons from './RegisterAdminBarButtons.mjs'
@@ -167,8 +167,11 @@ export default class Registry {
       providersSpan?.addTag('providerCount', folders.length)
 
       for (const folder of folders) {
-        const indexPath = path.join(providersDir, folder, 'index.mjs')
-        if (fs.existsSync(indexPath)) {
+        const possibleFiles = ['index.mjs', 'index.js', 'index.ts']
+        const indexPath = possibleFiles
+          .map(file => path.join(providersDir, folder, file))
+          .find(fullPath => fs.existsSync(fullPath))
+        if (indexPath) {
           const providerSpan = tracer?.startSpan(`providers.load.${folder}`, {
             category: TraceCategory.CORE,
             tags: { provider: folder }

@@ -2,7 +2,7 @@
  * Core Context Types
  */
 
-import { Knex } from 'knex'
+import type { Knex } from 'knex'
 import { Request, Response, NextFunction, Router } from 'express'
 
 declare global {
@@ -118,6 +118,18 @@ declare global {
        * @returns Excerpt string
        */
       theExcerpt?(post: Post, length?: number): string
+
+      /** Monitoring service instance (set by HealthController) */
+      monitoring?: any
+
+      /** WebSocket server for upload progress */
+      wss?: {
+        clients: Set<{
+          readyState: number
+          uploadId?: string
+          send: (data: string) => void
+        }>
+      }
     }
 
     interface ExtendedRequest extends Request {

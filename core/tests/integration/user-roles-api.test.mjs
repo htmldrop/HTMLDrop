@@ -2,7 +2,7 @@ import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest'
 import knex from 'knex'
 import express from 'express'
 import request from 'supertest'
-import UsersController from '../../controllers/v1/UsersController.mjs'
+import UsersController from '../../controllers/v1/UsersController.ts'
 
 describe('User Roles API Integration', () => {
   let db
