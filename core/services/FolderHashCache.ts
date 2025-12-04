@@ -73,6 +73,15 @@ if (isPrimary) {
       } else if (msg?.type === 'close_watcher' && msg.folderPath) {
         console.log(`[FolderHashCache] Primary received close_watcher request for: ${msg.folderPath}`)
         closeWatcher(msg.folderPath)
+      } else if (msg?.type === 'invalidate_folder_hash' && msg.folderPath) {
+        console.log(`[FolderHashCache] Primary received invalidate request for: ${msg.folderPath}`)
+        // Invalidate on primary
+        const cached = cache.get(msg.folderPath)
+        if (cached) {
+          cached.hash = null
+        }
+        // Broadcast to all workers
+        broadcastInvalidation(msg.folderPath)
       }
     })
   })
@@ -221,11 +230,21 @@ export async function getFolderHash(folderPath: string, ignorePatterns: (string 
 /**
  * Invalidate cache for a specific folder
  * Useful when you know a folder has changed (e.g., after theme/plugin install)
+ * This also broadcasts to other workers via the primary process
  */
 export function invalidateCache(folderPath: string): void {
   const cached = cache.get(folderPath)
   if (cached) {
     cached.hash = null
+  }
+
+  // Broadcast to all workers via primary process
+  if (isPrimary) {
+    // If called from primary, broadcast directly
+    broadcastInvalidation(folderPath)
+  } else if (process.send) {
+    // If called from worker, notify primary to broadcast
+    process.send({ type: 'invalidate_folder_hash', folderPath })
   }
 }
 
