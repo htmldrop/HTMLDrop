@@ -832,7 +832,7 @@ export default (context: HTMLDrop.Context): Router => {
 
       const response = await fetch(npmApiUrl)
       const data = await response.json() as {
-        objects?: Array<{ package: { name: string; description?: string; keywords?: string[] } }>
+        objects?: Array<{ package: { name: string; description?: string; keywords?: string[] }; downloads?: { weekly: number } }>
         total?: number
       }
 
@@ -852,6 +852,34 @@ export default (context: HTMLDrop.Context): Router => {
         })
 
         data.total = data.objects.length
+
+        // Fetch total downloads for all packages in parallel
+        const packageNames = data.objects.map(obj => obj.package.name)
+        if (packageNames.length > 0) {
+          try {
+            // Use bulk downloads API (scoped packages need encoding)
+            const downloadsPromises = packageNames.map(async (name) => {
+              try {
+                const encodedName = name.replace('/', '%2F')
+                const dlResponse = await fetch(`https://api.npmjs.org/downloads/point/last-year/${encodedName}`)
+                if (dlResponse.ok) {
+                  const dlData = await dlResponse.json() as { downloads?: number }
+                  return { name, downloads: dlData.downloads || 0 }
+                }
+              } catch { /* ignore individual failures */ }
+              return { name, downloads: 0 }
+            })
+
+            const downloadsResults = await Promise.all(downloadsPromises)
+            const downloadsMap = new Map(downloadsResults.map(r => [r.name, r.downloads]))
+
+            // Replace weekly downloads with total downloads
+            for (const obj of data.objects) {
+              const total = downloadsMap.get(obj.package.name) || 0
+              obj.downloads = { weekly: total } // Reuse the weekly field to avoid frontend changes
+            }
+          } catch { /* ignore bulk fetch errors, keep original data */ }
+        }
       }
 
       res.json(data)
