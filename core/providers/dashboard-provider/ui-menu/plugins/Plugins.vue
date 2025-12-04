@@ -136,6 +136,9 @@
             >
               {{ showRollbackFor === plugin.slug ? translate('Hide rollback') : translate('Rollback') }}
             </button>
+            <button @click="downloadPlugin(plugin)" class="action-link download">
+              {{ translate('Download') }}
+            </button>
             <button v-if="!plugin.active" @click="deletePlugin(plugin)" class="action-link delete">
               {{ translate('Delete') }}
             </button>
@@ -446,6 +449,30 @@ export default {
         this.showRollbackFor = null
       } else {
         this.showRollbackFor = plugin.slug
+      }
+    },
+    async downloadPlugin(plugin) {
+      try {
+        const result = await this.apiFetch(`${this.apiBase}/api/v1/plugins/${plugin.slug}/download`)
+
+        if (!result.ok) {
+          const data = await result.json()
+          throw new Error(data.error || 'Download failed')
+        }
+
+        // Get the blob and trigger download
+        const blob = await result.blob()
+        const url = window.URL.createObjectURL(blob)
+        const a = document.createElement('a')
+        a.href = url
+        a.download = `${plugin.slug}-${plugin.version || '1.0.0'}.zip`
+        document.body.appendChild(a)
+        a.click()
+        window.URL.revokeObjectURL(url)
+        a.remove()
+      } catch (err) {
+        console.error('Failed to download plugin:', err)
+        alert(err.message || this.translate('Failed to download plugin'))
       }
     },
     async getTree() {
@@ -768,6 +795,14 @@ export default {
 
 .plugins-page-container .action-link.rollback:hover {
   opacity: 1;
+}
+
+.plugins-page-container .action-link.download {
+  color: #17a2b8;
+}
+
+.plugins-page-container .action-link.download:hover {
+  color: #138496;
 }
 
 .plugins-page-container .empty-state {

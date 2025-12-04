@@ -1246,6 +1246,73 @@ export default (context: HTMLDrop.Context): Router => {
 
   /**
    * @openapi
+   * /themes/{slug}/download:
+   *   get:
+   *     tags:
+   *       - Themes
+   *     summary: Download theme as ZIP
+   *     description: Downloads an installed theme as a ZIP file
+   *     security:
+   *       - bearerAuth: []
+   *     parameters:
+   *       - in: path
+   *         name: slug
+   *         required: true
+   *         schema:
+   *           type: string
+   *         description: Theme slug to download
+   *         example: modern-theme
+   *     responses:
+   *       200:
+   *         description: ZIP file download
+   *         content:
+   *           application/zip:
+   *             schema:
+   *               type: string
+   *               format: binary
+   *       401:
+   *         description: Unauthorized
+   *       403:
+   *         description: Forbidden - user lacks read_theme capability
+   *       404:
+   *         description: Theme not found
+   */
+  router.get('/:slug/download', async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const guardReq = req as HTMLDrop.ExtendedRequest
+      const hasAccess = await guardReq.guard.user({ canOneOf: ['read', 'read_theme'], userId: guardReq?.user?.id })
+      if (!hasAccess) return res.status(403).json({ error: 'Permission denied' })
+
+      const { slug } = req.params
+      const themeFolder = path.join(THEMES_BASE, slug)
+
+      if (!fs.existsSync(themeFolder)) {
+        return res.status(404).json({ error: 'Theme not found' })
+      }
+
+      // Get theme metadata for filename
+      const metadata = await getThemeMetadata(slug)
+      const version = metadata?.version || '1.0.0'
+      const filename = `${slug}-${version}.zip`
+
+      // Create ZIP archive
+      const zip = new AdmZip()
+      zip.addLocalFolder(themeFolder, slug)
+
+      // Send as download
+      const zipBuffer = zip.toBuffer()
+
+      res.setHeader('Content-Type', 'application/zip')
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`)
+      res.setHeader('Content-Length', zipBuffer.length)
+      res.send(zipBuffer)
+    } catch (err) {
+      next(err)
+    }
+  })
+
+  /**
+   * @openapi
    * /themes/install/npm:
    *   post:
    *     tags:
