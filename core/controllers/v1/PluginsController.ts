@@ -8,7 +8,6 @@ import AdmZip from 'adm-zip'
 import { spawn } from 'child_process'
 import { validatePackageName, validateVersion, buildNpmInstallArgs } from '../../utils/npmValidator.ts'
 import PluginLifecycleService from '../../services/PluginLifecycleService.ts'
-import PersistenceService from '../../services/PersistenceService.ts'
 
 interface BackupInfo {
   files: string[]
@@ -38,6 +37,118 @@ interface NpmInstallResult {
 
 const PLUGINS_BASE = path.resolve('./content/plugins')
 if (!fs.existsSync(PLUGINS_BASE)) fs.mkdirSync(PLUGINS_BASE, { recursive: true })
+
+interface PluginPersistenceConfig {
+  persistent_directories: string[]
+  persistent_files: string[]
+}
+
+/**
+ * Load persistence configuration from plugin's config.mjs
+ */
+const loadPersistenceConfig = async (pluginFolder: string): Promise<PluginPersistenceConfig> => {
+  const defaultConfig: PluginPersistenceConfig = {
+    persistent_directories: [],
+    persistent_files: []
+  }
+
+  try {
+    const configPath = path.join(pluginFolder, 'config.mjs')
+    if (!fs.existsSync(configPath)) {
+      return defaultConfig
+    }
+
+    // Dynamic import with cache-busting
+    const config = await import(`${configPath}?t=${Date.now()}`)
+    return {
+      persistent_directories: config.default?.persistent_directories || [],
+      persistent_files: config.default?.persistent_files || []
+    }
+  } catch (error) {
+    console.warn(`[PluginsController] Could not load persistence config:`, error)
+    return defaultConfig
+  }
+}
+
+/**
+ * Backup only persistent directories and files
+ */
+const backupPersistent = async (
+  pluginFolder: string,
+  backupDir: string,
+  config: PluginPersistenceConfig
+): Promise<BackupInfo> => {
+  const files: string[] = []
+  const directories: string[] = []
+
+  await fs.promises.mkdir(backupDir, { recursive: true })
+
+  // Backup persistent directories
+  for (const dir of config.persistent_directories) {
+    const srcDir = path.join(pluginFolder, dir)
+    const destDir = path.join(backupDir, dir)
+
+    if (fs.existsSync(srcDir)) {
+      await fs.promises.cp(srcDir, destDir, { recursive: true })
+      directories.push(dir)
+    }
+  }
+
+  // Backup persistent files
+  for (const file of config.persistent_files) {
+    const srcFile = path.join(pluginFolder, file)
+    const destFile = path.join(backupDir, file)
+
+    if (fs.existsSync(srcFile)) {
+      await fs.promises.mkdir(path.dirname(destFile), { recursive: true })
+      await fs.promises.copyFile(srcFile, destFile)
+      files.push(file)
+    }
+  }
+
+  return { files, directories }
+}
+
+/**
+ * Restore only persistent directories and files
+ */
+const restorePersistent = async (
+  backupDir: string,
+  pluginFolder: string,
+  backupInfo: BackupInfo
+): Promise<BackupInfo> => {
+  const restoredFiles: string[] = []
+  const restoredDirs: string[] = []
+
+  // Restore directories
+  for (const dir of backupInfo.directories) {
+    const srcDir = path.join(backupDir, dir)
+    const destDir = path.join(pluginFolder, dir)
+
+    if (fs.existsSync(srcDir)) {
+      // Remove existing directory if it exists (from new version)
+      if (fs.existsSync(destDir)) {
+        await fs.promises.rm(destDir, { recursive: true, force: true })
+      }
+      await fs.promises.cp(srcDir, destDir, { recursive: true })
+      restoredDirs.push(dir)
+    }
+  }
+
+  // Restore files
+  for (const file of backupInfo.files) {
+    const srcFile = path.join(backupDir, file)
+    const destFile = path.join(pluginFolder, file)
+
+    if (fs.existsSync(srcFile)) {
+      await fs.promises.mkdir(path.dirname(destFile), { recursive: true })
+      await fs.promises.copyFile(srcFile, destFile)
+      restoredFiles.push(file)
+    }
+  }
+
+  return { files: restoredFiles, directories: restoredDirs }
+}
 
 /**
  * Safely executes npm install using spawn to prevent command injection
@@ -996,10 +1107,10 @@ export default (context: HTMLDrop.Context): Router => {
       await fs.promises.mkdir(tempDir, { recursive: true })
 
       try {
-        // Backup persistent files and directories before upgrade/downgrade
-        const persistenceService = new PersistenceService()
-        const backupInfo = await persistenceService.backup(pluginFolder, backupDir) as BackupInfo
-        console.log(`[PluginsController] Backed up ${backupInfo.files.length} files and ${backupInfo.directories.length} directories`)
+        // Load persistence config and backup only persistent directories/files
+        const persistConfig = await loadPersistenceConfig(pluginFolder)
+        const backupInfo = await backupPersistent(pluginFolder, backupDir, persistConfig)
+        console.log(`[PluginsController] Backed up ${backupInfo.files.length} persistent files and ${backupInfo.directories.length} persistent directories`)
 
         // Install specific version to temp directory using safe method
         await safeNpmInstall(packageName, version, {
@@ -1012,7 +1123,7 @@ export default (context: HTMLDrop.Context): Router => {
         const nodeModulesPath = path.join(tempDir, 'node_modules', packageName)
 
         if (!fs.existsSync(nodeModulesPath)) {
-          await persistenceService.cleanup(backupDir)
+          await fs.promises.rm(backupDir, { recursive: true, force: true })
           await fs.promises.rm(tempDir, { recursive: true, force: true })
           return res.status(400).json({ error: 'Package installation failed' })
         }
@@ -1023,7 +1134,7 @@ export default (context: HTMLDrop.Context): Router => {
           .map(file => path.join(nodeModulesPath, file))
           .find(fullPath => fs.existsSync(fullPath))
         if (!indexPath) {
-          await persistenceService.cleanup(backupDir)
+          await fs.promises.rm(backupDir, { recursive: true, force: true })
           await fs.promises.rm(tempDir, { recursive: true, force: true })
           return res.status(400).json({ error: 'Invalid plugin structure: missing index' })
         }
@@ -1035,11 +1146,11 @@ export default (context: HTMLDrop.Context): Router => {
         await fs.promises.rename(nodeModulesPath, pluginFolder)
 
         // Restore persistent files and directories
-        const restoreInfo = await persistenceService.restore(backupDir, pluginFolder, backupInfo) as BackupInfo
-        console.log(`[PluginsController] Restored ${restoreInfo.files.length} files and ${restoreInfo.directories.length} directories`)
+        const restoreInfo = await restorePersistent(backupDir, pluginFolder, backupInfo)
+        console.log(`[PluginsController] Restored ${restoreInfo.files.length} persistent files and ${restoreInfo.directories.length} persistent directories`)
 
         // Clean up backup
-        await persistenceService.cleanup(backupDir)
+        await fs.promises.rm(backupDir, { recursive: true, force: true })
 
         // Clean up temp directory
         await fs.promises.rm(tempDir, { recursive: true, force: true })

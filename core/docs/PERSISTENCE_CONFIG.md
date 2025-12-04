@@ -120,17 +120,9 @@ export default {
 
 ## Logging
 
-The persistence system logs all operations:
+The persistence system logs backup and restore operations:
 
 ```
-[PersistenceService] Creating backup from /app/content/themes/my-theme to /app/content/themes/.backup-my-theme-1234567890
-[PersistenceService] Backed up file: settings.json
-[PersistenceService] Backed up directory: workdir
-[PersistenceService] Backup complete: 2 files, 1 directories
-[ThemesController] Backed up 2 files and 1 directories
-[PersistenceService] Restoring backup from /app/content/themes/.backup-my-theme-1234567890 to /app/content/themes/my-theme
-[PersistenceService] Restored file: settings.json
-[PersistenceService] Restore complete: 15 files restored
-[ThemesController] Restored 15 files
-[PersistenceService] Cleaned up backup directory: /app/content/themes/.backup-my-theme-1234567890
+[ThemesController] Backed up 2 persistent files and 1 persistent directories
+[ThemesController] Restored 2 persistent files and 1 persistent directories
 ```
