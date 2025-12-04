@@ -80,6 +80,9 @@ export default (context: HTMLDrop.Context): Router => {
    */
   router.get('/:provider/login', async (req: Request, res: Response) => {
     const { knex, table } = context
+    if (!knex) {
+      return res.status(503).json({ success: false, error: 'Database not available' })
+    }
     const { provider } = req.params
     const config = await knex(table('auth_providers'))
       .where({ slug: provider, active: true })
@@ -168,6 +171,9 @@ export default (context: HTMLDrop.Context): Router => {
    */
   router.all('/:provider/callback', async (req: Request, res: Response) => {
     const { knex, table } = context
+    if (!knex) {
+      return res.status(503).json({ success: false, error: 'Database not available' })
+    }
     const { provider } = req.params
     const { code } = req.query as { code?: string }
     if (!code) return res.status(400).send('Missing code')

@@ -4,9 +4,9 @@ import express from 'express'
 import Knex from 'knex'
 import type { Knex as KnexType } from 'knex'
 import { WebSocketServer, WebSocket } from 'ws'
-import webRoutes from './routes/web.mjs'
-import adminRoutes from './routes/admin.mjs'
-import apiRoutes from './routes/api.mjs'
+import webRoutes from './routes/web.ts'
+import adminRoutes from './routes/admin.ts'
+import apiRoutes from './routes/api.ts'
 import { cpus } from 'os'
 import cluster, { Worker } from 'cluster'
 import cors from 'cors'
@@ -18,11 +18,11 @@ import UserGuard from './utils/UserGuard.ts'
 import translate from './utils/translation.ts'
 import createWsAuthMiddleware from './utils/wsAuthMiddleware.ts'
 import { initSecrets, ensureSecrets } from './utils/secrets.ts'
-import SchedulerService from './services/SchedulerService.mjs'
-import BadgeCountService from './services/BadgeCountService.mjs'
-import TraceStorage from './services/TraceStorage.mjs'
-import TraceStorageDB from './services/TraceStorageDB.mjs'
-import { initSharedSSRCache } from './services/SharedSSRCache.mjs'
+import SchedulerService from './services/SchedulerService.ts'
+import BadgeCountService from './services/BadgeCountService.ts'
+import TraceStorage from './services/TraceStorage.ts'
+import TraceStorageDB from './services/TraceStorageDB.ts'
+import { initSharedSSRCache } from './services/SharedSSRCache.ts'
 
 // Extended WebSocket with auth properties
 interface AuthenticatedWebSocket extends WebSocket {
@@ -214,7 +214,7 @@ if (cluster.isPrimary) {
   // Set up file watchers for active themes and plugins only on primary process
   // Watchers for active plugins/themes are managed by RegisterPlugins/RegisterThemes
   // This block sets them up eagerly on startup instead of waiting for first request
-  const { requestWatcherSetup } = await import('./services/FolderHashCache.mjs')
+  const { requestWatcherSetup } = await import('./services/FolderHashCache.ts')
   const fs = await import('fs')
   const options = await initializeOptions(knex, (name: string) => `${process.env.TABLE_PREFIX || ''}${name}`)
 
@@ -496,25 +496,7 @@ if (cluster.isPrimary) {
   // Trace storage will be initialized after options are loaded
   let traceStorage: InstanceType<typeof TraceStorage> | InstanceType<typeof TraceStorageDB> | null = null
 
-  // Worker context type - extends the core HTMLDrop.Context
-  interface WorkerContext {
-    app: ReturnType<typeof express>
-    port: string | number
-    server: ReturnType<typeof createServer>
-    wss: WebSocketServer
-    knex: KnexType | null
-    options: SiteOptions | null
-    parseVue: typeof parseVue
-    scheduler: HTMLDrop.SchedulerService | null
-    traceStorage: InstanceType<typeof TraceStorage> | InstanceType<typeof TraceStorageDB> | null
-    formatDate(date?: Date): string
-    table(name: string): string
-    normalizeSlug(val: string): string
-    translate: typeof translate
-    onPluginsInitialized?: () => void
-  }
-
-  const context: WorkerContext = {
+  const context: HTMLDrop.Context = {
     app,
     port,
     server,
@@ -524,7 +506,7 @@ if (cluster.isPrimary) {
     parseVue,
     scheduler: null, // Will be initialized after knex
     traceStorage: null, // Will be initialized after options are loaded
-    formatDate(date = new Date()) {
+    formatDate(date: Date = new Date()) {
       return date.toISOString().replace('Z', '').replace('T', ' ')
     },
     table(name: string) {
@@ -562,7 +544,7 @@ if (cluster.isPrimary) {
     if (useDBStorage) {
       // DB-backed storage with retention and archiving
       traceStorage = new TraceStorageDB({
-        context,
+        context: context as any,
         retentionDays: tracingConfig.retentionDays ?? (parseInt(process.env.HD_TRACING_RETENTION_DAYS || '30')),
         archiveAfterDays: tracingConfig.archiveAfterDays ?? (parseInt(process.env.HD_TRACING_ARCHIVE_AFTER_DAYS || '7')),
         archivePath: tracingConfig.archivePath ?? (process.env.HD_TRACING_ARCHIVE_PATH || './content/traces'),
@@ -674,7 +656,7 @@ if (cluster.isPrimary) {
   })
 
   app.set('json spaces', 2)
-  app.use((req: Request & { context?: WorkerContext }, res: Response, next: NextFunction) => {
+  app.use((req: Request & { context?: HTMLDrop.Context }, res: Response, next: NextFunction) => {
     req.context = context
     if (req.method) req.method = req.method.toUpperCase()
     next()
@@ -718,9 +700,9 @@ if (cluster.isPrimary) {
     next()
   })
 
-  app.use('/api', apiRoutes(context))
-  app.use('/admin', adminRoutes(context))
-  app.use('/', webRoutes(context))
+  app.use('/api', apiRoutes(context as any))
+  app.use('/admin', adminRoutes(context as any))
+  app.use('/', webRoutes(context as any))
 
   // Receive sockets from the master
   process.on('message', async (msg: string | WorkerMessage, socket: net.Socket | undefined) => {
@@ -745,7 +727,7 @@ if (cluster.isPrimary) {
 
     if (typedMsg?.type === 'reinitialize_options') {
       try {
-        context.options = await initializeOptions(context.knex, context.table) ?? null
+        if (context?.knex) context.options = await initializeOptions(context.knex, context.table) ?? null
         process.send?.({ type: 'worker_ready', action: 'Options reinitialization' })
       } catch (error) {
         console.error(`Worker ${process.pid} failed to reinitialize options:`, error)

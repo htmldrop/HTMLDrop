@@ -3,7 +3,7 @@ import knex from 'knex'
 import express from 'express'
 import request from 'supertest'
 import JobsController from '../../controllers/v1/JobsController.ts'
-import RegisterJobs from '../../registries/RegisterJobs.mjs'
+import RegisterJobs from '../../registries/RegisterJobs.ts'
 
 describe('Jobs API Integration', () => {
   let db

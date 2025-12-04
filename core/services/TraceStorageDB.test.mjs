@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
-import TraceStorageDB from './TraceStorageDB.mjs'
+import TraceStorageDB from './TraceStorageDB.ts'
 import knex from 'knex'
 import fs from 'fs'
 import path from 'path'

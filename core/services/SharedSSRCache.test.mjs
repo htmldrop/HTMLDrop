@@ -50,7 +50,7 @@ describe('SharedSSRCache', () => {
     process.on = mockProcessOn
 
     // Re-import module to get fresh state
-    SharedSSRCache = await import('./SharedSSRCache.mjs')
+    SharedSSRCache = await import('./SharedSSRCache.ts')
 
     // Restore after import (we'll use mocks in tests)
     process.send = originalSend
@@ -77,7 +77,7 @@ describe('SharedSSRCache', () => {
         }
       }))
 
-      SharedSSRCache = await import('./SharedSSRCache.mjs')
+      SharedSSRCache = await import('./SharedSSRCache.ts')
     })
 
     it('should export init function', () => {
@@ -133,7 +133,7 @@ describe('SharedSSRCache', () => {
         default: clusterMock
       }))
 
-      workerModule = await import('./SharedSSRCache.mjs')
+      workerModule = await import('./SharedSSRCache.ts')
     })
 
     it('should return null for cache miss when not initialized', async () => {
@@ -166,7 +166,7 @@ describe('SharedSSRCache', () => {
         }
       }))
 
-      const module = await import('./SharedSSRCache.mjs')
+      const module = await import('./SharedSSRCache.ts')
       const stats = module.getSSRCacheStats()
 
       expect(stats).toHaveProperty('localSize')
@@ -187,7 +187,7 @@ describe('SharedSSRCache', () => {
         }
       }))
 
-      const module = await import('./SharedSSRCache.mjs')
+      const module = await import('./SharedSSRCache.ts')
 
       // Store a value
       module.setCachedSSR('/test-page', '<html>test</html>')
@@ -210,7 +210,7 @@ describe('SharedSSRCache', () => {
         }
       }))
 
-      const module = await import('./SharedSSRCache.mjs')
+      const module = await import('./SharedSSRCache.ts')
 
       // Store values
       module.setCachedSSR('/page1', '<html>page1</html>')
@@ -237,7 +237,7 @@ describe('SharedSSRCache', () => {
         }
       }))
 
-      const module = await import('./SharedSSRCache.mjs')
+      const module = await import('./SharedSSRCache.ts')
 
       // Store values
       module.setCachedSSR('/page1', '<html>page1</html>')
@@ -264,7 +264,7 @@ describe('SharedSSRCache', () => {
         }
       }))
 
-      const module = await import('./SharedSSRCache.mjs')
+      const module = await import('./SharedSSRCache.ts')
 
       // Store a value
       module.setCachedSSR('/test', '<html>test</html>')
@@ -292,7 +292,7 @@ describe('SharedSSRCache', () => {
         }
       }))
 
-      const module = await import('./SharedSSRCache.mjs')
+      const module = await import('./SharedSSRCache.ts')
       const beforeStore = Date.now()
 
       module.setCachedSSR('/test', '<html>test</html>')
@@ -328,7 +328,7 @@ describe('SharedSSRCache', () => {
         }
       }))
 
-      const module = await import('./SharedSSRCache.mjs')
+      const module = await import('./SharedSSRCache.ts')
 
       // Initialize to set up message handlers
       module.initSharedSSRCache()
@@ -372,7 +372,7 @@ describe('SharedSSRCache', () => {
         }
       }))
 
-      const module = await import('./SharedSSRCache.mjs')
+      const module = await import('./SharedSSRCache.ts')
       module.initSharedSSRCache()
 
       // First add some data
@@ -416,7 +416,7 @@ describe('SharedSSRCache', () => {
         }
       }))
 
-      const module = await import('./SharedSSRCache.mjs')
+      const module = await import('./SharedSSRCache.ts')
 
       module.setCachedSSR('', '<html>empty key</html>')
       const result = await module.getCachedSSR('', 5000)
@@ -437,7 +437,7 @@ describe('SharedSSRCache', () => {
         }
       }))
 
-      const module = await import('./SharedSSRCache.mjs')
+      const module = await import('./SharedSSRCache.ts')
 
       const specialKey = '/page?foo=bar&baz=qux#section'
       module.setCachedSSR(specialKey, '<html>special</html>')
@@ -459,7 +459,7 @@ describe('SharedSSRCache', () => {
         }
       }))
 
-      const module = await import('./SharedSSRCache.mjs')
+      const module = await import('./SharedSSRCache.ts')
 
       // Create 1MB of content
       const largeHtml = `<html>${  'x'.repeat(1024 * 1024)  }</html>`
@@ -482,7 +482,7 @@ describe('SharedSSRCache', () => {
         }
       }))
 
-      const module = await import('./SharedSSRCache.mjs')
+      const module = await import('./SharedSSRCache.ts')
 
       // Simulate concurrent sets
       const promises = []
@@ -512,7 +512,7 @@ describe('SharedSSRCache', () => {
         }
       }))
 
-      const module = await import('./SharedSSRCache.mjs')
+      const module = await import('./SharedSSRCache.ts')
 
       // These shouldn't throw
       module.setCachedSSR('/null', null)

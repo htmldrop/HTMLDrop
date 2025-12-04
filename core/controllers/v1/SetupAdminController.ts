@@ -78,6 +78,10 @@ export default (context: HTMLDrop.Context): Router => {
   router.post('/', express.json(), async (req: Request, res: Response) => {
     const setupReq = req as SetupRequest
     const { knex, table } = context
+    if (!knex) {
+      return res.status(503).json({ success: false, error: 'Database not available' })
+    }
+    const db = knex
     try {
       const username = setupReq.body.email?.split('@')[0]?.trim()
       const email = setupReq.body.email?.trim()
@@ -95,20 +99,20 @@ export default (context: HTMLDrop.Context): Router => {
         return res.status(400).send(passwordValidation.message)
       }
 
-      const role = await knex(table('roles')).where('slug', 'administrator').first() as Role | undefined
+      const role = await db(table('roles')).where('slug', 'administrator').first() as Role | undefined
 
       if (!role) {
         return res.status(500).send('Administrator role not found. Database may not be properly seeded.')
       }
 
-      const [userId] = await knex(table('users')).insert({
+      const [userId] = await db(table('users')).insert({
         username,
         email,
         password: await hash(password || ''),
         locale
       })
 
-      await knex(table('user_roles')).insert({ user_id: userId, role_id: role.id })
+      await db(table('user_roles')).insert({ user_id: userId, role_id: role.id })
 
       res.status(200).send('Database configured successfully. Updating all workers...')
     } catch (error) {

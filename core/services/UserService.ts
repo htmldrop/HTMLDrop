@@ -8,11 +8,6 @@ import bcrypt from 'bcrypt'
 import type { Knex } from 'knex'
 import { BCRYPT_ROUNDS } from '../utils/constants.ts'
 
-interface Context {
-  knex: Knex
-  table: (name: string) => string
-}
-
 interface User {
   id: number
   username: string
@@ -61,11 +56,14 @@ interface UpdateUserData {
 }
 
 class UserService {
-  private context: Context
+  private context: HTMLDrop.Context
   private knex: Knex
   private table: (name: string) => string
 
-  constructor(context: Context) {
+  constructor(context: HTMLDrop.Context) {
+    if (!context.knex) {
+      throw new Error('UserService requires a database connection')
+    }
     this.context = context
     this.knex = context.knex
     this.table = context.table.bind(context)

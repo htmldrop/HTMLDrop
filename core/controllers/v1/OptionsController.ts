@@ -82,6 +82,9 @@ export default (context: HTMLDrop.Context): Router => {
   router.get('/', async (req, res: Response, _next: NextFunction) => {
     const typedReq = req as HTMLDrop.ExtendedRequest
     const { knex, table } = context
+    if (!knex) {
+      return res.status(503).json({ success: false, error: 'Database not available' })
+    }
 
     const hasAccess = await typedReq.guard.user({ canOneOf: ['read', 'read_option'], userId: typedReq?.user?.id })
 
@@ -191,6 +194,9 @@ export default (context: HTMLDrop.Context): Router => {
   router.get('/:idOrName', async (req, res: Response, _next: NextFunction) => {
     const typedReq = req as unknown as HTMLDrop.ExtendedRequest
     const { knex, table } = context
+    if (!knex) {
+      return res.status(503).json({ success: false, error: 'Database not available' })
+    }
     const { idOrName } = req.params
 
     const option = await knex(table('options'))
@@ -248,6 +254,9 @@ export default (context: HTMLDrop.Context): Router => {
   router.post('/', async (req, res: Response, next: NextFunction) => {
     const typedReq = req as HTMLDrop.ExtendedRequest
     const { knex, table, normalizeSlug } = context
+    if (!knex) {
+      return res.status(503).json({ success: false, error: 'Database not available' })
+    }
     const { applyFilters, doAction } = typedReq.hooks
     const { name, value, autoload } = req.body
 
@@ -320,6 +329,9 @@ export default (context: HTMLDrop.Context): Router => {
   router.patch('/:idOrName', async (req, res: Response, next: NextFunction) => {
     const typedReq = req as unknown as HTMLDrop.ExtendedRequest
     const { knex, table } = context
+    if (!knex) {
+      return res.status(503).json({ success: false, error: 'Database not available' })
+    }
     const { doAction, applyFilters } = typedReq.hooks
     const { idOrName } = req.params
     const option = await knex(table('options')).where('id', idOrName).orWhere('name', idOrName).first() as Option | undefined
@@ -394,6 +406,9 @@ export default (context: HTMLDrop.Context): Router => {
   router.delete('/:idOrName', async (req, res: Response, next: NextFunction) => {
     const typedReq = req as unknown as HTMLDrop.ExtendedRequest
     const { knex, table } = context
+    if (!knex) {
+      return res.status(503).json({ success: false, error: 'Database not available' })
+    }
     const { idOrName } = req.params
     const { doAction, applyFilters } = typedReq.hooks
     const option = await knex(table('options')).where('id', idOrName).orWhere('name', idOrName).first() as Option | undefined

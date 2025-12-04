@@ -1,10 +1,4 @@
 import crypto from 'crypto'
-import type { Knex } from 'knex'
-
-interface Context {
-  knex: Knex
-  table: (name: string) => string
-}
 
 interface User {
   id: number
@@ -21,7 +15,10 @@ interface TokenPayload {
   jti: string
 }
 
-export const buildPayload = async (context: Context, user: User): Promise<TokenPayload> => {
+export const buildPayload = async (context: HTMLDrop.Context, user: User): Promise<TokenPayload> => {
+  if (!context.knex) {
+    throw new Error('buildPayload requires a database connection')
+  }
   const { knex, table } = context
   const roles = await knex(table('user_roles'))
     .join(table('roles'), `${table('user_roles')}.role_id`, `${table('roles')}.id`)

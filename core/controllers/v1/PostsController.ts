@@ -210,6 +210,7 @@ export default (context: HTMLDrop.Context): Router => {
     req: PostsRequest
   ): Promise<Record<string, unknown>[]> => {
     const { knex, table } = context
+    if (!knex) return posts.map(p => ({ ...p, terms: {} }))
     const ids = posts.map((p) => p.id)
 
     const relationshipsRaw = (await knex(table('term_relationships'))
@@ -240,6 +241,7 @@ export default (context: HTMLDrop.Context): Router => {
 
   const withMetaMany = async (posts: Post[], req: PostsRequest): Promise<Record<string, unknown>[]> => {
     const { knex, table } = context
+    if (!knex) return posts.map(p => parseRow(p as unknown as Record<string, unknown>))
     const { applyFilters } = req.hooks
     const ids = posts.map((p) => p.id)
     const metas = (await knex(table('post_meta')).whereIn('post_id', ids)) as PostMeta[]
@@ -268,6 +270,7 @@ export default (context: HTMLDrop.Context): Router => {
     req: PostsRequest
   ): Promise<Record<string, unknown>[]> => {
     const { knex, table } = context
+    if (!knex) return terms.map(p => ({ ...parseRow(p as unknown as Record<string, unknown>), post_count: 0 }))
     const { applyFilters } = req.hooks
     const ids = terms.map((p) => p.id)
 
@@ -512,6 +515,10 @@ export default (context: HTMLDrop.Context): Router => {
   router.get('/', async (req: Request, res: Response, next: NextFunction) => {
     const typedReq = req as PostsRequest
     const { knex, table } = context
+    if (!knex) {
+      return res.status(503).json({ success: false, error: 'Database not available' })
+    }
+    const db = knex // Create local constant so TypeScript knows it's non-null
     const { postType } = typedReq.params
 
     const type = await checkCapability(typedReq, ['read', 'read_post'], postType)
@@ -570,7 +577,7 @@ export default (context: HTMLDrop.Context): Router => {
     const searchableCore = searchFields?.filter((field) => coreFields.includes(field)) || []
     const searchableMeta = searchFields?.filter((field) => !coreFields.includes(field)) || []
 
-    let query = knex(table('posts')).where('post_type_slug', postType)
+    let query = db(table('posts')).where('post_type_slug', postType)
 
     if (!type) {
       // user can only see posts where they are an author
@@ -588,7 +595,7 @@ export default (context: HTMLDrop.Context): Router => {
     const totals = (await query
       .clone()
       .select(
-        knex.raw(`
+        db.raw(`
           SUM(CASE WHEN deleted_at IS NULL THEN 1 ELSE 0 END) as total,
           SUM(CASE WHEN status = 'draft' AND deleted_at IS NULL THEN 1 ELSE 0 END) as total_drafts,
           SUM(CASE WHEN status = 'published' AND deleted_at IS NULL THEN 1 ELSE 0 END) as total_published,
@@ -833,9 +840,13 @@ export default (context: HTMLDrop.Context): Router => {
   router.get('/:idOrSlug', async (req: Request, res: Response, next: NextFunction) => {
     const typedReq = req as PostsRequest
     const { knex, table } = context
+    if (!knex) {
+      return res.status(503).json({ success: false, error: 'Database not available' })
+    }
+    const db = knex
     const { idOrSlug, postType } = typedReq.params
 
-    const post = (await knex(table('posts'))
+    const post = (await db(table('posts'))
       .where('post_type_slug', postType)
       .andWhere((builder) => builder.where('id', idOrSlug).orWhere('slug', idOrSlug))
       .first()) as Post | undefined
@@ -844,7 +855,7 @@ export default (context: HTMLDrop.Context): Router => {
     const type = await checkCapability(typedReq, ['read_post'], post.post_type_slug, post.id)
     const isOwner =
       typedReq?.user?.id &&
-      (await knex(table('post_authors')).where({ post_id: post.id, user_id: typedReq.user.id }).first())
+      (await db(table('post_authors')).where({ post_id: post.id, user_id: typedReq.user.id }).first())
     if (!type && !isOwner) return res.status(403).json({ error: 'Permission denied' })
 
     const result = await withMetaAndTaxonomies(post, typedReq)
@@ -909,6 +920,10 @@ export default (context: HTMLDrop.Context): Router => {
   router.post('/', async (req: Request, res: Response, next: NextFunction) => {
     const typedReq = req as PostsRequest
     const { knex, table, normalizeSlug } = context
+    if (!knex) {
+      return res.status(503).json({ success: false, error: 'Database not available' })
+    }
+    const db = knex
     const { getFields, applyFilters, doAction } = typedReq.hooks
     const { slug, status, title } = typedReq.body
     const { postType } = typedReq.params
@@ -941,7 +956,7 @@ export default (context: HTMLDrop.Context): Router => {
     coreData = filtered?.coreData || {}
     metaData = filtered?.metaData || {}
 
-    const [id] = (await knex(table('posts')).insert(coreData)) as number[]
+    const [id] = (await db(table('posts')).insert(coreData)) as number[]
 
     const metaInserts = Object.entries(metaData).map(([field_slug, value]) => ({
       post_id: id,
@@ -950,23 +965,23 @@ export default (context: HTMLDrop.Context): Router => {
     }))
 
     if (metaInserts.length > 0) {
-      await knex(table('post_meta')).insert(metaInserts)
+      await db(table('post_meta')).insert(metaInserts)
     }
 
     if (typeof typedReq.body.terms !== 'undefined') {
       const termIds = await resolveTermIds(typedReq.body.terms)
       if (termIds.length > 0) {
         const relInserts = termIds.map((term_id) => ({ term_id, post_id: id }))
-        await knex(table('term_relationships')).insert(relInserts)
+        await db(table('term_relationships')).insert(relInserts)
       }
     }
 
-    const created = (await knex(table('posts')).where('id', id).first()) as Post
+    const created = (await db(table('posts')).where('id', id).first()) as Post
     const result = await withMetaAndTaxonomies(created, typedReq)
 
     // insert authors
     if (typedReq?.user?.id) {
-      await knex(table('post_authors')).insert({ post_id: id, user_id: typedReq.user.id })
+      await db(table('post_authors')).insert({ post_id: id, user_id: typedReq.user.id })
     }
 
     doAction('save_post', { req: typedReq, res, next, postType, post: result })
@@ -1045,9 +1060,13 @@ export default (context: HTMLDrop.Context): Router => {
   router.patch('/:idOrSlug', async (req: Request, res: Response, next: NextFunction) => {
     const typedReq = req as PostsRequest
     const { knex, table, normalizeSlug } = context
+    if (!knex) {
+      return res.status(503).json({ success: false, error: 'Database not available' })
+    }
+    const db = knex
     const { getFields, doAction, applyFilters } = typedReq.hooks
     const { idOrSlug, postType } = typedReq.params
-    const post = (await knex(table('posts'))
+    const post = (await db(table('posts'))
       .where('post_type_slug', postType)
       .andWhere((builder) => {
         builder.where('id', idOrSlug).orWhere('slug', idOrSlug)
@@ -1059,7 +1078,7 @@ export default (context: HTMLDrop.Context): Router => {
 
     const type = await checkCapability(typedReq, ['edit', 'edit_posts'], post.post_type_slug, id)
     const isOwner =
-      typedReq?.user?.id && (await knex(table('post_authors')).where({ post_id: id, user_id: typedReq.user.id }).first())
+      typedReq?.user?.id && (await db(table('post_authors')).where({ post_id: id, user_id: typedReq.user.id }).first())
     if (!type && !isOwner) return res.status(403).json({ error: 'Permission denied' })
 
     let coreUpdates: Record<string, unknown> = {}
@@ -1067,7 +1086,7 @@ export default (context: HTMLDrop.Context): Router => {
 
     const fields = await getFields(postType) as unknown as FieldInfo[]
     if (fields.some((field) => field.field.slug === 'authors')) {
-      const meta = (await knex(table('post_meta'))
+      const meta = (await db(table('post_meta'))
         .where('post_id', id)
         .where('field_slug', 'authors')
         .first()) as { value: unknown } | undefined
@@ -1114,44 +1133,44 @@ export default (context: HTMLDrop.Context): Router => {
     const hasMetaUpdates = Object.keys(metaUpdates).length > 0
 
     if (!hasCoreUpdates && hasMetaUpdates) {
-      coreUpdates.updated_at = knex.fn.now()
+      coreUpdates.updated_at = db.fn.now()
     }
 
     if (hasCoreUpdates || hasMetaUpdates) {
-      await knex(table('posts')).where('id', id).update(coreUpdates)
+      await db(table('posts')).where('id', id).update(coreUpdates)
       if (typedReq?.user?.id) {
-        await knex(table('post_authors'))
+        await db(table('post_authors'))
           .insert({
             post_id: id,
             user_id: typedReq.user.id,
-            updated_at: knex.fn.now()
+            updated_at: db.fn.now()
           })
           .onConflict(['post_id', 'user_id'])
           .merge({
-            updated_at: knex.fn.now()
+            updated_at: db.fn.now()
           })
       }
     }
 
     for (const [field_slug, value] of Object.entries(metaUpdates)) {
-      const exists = await knex(table('post_meta')).where({ post_id: id, field_slug }).first()
+      const exists = await db(table('post_meta')).where({ post_id: id, field_slug }).first()
       if (exists) {
-        await knex(table('post_meta'))
+        await db(table('post_meta'))
           .where({ post_id: id, field_slug })
           .update({ value: normalizeObject(value) as string })
       } else {
-        await knex(table('post_meta')).insert({ post_id: id, field_slug, value: normalizeObject(value) as string })
+        await db(table('post_meta')).insert({ post_id: id, field_slug, value: normalizeObject(value) as string })
       }
     }
     if (typeof req.body.terms !== 'undefined') {
       const termIds = await resolveTermIds(req.body.terms)
 
       // Replace existing relationships
-      await knex(table('term_relationships')).where('post_id', id).delete()
+      await db(table('term_relationships')).where('post_id', id).delete()
 
       if (termIds.length > 0) {
         const relInserts = termIds.map((term_id) => ({ term_id, post_id: id }))
-        await knex(table('term_relationships')).insert(relInserts)
+        await db(table('term_relationships')).insert(relInserts)
       }
     }
 
@@ -1166,7 +1185,7 @@ export default (context: HTMLDrop.Context): Router => {
         if (typeof newValue === 'undefined') return
 
         // fetch the last revision
-        const lastRevision = (await knex(table('post_revisions'))
+        const lastRevision = (await db(table('post_revisions'))
           .where({ post_id: id, field_slug: slug })
           .orderBy('id', 'desc')
           .first()) as { value: string } | undefined
@@ -1175,7 +1194,7 @@ export default (context: HTMLDrop.Context): Router => {
         const lastValue = lastRevision ? lastRevision.value : null
 
         if (lastValue !== normalizedNewValue) {
-          await knex(table('post_revisions')).insert({
+          await db(table('post_revisions')).insert({
             post_id: id,
             field_slug: slug,
             value: JSON.stringify(newValue),
@@ -1193,7 +1212,7 @@ export default (context: HTMLDrop.Context): Router => {
     // run all in parallel
     await Promise.all(revisionPromises)
 
-    const updated = (await knex(table('posts')).where('id', id).first()) as Post
+    const updated = (await db(table('posts')).where('id', id).first()) as Post
     const result = await withMetaAndTaxonomies(updated, typedReq)
     doAction('edit_post', { req: typedReq, res, next, postType, post: result })
     doAction('save_post', { req: typedReq, res, next, postType, post: result })
@@ -1254,9 +1273,13 @@ export default (context: HTMLDrop.Context): Router => {
   router.delete('/:idOrSlug', async (req: Request, res: Response, next: NextFunction) => {
     const typedReq = req as PostsRequest
     const { knex, table, formatDate } = context
+    if (!knex) {
+      return res.status(503).json({ success: false, error: 'Database not available' })
+    }
+    const db = knex
     const { idOrSlug, postType } = typedReq.params
     const { doAction, applyFilters } = typedReq.hooks
-    const post = (await knex(table('posts'))
+    const post = (await db(table('posts'))
       .where('post_type_slug', postType)
       .andWhere((builder) => {
         builder.where('id', idOrSlug).orWhere('slug', idOrSlug)
@@ -1268,7 +1291,7 @@ export default (context: HTMLDrop.Context): Router => {
 
     const type = await checkCapability(typedReq, ['delete_posts'], post.post_type_slug, id)
     const isOwner =
-      typedReq?.user?.id && (await knex(table('post_authors')).where({ post_id: id, user_id: typedReq.user.id }).first())
+      typedReq?.user?.id && (await db(table('post_authors')).where({ post_id: id, user_id: typedReq.user.id }).first())
     if (!type && !isOwner) return res.status(403).json({ error: 'Permission denied' })
 
     const deleted = await withMetaAndTaxonomies(post, typedReq)
@@ -1307,9 +1330,9 @@ export default (context: HTMLDrop.Context): Router => {
         }
       }
 
-      await knex(table('posts')).where('id', id).delete()
+      await db(table('posts')).where('id', id).delete()
     } else {
-      await knex(table('posts'))
+      await db(table('posts'))
         .where('id', id)
         .update({ deleted_at: formatDate(new Date()) })
     }
@@ -1422,6 +1445,11 @@ export default (context: HTMLDrop.Context): Router => {
   const uploadHandler = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     const typedReq = req as PostsRequest
     const { knex, table, normalizeSlug, wss } = context
+    if (!knex) {
+      res.status(503).json({ success: false, error: 'Database not available' })
+      return
+    }
+    const db = knex
     try {
       const { postType, idOrSlug, fieldSlug } = typedReq.params
       const { applyFilters, doAction } = typedReq.hooks
@@ -1438,7 +1466,7 @@ export default (context: HTMLDrop.Context): Router => {
           res.status(403).json({ error: 'Permission denied' })
           return
         }
-        post = (await knex(table('posts'))
+        post = (await db(table('posts'))
           .where('post_type_slug', postType)
           .andWhere((builder) => builder.where('id', idOrSlug).orWhere('slug', idOrSlug))
           .first()) as Post | undefined
@@ -1458,7 +1486,7 @@ export default (context: HTMLDrop.Context): Router => {
       // WebSocket for progress
       let ws: { readyState: number; uploadId?: string; send: (data: string) => void } | undefined
       if (uploadId && wss?.clients) {
-        ws = [...wss.clients].find((c) => c.readyState === 1 && c.uploadId === uploadId)
+        ws = [...wss.clients].find((c: any) => c.readyState === 1 && c.uploadId === uploadId)
       }
 
       // Track total upload progress
@@ -1497,7 +1525,7 @@ export default (context: HTMLDrop.Context): Router => {
           fileMeta = applyFilters('attachment_metadata', fileMeta, req)
 
           // Insert attachment post
-          const [attachmentId] = (await knex(table('posts')).insert({
+          const [attachmentId] = (await db(table('posts')).insert({
             slug: normalizeSlug(`${file.originalname.replace(/\s+/g, '_')}-${Date.now()}`),
             post_type_slug: 'attachments',
             post_type_id: null,
@@ -1505,7 +1533,7 @@ export default (context: HTMLDrop.Context): Router => {
           })) as number[]
 
           if (typedReq?.user?.id) {
-            await knex(table('post_authors')).insert({ post_id: attachmentId, user_id: typedReq.user.id })
+            await db(table('post_authors')).insert({ post_id: attachmentId, user_id: typedReq.user.id })
           }
 
           // Insert metadata for the attachment
@@ -1514,7 +1542,7 @@ export default (context: HTMLDrop.Context): Router => {
             { post_id: attachmentId, field_slug: 'file', value: JSON.stringify(fileMeta) },
             { post_id: attachmentId, field_slug: 'authors', value: JSON.stringify([typedReq.user!.id]) }
           ]
-          await knex(table('post_meta')).insert(metaInserts)
+          await db(table('post_meta')).insert(metaInserts)
 
           attachments.push({ attachment_id: attachmentId, ...fileMeta })
         }
@@ -1522,10 +1550,10 @@ export default (context: HTMLDrop.Context): Router => {
         // Update post field if given
         if (post) {
           const value = JSON.stringify(attachments)
-          const exists = await knex(table('post_meta')).where({ post_id: post.id, field_slug: fieldSlug }).first()
+          const exists = await db(table('post_meta')).where({ post_id: post.id, field_slug: fieldSlug }).first()
           if (exists)
-            await knex(table('post_meta')).where({ post_id: post.id, field_slug: fieldSlug }).update({ value })
-          else await knex(table('post_meta')).insert({ post_id: post.id, field_slug: fieldSlug, value })
+            await db(table('post_meta')).where({ post_id: post.id, field_slug: fieldSlug }).update({ value })
+          else await db(table('post_meta')).insert({ post_id: post.id, field_slug: fieldSlug, value })
         }
 
         // After upload action

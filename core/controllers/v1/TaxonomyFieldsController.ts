@@ -195,6 +195,10 @@ export default (context: HTMLDrop.Context): Router => {
   router.post('/', async (req: Request, res: Response) => {
     const guardReq = req as unknown as HTMLDrop.ExtendedRequest
     const { normalizeSlug, knex, table } = context
+    if (!knex) {
+      return res.status(503).json({ success: false, error: 'Database not available' })
+    }
+    const db = knex
     const { postType, taxonomy } = req.params
     const canCreate = await checkCapability(guardReq, postType, taxonomy, ['edit', 'edit_taxonomies'])
     if (!canCreate) return res.status(403).json({ error: 'Permission denied or taxonomy not accessible' })
@@ -215,8 +219,8 @@ export default (context: HTMLDrop.Context): Router => {
     data.taxonomy_slug = normalizeSlug(taxonomy)
     data.post_type_slug = normalizeSlug(postType)
 
-    const [id] = await knex(table('taxonomy_fields')).insert(data)
-    const created = await knex(table('taxonomy_fields')).where('id', id).first() as TaxonomyField
+    const [id] = await db(table('taxonomy_fields')).insert(data)
+    const created = await db(table('taxonomy_fields')).where('id', id).first() as TaxonomyField
     res.json(parseRow(created))
   })
 
@@ -282,11 +286,15 @@ export default (context: HTMLDrop.Context): Router => {
   router.get('/:id', async (req: Request, res: Response) => {
     const guardReq = req as unknown as HTMLDrop.ExtendedRequest
     const { knex, table } = context
+    if (!knex) {
+      return res.status(503).json({ success: false, error: 'Database not available' })
+    }
+    const db = knex
     const { postType, taxonomy, id } = req.params
     const canRead = await checkCapability(guardReq, postType, taxonomy, ['read', 'read_taxonomy', 'read_term'])
     if (!canRead) return res.status(403).json({ error: 'Permission denied or taxonomy not accessible' })
 
-    const field = await knex(table('taxonomy_fields')).where('id', id).first() as TaxonomyField | undefined
+    const field = await db(table('taxonomy_fields')).where('id', id).first() as TaxonomyField | undefined
     if (!field) return res.status(404).json({ error: 'Taxonomy field not found' })
 
     res.json(parseRow(field))
@@ -354,6 +362,10 @@ export default (context: HTMLDrop.Context): Router => {
   router.patch('/:id', async (req: Request, res: Response) => {
     const guardReq = req as unknown as HTMLDrop.ExtendedRequest
     const { normalizeSlug, knex, table } = context
+    if (!knex) {
+      return res.status(503).json({ success: false, error: 'Database not available' })
+    }
+    const db = knex
     const { postType, taxonomy, id } = req.params
     const canEdit = await checkCapability(guardReq, postType, taxonomy, ['edit', 'edit_taxonomies'])
     if (!canEdit) return res.status(403).json({ error: 'Permission denied or taxonomy not accessible' })
@@ -372,8 +384,8 @@ export default (context: HTMLDrop.Context): Router => {
 
     if (typeof data.slug !== 'undefined') data.slug = normalizeSlug(data.slug as string)
 
-    await knex(table('taxonomy_fields')).where('id', id).update(data)
-    const updated = await knex(table('taxonomy_fields')).where('id', id).first() as TaxonomyField | undefined
+    await db(table('taxonomy_fields')).where('id', id).update(data)
+    const updated = await db(table('taxonomy_fields')).where('id', id).first() as TaxonomyField | undefined
     if (!updated) return res.status(404).json({ error: 'Taxonomy field not found' })
 
     res.json(parseRow(updated))
@@ -427,14 +439,18 @@ export default (context: HTMLDrop.Context): Router => {
   router.delete('/:id', async (req: Request, res: Response) => {
     const guardReq = req as unknown as HTMLDrop.ExtendedRequest
     const { knex, table } = context
+    if (!knex) {
+      return res.status(503).json({ success: false, error: 'Database not available' })
+    }
+    const db = knex
     const { postType, taxonomy, id } = req.params
     const canDelete = await checkCapability(guardReq, postType, taxonomy, ['edit', 'edit_taxonomies'])
     if (!canDelete) return res.status(403).json({ error: 'Permission denied or taxonomy not accessible' })
 
-    const field = await knex(table('taxonomy_fields')).where('id', id).first() as TaxonomyField | undefined
+    const field = await db(table('taxonomy_fields')).where('id', id).first() as TaxonomyField | undefined
     if (!field) return res.status(404).json({ error: 'Taxonomy field not found' })
 
-    await knex(table('taxonomy_fields')).where('id', id).delete()
+    await db(table('taxonomy_fields')).where('id', id).delete()
     res.json(parseRow(field))
   })
 

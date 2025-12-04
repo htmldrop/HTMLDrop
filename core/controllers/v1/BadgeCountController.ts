@@ -1,6 +1,6 @@
 import type { Router, Response } from 'express'
 import express from 'express'
-import BadgeCountService from '../../services/BadgeCountService.mjs'
+import BadgeCountService from '../../services/BadgeCountService.ts'
 
 export default (context: HTMLDrop.Context): Router => {
   const router = express.Router()

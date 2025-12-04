@@ -1,6 +1,6 @@
 import type { Router, Response } from 'express'
 import express from 'express'
-import MonitoringService from '../../services/MonitoringService.mjs'
+import MonitoringService from '../../services/MonitoringService.ts'
 
 export default (context: HTMLDrop.Context): Router => {
   const router = express.Router({ mergeParams: true })
@@ -129,32 +129,37 @@ export default (context: HTMLDrop.Context): Router => {
   // Legacy endpoint for backward compatibility
   router.get('/legacy', async (_req, res: Response) => {
     const { knex, table } = context
+    if (!knex) {
+      return res.status(503).json({ success: false, error: 'Database not available' })
+    }
+    const db = knex
     const database = { name: 'Database', slug: 'database', status: 'not-connected', message: '', ok: false }
     const admin = { name: 'Admin User', slug: 'admin', status: 'not-found', message: '', ok: false }
 
     if (knex) {
+      const db = knex
       try {
-        await knex.raw('SELECT 1+1 AS result')
+        await db.raw('SELECT 1+1 AS result')
         database.status = 'connected'
         database.ok = true
       } catch (err) {
         database.message = err instanceof Error ? err.message : String(err)
       }
-    }
 
-    if (database.ok) {
-      try {
-        const adminUserRole = await knex(table('roles'))
-          .join(table('user_roles'), `${table('roles')}.id`, '=', `${table('user_roles')}.role_id`)
-          .where(`${table('roles')}.slug`, 'administrator')
-          .first()
+      if (database.ok) {
+        try {
+          const adminUserRole = await db(table('roles'))
+            .join(table('user_roles'), `${table('roles')}.id`, '=', `${table('user_roles')}.role_id`)
+            .where(`${table('roles')}.slug`, 'administrator')
+            .first()
 
-        if (adminUserRole) {
-          admin.status = 'exists'
-          admin.ok = true
+          if (adminUserRole) {
+            admin.status = 'exists'
+            admin.ok = true
+          }
+        } catch (err) {
+          admin.message = err instanceof Error ? err.message : String(err)
         }
-      } catch (err) {
-        admin.message = err instanceof Error ? err.message : String(err)
       }
     }
     res.json([database, admin])

@@ -3,8 +3,8 @@ import fs from 'fs'
 import type { Response, NextFunction } from 'express'
 import express from 'express'
 import ThemeLifecycleService from '../services/ThemeLifecycleService.ts'
-import { TraceCategory } from '../services/PerformanceTracer.mjs'
-import { getFolderHash, invalidateCache, requestWatcherSetup, requestWatcherTeardown } from '../services/FolderHashCache.mjs'
+import { TraceCategory } from '../services/PerformanceTracer.ts'
+import { getFolderHash, invalidateCache, requestWatcherSetup, requestWatcherTeardown } from '../services/FolderHashCache.ts'
 
 interface ThemeModule {
   module: (args: { req: HTMLDrop.ExtendedRequest; res: Response; next: NextFunction; router: ReturnType<typeof express.Router> }) => Promise<{ init?: () => Promise<void> }>
@@ -35,6 +35,10 @@ export default class RegisterThemes {
   async init() {
     // Dynamically load provider modules from active theme
     const { options } = this.context
+    if (!options) {
+      console.warn('[RegisterThemes] No options available, skipping theme initialization')
+      return
+    }
     const tracer = this.req.tracer
 
     // Start theme registry init span

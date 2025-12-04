@@ -1,9 +1,15 @@
 /**
  * Core Context Types
  */
-
+import type { Application } from 'express'
 import type { Knex } from 'knex'
 import { Request, Response, NextFunction, Router } from 'express'
+import { WebSocketServer } from 'ws'
+import { Server } from 'http'
+import parseVue from '../utils/parseVue.ts'
+import translate from '../utils/translation.ts'
+import TraceStorage from '../services/TraceStorage.ts'
+import TraceStorageDB from '../services/TraceStorageDB.ts'
 
 declare global {
   namespace HTMLDrop {
@@ -12,28 +18,46 @@ declare global {
      */
     interface Context {
       /** Express application instance */
-      app: any
+      app: Application
+
+      /** Server port */
+      port: string | number
+
+      /** HTTP server instance */
+      server: Server
+
+      /** WebSocket server for real-time communication */
+      wss?: WebSocketServer
 
       /** Knex database instance for running queries */
-      knex: Knex
+      knex?: Knex | null
 
       /** Site options loaded from the database */
-      options: Record<string, any>
+      options?: Record<string, any> | null
 
-      /** Registered post types */
-      postTypes: PostType[]
-
-      /** Registered taxonomies */
-      taxonomies: Taxonomy[]
-
-      /** Hooks system for actions and filters */
-      hooks: Hooks
-
-      /** Authorization guard for capability checks */
-      guard: Guard
+      /** Vue parser for SSR (Server-Side Rendering) */
+      parseVue?: typeof parseVue
 
       /** Task scheduler for running scheduled jobs (Laravel-style) */
-      scheduler: SchedulerService
+      scheduler?: SchedulerService | null
+
+      /** Trace storage for performance tracing */
+      traceStorage?: InstanceType<typeof TraceStorage> | InstanceType<typeof TraceStorageDB> | null
+
+      /** Registered post types */
+      postTypes?: PostType[]
+
+      /** Registered taxonomies */
+      taxonomies?: Taxonomy[]
+
+      /** Hooks system for actions and filters */
+      hooks?: Hooks
+
+      /** Authorization guard for capability checks */
+      guard?: Guard
+
+      /** Registries for post types, taxonomies, etc. */
+      registries?: Record<string, any>
 
       /**
        * Get prefixed table name for database queries
@@ -71,10 +95,7 @@ declare global {
        * @example
        * const text = translate('welcome_message', 'en_US')
        */
-      translate(key: string, locale?: string): string
-
-      /** Vue parser for SSR (Server-Side Rendering) */
-      parseVue?: any
+      translate: typeof translate
 
       /**
        * Get a post type by slug
@@ -122,14 +143,8 @@ declare global {
       /** Monitoring service instance (set by HealthController) */
       monitoring?: any
 
-      /** WebSocket server for upload progress */
-      wss?: {
-        clients: Set<{
-          readyState: number
-          uploadId?: string
-          send: (data: string) => void
-        }>
-      }
+      onPluginsInitialized?: () => void
+
     }
 
     interface ExtendedRequest extends Request {

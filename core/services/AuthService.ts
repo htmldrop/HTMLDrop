@@ -10,11 +10,6 @@ import crypto from 'crypto'
 import type { Knex } from 'knex'
 import { TOKEN_EXPIRY } from '../utils/constants.ts'
 
-interface Context {
-  knex: Knex
-  table: (name: string) => string
-}
-
 interface User {
   id: number
   email: string
@@ -43,14 +38,17 @@ interface ResetTokenData {
 }
 
 class AuthService {
-  private context: Context
+  private context: HTMLDrop.Context
   private knex: Knex
   private table: (name: string) => string
   private jwtSecret: string
   private refreshSecret: string
 
-  constructor(context: Context) {
+  constructor(context: HTMLDrop.Context) {
     this.context = context
+    if (!context.knex) {
+      throw new Error('AuthService requires a database connection')
+    }
     this.knex = context.knex
     this.table = context.table.bind(context)
     this.jwtSecret = process.env.JWT_SECRET || 'your-secret-key'

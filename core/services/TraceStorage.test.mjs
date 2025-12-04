@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
-import TraceStorage from './TraceStorage.mjs'
+import TraceStorage from './TraceStorage.ts'
 
 describe('TraceStorage', () => {
   let storage

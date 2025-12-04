@@ -2,13 +2,7 @@ import type { Request, Response, NextFunction } from 'express'
 import type { JwtPayload } from 'jsonwebtoken'
 import jwt from 'jsonwebtoken'
 import crypto from 'crypto'
-import type { Knex } from 'knex'
 import UserGuard from '../utils/UserGuard.ts'
-
-interface Context {
-  knex?: Knex
-  table: (name: string) => string
-}
 
 interface RequestWithUser extends Request {
   payload?: JwtPayload
@@ -19,7 +13,7 @@ interface RequestWithUser extends Request {
   guard?: InstanceType<typeof UserGuard>
 }
 
-export default (context: Context) =>
+export default (context: HTMLDrop.Context) =>
   async (req: RequestWithUser, res: Response, next: NextFunction): Promise<void | Response> => {
     try {
       const { knex, table } = context

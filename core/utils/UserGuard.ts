@@ -1,10 +1,5 @@
 import type { Knex } from 'knex'
 
-interface Context {
-  knex: Knex
-  table: (name: string) => string
-}
-
 interface GuardOptions {
   canOneOf?: Record<string, string> | string[]
   canAllOf?: Record<string, string> | string[]
@@ -14,15 +9,20 @@ interface GuardOptions {
 }
 
 export default class UserGuard {
-  private context: Context
+  private context: HTMLDrop.Context
+  private knex: Knex
   private table: (name: string) => string
   private resolvedCapabilities: Set<string>
   private userId: number | null
   private postCapsCache: Map<number, Set<string>>
   private termCapsCache: Map<number, Set<string>>
 
-  constructor(context: Context, userId: number | null = null) {
+  constructor(context: HTMLDrop.Context, userId: number | null = null) {
+    if (!context.knex) {
+      throw new Error('UserGuard requires a database connection')
+    }
     this.context = context
+    this.knex = context.knex
     this.table = context.table
     this.resolvedCapabilities = new Set()
     this.userId = userId
@@ -94,8 +94,7 @@ export default class UserGuard {
     if (!userId) return new Set()
     const table = this.table
 
-    const row = await this.context
-      .knex(table('post_permissions'))
+    const row = await this.knex(table('post_permissions'))
       .where({ post_id: postId, user_id: userId })
       .first('capabilities')
 
@@ -107,8 +106,7 @@ export default class UserGuard {
     if (!userId) return new Set()
     const table = this.table
 
-    const row = await this.context
-      .knex(table('term_permissions'))
+    const row = await this.knex(table('term_permissions'))
       .where({ term_id: termId, user_id: userId })
       .first('capabilities')
 
@@ -118,8 +116,7 @@ export default class UserGuard {
 
   async resolveInheritedCaps(caps: string[]): Promise<Set<string>> {
     // Fetch all inheritance relationships
-    const inheritanceRows = await this.context
-      .knex(this.table('capability_inheritance'))
+    const inheritanceRows = await this.knex(this.table('capability_inheritance'))
       .join(
         `${this.table('capabilities')} as parent`,
         `${this.table('capability_inheritance')}.parent_capability_id`,
@@ -157,15 +154,13 @@ export default class UserGuard {
 
     if (userId) {
       // Direct user capabilities
-      const directCaps = await this.context
-        .knex(table('user_capabilities'))
+      const directCaps = await this.knex(table('user_capabilities'))
         .join(table('capabilities'), `${table('user_capabilities')}.capability_id`, `${table('capabilities')}.id`)
         .where(`${table('user_capabilities')}.user_id`, userId)
         .pluck(`${table('capabilities')}.slug`)
 
       // Role-based capabilities
-      const roleCaps = await this.context
-        .knex(table('user_roles'))
+      const roleCaps = await this.knex(table('user_roles'))
         .join(table('role_capabilities'), `${table('user_roles')}.role_id`, `${table('role_capabilities')}.role_id`)
         .join(table('capabilities'), `${table('role_capabilities')}.capability_id`, `${table('capabilities')}.id`)
         .where(`${table('user_roles')}.user_id`, userId)
@@ -174,11 +169,10 @@ export default class UserGuard {
       allCaps = [...new Set([...directCaps, ...roleCaps])]
     } else {
       // Guest capabilities
-      const guestRole = await this.context.knex(table('roles')).where('slug', 'guest').first()
+      const guestRole = await this.knex(table('roles')).where('slug', 'guest').first()
 
       if (guestRole) {
-        const guestCaps = await this.context
-          .knex(table('role_capabilities'))
+        const guestCaps = await this.knex(table('role_capabilities'))
           .where('role_id', guestRole.id)
           .join(table('capabilities'), `${table('capabilities')}.id`, `${table('role_capabilities')}.capability_id`)
           .pluck(`${table('capabilities')}.slug`)
@@ -187,8 +181,7 @@ export default class UserGuard {
     }
 
     // Fetch all inheritance relationships
-    const inheritanceRows = await this.context
-      .knex(table('capability_inheritance'))
+    const inheritanceRows = await this.knex(table('capability_inheritance'))
       .join(
         `${table('capabilities')} as parent`,
         `${table('capability_inheritance')}.parent_capability_id`,

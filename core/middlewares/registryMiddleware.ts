@@ -1,8 +1,7 @@
 import type { Request, Response, NextFunction } from 'express'
-import type { Knex } from 'knex'
-import Registry from '../registries/index.mjs'
-import RegisterJobs from '../registries/RegisterJobs.mjs'
-import PerformanceTracer, { TraceCategory } from '../services/PerformanceTracer.mjs'
+import Registry from '../registries/index.ts'
+import RegisterJobs from '../registries/RegisterJobs.ts'
+import PerformanceTracer, { TraceCategory } from '../services/PerformanceTracer.ts'
 import fs from 'fs'
 import path from 'path'
 
@@ -17,23 +16,16 @@ interface Options {
   }
 }
 
-interface ContextWithOptions {
-  knex?: Knex
-  table: (name: string) => string
+interface ContextWithOptions extends HTMLDrop.Context {
   options?: Options
-  traceStorage?: {
-    store: (data: unknown) => void
-  }
   tracer?: PerformanceTracer
-  hooks?: Record<string, unknown>
-  registries?: unknown
 }
 
 interface RequestWithContext extends Request {
   skipRegistry?: boolean
   context: ContextWithOptions
   tracer: PerformanceTracer
-  hooks: Record<string, unknown>
+  hooks: any
   guard?: {
     user: () => Promise<null>
   }
@@ -154,7 +146,7 @@ const getSkipPaths = async (options: Options | undefined): Promise<string[]> => 
  * All other routes (static assets, SSR pages, etc.) skip this middleware
  * for better performance. Themes handle their own routing for SSR.
  */
-export default (context: ContextWithOptions) =>
+export default (context: any) =>
   async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     const reqWithContext = req as RequestWithContext
 
@@ -199,7 +191,7 @@ export default (context: ContextWithOptions) =>
     })
 
     // Set request info on tracer
-    tracer.setRequest(req)
+    tracer.setRequest(req as any)
 
     // Attach tracer to request for access throughout the request lifecycle
     reqWithContext.tracer = tracer
@@ -270,7 +262,7 @@ export default (context: ContextWithOptions) =>
       })
 
       // Admin bar buttons registry - functional on SSR routes (appears on all pages)
-      const RegisterAdminBarButtons = (await import('../registries/RegisterAdminBarButtons.mjs')).default
+      const RegisterAdminBarButtons = (await import('../registries/RegisterAdminBarButtons.ts')).default
       const adminBarButtons = new RegisterAdminBarButtons(req, res, next)
       reqWithContext.hooks.adminBarButtons = adminBarButtons
       reqWithContext.hooks.registerButton = adminBarButtons.registerButton.bind(adminBarButtons)
@@ -304,7 +296,7 @@ export default (context: ContextWithOptions) =>
     })
 
     // Initialize a new Registry (per request)
-    const registry = new Registry(req, res, next)
+    const registry = new Registry(req as any, res, next)
 
     // Attach tracer helper methods to hooks BEFORE registry.init()
     // so themes/plugins can use them during initialization

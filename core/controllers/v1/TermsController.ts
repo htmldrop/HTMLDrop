@@ -92,6 +92,7 @@ export default (context: HTMLDrop.Context): Router => {
 
   const withMetaMany = async (terms: Term[], req: TermsRequest): Promise<Term[]> => {
     const { knex, table } = context
+    if (!knex) return terms
     const { applyFilters } = req.hooks
     const ids = terms.map((p) => p.id)
 
@@ -188,6 +189,10 @@ export default (context: HTMLDrop.Context): Router => {
   router.get('/', async (req: Request, res: Response, next: NextFunction) => {
     const guardReq = req as unknown as TermsRequest
     const { knex, table } = context
+    if (!knex) {
+      return res.status(503).json({ success: false, error: 'Database not available' })
+    }
+    const db = knex
     const { postType, taxonomy } = req.params
 
     const canReadTaxonomy = await checkCapability(guardReq, ['read', 'read_term'], postType, taxonomy)
@@ -248,7 +253,7 @@ export default (context: HTMLDrop.Context): Router => {
     const searchableCore = searchFields?.filter((field) => coreFields.includes(field)) || []
     const searchableMeta = searchFields?.filter((field) => !coreFields.includes(field)) || []
 
-    let query = knex(table('terms')).where('taxonomy_slug', taxonomy).where('post_type_slug', postType)
+    let query = db(table('terms')).where('taxonomy_slug', taxonomy).where('post_type_slug', postType)
 
     if (!canReadTaxonomy) {
       // user can only see terms where they are an author
@@ -429,9 +434,13 @@ export default (context: HTMLDrop.Context): Router => {
   router.get('/:idOrSlug', async (req: Request, res: Response, next: NextFunction) => {
     const guardReq = req as unknown as TermsRequest
     const { knex, table } = context
+    if (!knex) {
+      return res.status(503).json({ success: false, error: 'Database not available' })
+    }
+    const db = knex
     const { postType, idOrSlug, taxonomy } = req.params
 
-    const term = await knex(table('terms'))
+    const term = await db(table('terms'))
       .where('taxonomy_slug', taxonomy)
       .where('post_type_slug', postType)
       .andWhere((builder) => builder.where('id', idOrSlug).orWhere('slug', idOrSlug))
@@ -440,7 +449,7 @@ export default (context: HTMLDrop.Context): Router => {
 
     const canReadTaxonomy = await checkCapability(guardReq, ['read_term'], postType, term.taxonomy_slug, term.id)
     const isOwner =
-      guardReq?.user?.id && (await knex(table('term_authors')).where({ term_id: term.id, user_id: guardReq.user.id }).first())
+      guardReq?.user?.id && (await db(table('term_authors')).where({ term_id: term.id, user_id: guardReq.user.id }).first())
     if (!canReadTaxonomy && !isOwner) return res.status(403).json({ error: 'Permission denied' })
 
     const result = await withMeta(term, guardReq)
@@ -467,6 +476,10 @@ export default (context: HTMLDrop.Context): Router => {
   router.post('/', async (req: Request, res: Response, next: NextFunction) => {
     const guardReq = req as unknown as TermsRequest
     const { knex, table, normalizeSlug } = context
+    if (!knex) {
+      return res.status(503).json({ success: false, error: 'Database not available' })
+    }
+    const db = knex
     const { getFields, applyFilters, doAction } = guardReq.hooks
     const { parent_id, slug, status, title } = req.body
     const { postType, taxonomy } = req.params
@@ -501,7 +514,7 @@ export default (context: HTMLDrop.Context): Router => {
     coreData = filtered?.coreData || {}
     metaData = filtered?.metaData || {}
 
-    const [id] = await knex(table('terms')).insert(coreData)
+    const [id] = await db(table('terms')).insert(coreData)
 
     const metaInserts = Object.entries(metaData).map(([field_slug, value]) => ({
       term_id: id,
@@ -510,15 +523,15 @@ export default (context: HTMLDrop.Context): Router => {
     }))
 
     if (metaInserts.length > 0) {
-      await knex(table('term_meta')).insert(metaInserts)
+      await db(table('term_meta')).insert(metaInserts)
     }
 
-    const created = await knex(table('terms')).where('id', id).first() as Term
+    const created = await db(table('terms')).where('id', id).first() as Term
     const result = await withMeta(created, guardReq)
 
     // insert authors
     if (guardReq?.user?.id) {
-      await knex(table('term_authors')).insert({ term_id: id, user_id: guardReq.user.id })
+      await db(table('term_authors')).insert({ term_id: id, user_id: guardReq.user.id })
     }
 
     doAction('save_term', { req, res, next, taxonomy, term: result })
@@ -548,9 +561,13 @@ export default (context: HTMLDrop.Context): Router => {
   router.patch('/:idOrSlug', async (req: Request, res: Response, next: NextFunction) => {
     const guardReq = req as unknown as TermsRequest
     const { knex, table, normalizeSlug } = context
+    if (!knex) {
+      return res.status(503).json({ success: false, error: 'Database not available' })
+    }
+    const db = knex
     const { getFields, doAction, applyFilters } = guardReq.hooks
     const { postType, idOrSlug, taxonomy } = req.params
-    const term = await knex(table('terms'))
+    const term = await db(table('terms'))
       .where('taxonomy_slug', taxonomy)
       .andWhere((builder) => {
         builder.where('id', idOrSlug).orWhere('slug', idOrSlug)
@@ -562,7 +579,7 @@ export default (context: HTMLDrop.Context): Router => {
 
     const canEditTaxonomy = await checkCapability(guardReq, ['edit', 'edit_terms'], postType, term.taxonomy_slug, id)
     const isOwner =
-      guardReq?.user?.id && (await knex(table('term_authors')).where({ term_id: id, user_id: guardReq.user.id }).first())
+      guardReq?.user?.id && (await db(table('term_authors')).where({ term_id: id, user_id: guardReq.user.id }).first())
     if (!canEditTaxonomy && !isOwner) return res.status(403).json({ error: 'Permission denied' })
 
     let coreUpdates: Record<string, unknown> = {}
@@ -570,7 +587,7 @@ export default (context: HTMLDrop.Context): Router => {
 
     const fields = await getFields(taxonomy) as unknown as FieldInfo[]
     if (fields.some((field) => field.field.slug === 'authors')) {
-      const meta = await knex(table('term_meta')).where('term_id', id).where('field_slug', 'authors').first() as TermMeta | undefined
+      const meta = await db(table('term_meta')).where('term_id', id).where('field_slug', 'authors').first() as TermMeta | undefined
       if (Array.isArray(meta?.value)) metaUpdates.authors = meta.value
       else if (typeof meta?.value === 'string') metaUpdates.authors = JSON.parse(meta?.value || '[]')
       if (!Array.isArray(metaUpdates.authors)) metaUpdates.authors = []
@@ -628,9 +645,9 @@ export default (context: HTMLDrop.Context): Router => {
     }
 
     if (hasCoreUpdates || hasMetaUpdates) {
-      await knex(table('terms')).where('id', id).update(coreUpdates)
+      await db(table('terms')).where('id', id).update(coreUpdates)
       if (guardReq?.user?.id) {
-        await knex(table('term_authors'))
+        await db(table('term_authors'))
           .insert({
             term_id: id,
             user_id: guardReq.user.id,
@@ -644,13 +661,13 @@ export default (context: HTMLDrop.Context): Router => {
     }
 
     for (const [field_slug, value] of Object.entries(metaUpdates)) {
-      const exists = await knex(table('term_meta')).where({ term_id: id, field_slug }).first()
+      const exists = await db(table('term_meta')).where({ term_id: id, field_slug }).first()
       if (exists) {
-        await knex(table('term_meta'))
+        await db(table('term_meta'))
           .where({ term_id: id, field_slug })
           .update({ value: normalizeObject(value) as string })
       } else {
-        await knex(table('term_meta')).insert({ term_id: id, field_slug, value: normalizeObject(value) as string })
+        await db(table('term_meta')).insert({ term_id: id, field_slug, value: normalizeObject(value) as string })
       }
     }
 
@@ -665,7 +682,7 @@ export default (context: HTMLDrop.Context): Router => {
         if (typeof newValue === 'undefined') return
 
         // fetch the last revision
-        const lastRevision = await knex(table('term_revisions'))
+        const lastRevision = await db(table('term_revisions'))
           .where({ term_id: id, field_slug: slug })
           .orderBy('id', 'desc')
           .first() as { value: string } | undefined
@@ -674,7 +691,7 @@ export default (context: HTMLDrop.Context): Router => {
         const lastValue = lastRevision ? lastRevision.value : null
 
         if (lastValue !== normalizedNewValue) {
-          await knex(table('term_revisions')).insert({
+          await db(table('term_revisions')).insert({
             parent_id: id,
             term_id: id,
             field_slug: slug,
@@ -693,7 +710,7 @@ export default (context: HTMLDrop.Context): Router => {
     // run all in parallel
     await Promise.all(revisionPromises)
 
-    const updated = await knex(table('terms')).where('id', id).first() as Term
+    const updated = await db(table('terms')).where('id', id).first() as Term
     const result = await withMeta(updated, guardReq)
     doAction('edit_term', { req, res, next, taxonomy, term: result })
     doAction('save_term', { req, res, next, taxonomy, term: result })
@@ -734,9 +751,13 @@ export default (context: HTMLDrop.Context): Router => {
   router.delete('/:idOrSlug', async (req: Request, res: Response, next: NextFunction) => {
     const guardReq = req as unknown as TermsRequest
     const { knex, table, formatDate } = context
+    if (!knex) {
+      return res.status(503).json({ success: false, error: 'Database not available' })
+    }
+    const db = knex
     const { postType, idOrSlug, taxonomy } = req.params
     const { doAction, applyFilters } = guardReq.hooks
-    const term = await knex(table('terms'))
+    const term = await db(table('terms'))
       .where('taxonomy_slug', taxonomy)
       .where('post_type_slug', postType)
       .andWhere((builder) => {
@@ -749,7 +770,7 @@ export default (context: HTMLDrop.Context): Router => {
 
     const canDeleteTaxonomy = await checkCapability(guardReq, ['delete_terms'], postType, term.taxonomy_slug, id)
     const isOwner =
-      guardReq?.user?.id && (await knex(table('term_authors')).where({ term_id: id, user_id: guardReq.user.id }).first())
+      guardReq?.user?.id && (await db(table('term_authors')).where({ term_id: id, user_id: guardReq.user.id }).first())
     if (!canDeleteTaxonomy && !isOwner) return res.status(403).json({ error: 'Permission denied' })
 
     const deleted = await withMeta(term, guardReq)
@@ -762,9 +783,9 @@ export default (context: HTMLDrop.Context): Router => {
 
     if (guardReq.query?.permanently) {
       doAction('before_delete_term', { req, res, next, taxonomy, term: deleted })
-      await knex(table('terms')).where('id', id).delete()
+      await db(table('terms')).where('id', id).delete()
     } else {
-      await knex(table('terms'))
+      await db(table('terms'))
         .where('id', id)
         .update({ deleted_at: formatDate(new Date()) })
     }

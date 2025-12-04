@@ -6,8 +6,8 @@
 
 import fs from 'fs'
 import path from 'path'
-import BadgeCountService from './BadgeCountService.mjs'
-import { invalidateCache, requestWatcherTeardown } from './FolderHashCache.mjs'
+import BadgeCountService from './BadgeCountService.ts'
+import { invalidateCache, requestWatcherTeardown } from './FolderHashCache.ts'
 
 // NPM logo SVG
 const NPM_LOGO_SVG = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 780 250"><path fill="#CB3837" d="M240,250h100v-50h100V0H240V250z M340,50h50v100h-50V50z M480,0v200h100V50h50v150h50V50h50v150h50V0H480z M0,200h100V50h50v150h50V0H0V200z"/></svg>'
@@ -111,6 +111,7 @@ class ThemeLifecycleService {
    */
   async getActiveTheme(): Promise<string | null> {
     const { knex, table } = this.context
+    if (!knex) throw new Error('Database not available')
     const optionRow = await knex(table('options')).where({ name: 'theme' }).first()
 
     return optionRow ? optionRow.value : null
@@ -121,6 +122,7 @@ class ThemeLifecycleService {
    */
   async setActiveTheme(themeSlug: string): Promise<void> {
     const { knex, table } = this.context
+    if (!knex) throw new Error('Database not available')
 
     const existing = await knex(table('options')).where({ name: 'theme' }).first()
 
@@ -600,6 +602,7 @@ class ThemeLifecycleService {
    */
   async storeThemeState(themeSlug: string, state: Partial<ThemeState>): Promise<void> {
     const { knex, table } = this.context
+    if (!knex) throw new Error('Database not available')
     const optionName = `theme_state_${themeSlug}`
 
     // Get existing state
@@ -626,6 +629,7 @@ class ThemeLifecycleService {
    */
   async getThemeState(themeSlug: string): Promise<ThemeState> {
     const { knex, table } = this.context
+    if (!knex) throw new Error('Database not available')
     const optionName = `theme_state_${themeSlug}`
 
     const existing = await knex(table('options')).where({ name: optionName }).first()
@@ -638,6 +642,7 @@ class ThemeLifecycleService {
    */
   async removeThemeState(themeSlug: string): Promise<void> {
     const { knex, table } = this.context
+    if (!knex) throw new Error('Database not available')
     const optionName = `theme_state_${themeSlug}`
 
     await knex(table('options')).where({ name: optionName }).del()

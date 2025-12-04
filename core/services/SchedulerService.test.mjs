@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
-import SchedulerService from './SchedulerService.mjs'
+import SchedulerService from './SchedulerService.ts'
 
 // Mock context
 const createMockContext = () => {

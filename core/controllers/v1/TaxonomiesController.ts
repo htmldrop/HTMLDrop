@@ -142,6 +142,10 @@ export default (context: HTMLDrop.Context): Router => {
   router.post('/', async (req: Request, res: Response) => {
     const guardReq = req as unknown as HTMLDrop.ExtendedRequest
     const { normalizeSlug, knex, table } = context
+    if (!knex) {
+      return res.status(503).json({ success: false, error: 'Database not available' })
+    }
+    const db = knex
     if (!(await checkCapability(guardReq, ['create', 'create_taxonomies']))) {
       return res.status(403).json({ error: 'Permission denied' })
     }
@@ -164,8 +168,8 @@ export default (context: HTMLDrop.Context): Router => {
     data.slug = normalizeSlug((data.slug as string) || (data.name_plural as string))
     data.post_type_slug = normalizeSlug(postType)
 
-    const [id] = await knex(table('taxonomies')).insert(data)
-    const created = await knex(table('taxonomies')).where('id', id).first() as Taxonomy
+    const [id] = await db(table('taxonomies')).insert(data)
+    const created = await db(table('taxonomies')).where('id', id).first() as Taxonomy
     res.json(parseRow(created))
   })
 
@@ -209,13 +213,17 @@ export default (context: HTMLDrop.Context): Router => {
   router.get('/:idOrSlug', async (req: Request, res: Response) => {
     const guardReq = req as unknown as HTMLDrop.ExtendedRequest
     const { knex, table } = context
+    if (!knex) {
+      return res.status(503).json({ success: false, error: 'Database not available' })
+    }
+    const db = knex
     const { getTaxonomy } = guardReq.hooks
     if (!(await checkCapability(guardReq, ['read', 'read_taxonomy']))) {
       return res.status(403).json({ error: 'Permission denied' })
     }
 
     const { postType, idOrSlug } = req.params
-    const query = knex(table('taxonomies'))
+    const query = db(table('taxonomies'))
     if (/^\d+$/.test(idOrSlug)) query.where('id', idOrSlug)
     else query.where('slug', idOrSlug)
 
@@ -285,6 +293,10 @@ export default (context: HTMLDrop.Context): Router => {
   router.patch('/:idOrSlug', async (req: Request, res: Response) => {
     const guardReq = req as unknown as HTMLDrop.ExtendedRequest
     const { normalizeSlug, knex, table } = context
+    if (!knex) {
+      return res.status(503).json({ success: false, error: 'Database not available' })
+    }
+    const db = knex
     if (!(await checkCapability(guardReq, ['edit', 'edit_taxonomies']))) {
       return res.status(403).json({ error: 'Permission denied' })
     }
@@ -294,7 +306,7 @@ export default (context: HTMLDrop.Context): Router => {
       Object.entries(req.body).map(([k, v]) => [k, Array.isArray(v) || typeof v === 'object' ? JSON.stringify(v) : v])
     )
 
-    const query = knex(table('taxonomies'))
+    const query = db(table('taxonomies'))
     if (/^\d+$/.test(idOrSlug)) query.where('id', idOrSlug)
     else query.where('slug', idOrSlug)
 
@@ -304,7 +316,7 @@ export default (context: HTMLDrop.Context): Router => {
     if (typeof data.post_type_slug !== 'undefined') data.post_type_slug = normalizeSlug(postType)
 
     const entity = await query.clone().update(data) as unknown as { id: number }
-    const updated = await knex(table('taxonomies')).where('id', entity.id).first() as Taxonomy | undefined
+    const updated = await db(table('taxonomies')).where('id', entity.id).first() as Taxonomy | undefined
     if (!updated) return res.status(404).json({ error: 'Taxonomy not found' })
 
     res.json(parseRow(updated))
@@ -350,12 +362,16 @@ export default (context: HTMLDrop.Context): Router => {
   router.delete('/:idOrSlug', async (req: Request, res: Response) => {
     const guardReq = req as unknown as HTMLDrop.ExtendedRequest
     const { knex, table } = context
+    if (!knex) {
+      return res.status(503).json({ success: false, error: 'Database not available' })
+    }
+    const db = knex
     if (!(await checkCapability(guardReq, ['delete', 'delete_taxonomies']))) {
       return res.status(403).json({ error: 'Permission denied' })
     }
 
     const { postType, idOrSlug } = req.params
-    const query = knex(table('taxonomies'))
+    const query = db(table('taxonomies'))
     if (/^\d+$/.test(idOrSlug)) query.where('id', idOrSlug)
     else query.where('slug', idOrSlug)
 

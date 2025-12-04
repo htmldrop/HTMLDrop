@@ -8,7 +8,7 @@ import AdmZip from 'adm-zip'
 import { spawn } from 'child_process'
 import { validatePackageName, validateVersion, buildNpmInstallArgs } from '../../utils/npmValidator.ts'
 import PluginLifecycleService from '../../services/PluginLifecycleService.ts'
-import PersistenceService from '../../services/PersistenceService.mjs'
+import PersistenceService from '../../services/PersistenceService.ts'
 
 interface BackupInfo {
   files: string[]
@@ -160,6 +160,7 @@ export default (context: HTMLDrop.Context): Router => {
   // Helper: Get active plugins from options
   const getActivePlugins = async (): Promise<string[]> => {
     const { knex, table } = context
+    if (!knex) return []
     const optionRow = await knex(table('options')).where({ name: 'active_plugins' }).first() as { value: string } | undefined
 
     if (!optionRow) return []
@@ -174,6 +175,7 @@ export default (context: HTMLDrop.Context): Router => {
   // Helper: Update active plugins in options
   const updateActivePlugins = async (plugins: string[]): Promise<void> => {
     const { knex, table } = context
+    if (!knex) return
     await knex(table('options'))
       .where({ name: 'active_plugins' })
       .update({ value: JSON.stringify(plugins) })

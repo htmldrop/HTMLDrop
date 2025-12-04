@@ -61,14 +61,18 @@ export default (context: HTMLDrop.Context): Router => {
   router.get('/', async (req, res: Response) => {
     const typedReq = req as RoleRequest
     const { knex, table } = context
+    if (!knex) {
+      return res.status(503).json({ success: false, error: 'Database not available' })
+    }
+    const db = knex
 
     const hasAccess = await typedReq.guard.user({ canOneOf: ['manage_roles', 'read'], userId: typedReq?.user?.id })
     if (!hasAccess) return res.status(403).json({ error: 'Permission denied' })
 
-    const roles = await knex(table('roles')).select('*').orderBy('name') as Role[]
+    const roles = await db(table('roles')).select('*').orderBy('name') as Role[]
 
     // Get capabilities for each role
-    const roleCapabilities = await knex(table('role_capabilities'))
+    const roleCapabilities = await db(table('role_capabilities'))
       .join(table('capabilities'), `${table('role_capabilities')}.capability_id`, '=', `${table('capabilities')}.id`)
       .select(
         `${table('role_capabilities')}.role_id`,
@@ -78,7 +82,7 @@ export default (context: HTMLDrop.Context): Router => {
       ) as Capability[]
 
     // Get user counts for each role
-    const userCounts = await knex(table('user_roles'))
+    const userCounts = await db(table('user_roles'))
       .select('role_id')
       .count('* as count')
       .groupBy('role_id') as UserCount[]
@@ -139,20 +143,24 @@ export default (context: HTMLDrop.Context): Router => {
   router.get('/:slug', async (req, res: Response) => {
     const typedReq = req as unknown as RoleRequest
     const { knex, table } = context
+    if (!knex) {
+      return res.status(503).json({ success: false, error: 'Database not available' })
+    }
+    const db = knex
     const { slug } = req.params
 
     const hasAccess = await typedReq.guard.user({ canOneOf: ['manage_roles', 'read'], userId: typedReq?.user?.id })
     if (!hasAccess) return res.status(403).json({ error: 'Permission denied' })
 
-    const role = await knex(table('roles')).where('slug', slug).first() as Role | undefined
+    const role = await db(table('roles')).where('slug', slug).first() as Role | undefined
     if (!role) return res.status(404).json({ error: 'Role not found' })
 
-    const capabilities = await knex(table('role_capabilities'))
+    const capabilities = await db(table('role_capabilities'))
       .join(table('capabilities'), `${table('role_capabilities')}.capability_id`, '=', `${table('capabilities')}.id`)
       .where(`${table('role_capabilities')}.role_id`, role.id)
       .select(`${table('capabilities')}.id`, `${table('capabilities')}.name`, `${table('capabilities')}.slug`) as Capability[]
 
-    const userCount = await knex(table('user_roles'))
+    const userCount = await db(table('user_roles'))
       .where('role_id', role.id)
       .count('* as count')
       .first() as { count: number } | undefined
@@ -212,6 +220,10 @@ export default (context: HTMLDrop.Context): Router => {
   router.post('/', async (req, res: Response) => {
     const typedReq = req as RoleRequest
     const { knex, table, normalizeSlug } = context
+    if (!knex) {
+      return res.status(503).json({ success: false, error: 'Database not available' })
+    }
+    const db = knex
     const { name, slug, description } = typedReq.body
 
     const hasAccess = await typedReq.guard.user({ canOneOf: ['manage_roles'], userId: typedReq?.user?.id })
@@ -221,16 +233,16 @@ export default (context: HTMLDrop.Context): Router => {
 
     const roleSlug = normalizeSlug(slug || name)
 
-    const existing = await knex(table('roles')).where('slug', roleSlug).first()
+    const existing = await db(table('roles')).where('slug', roleSlug).first()
     if (existing) return res.status(400).json({ error: 'Role with this slug already exists' })
 
-    const [id] = await knex(table('roles')).insert({
+    const [id] = await db(table('roles')).insert({
       name,
       slug: roleSlug,
       description: description || ''
     })
 
-    const created = await knex(table('roles')).where('id', id).first() as Role
+    const created = await db(table('roles')).where('id', id).first() as Role
     res.json({ ...created, capabilities: [], user_count: 0 })
   })
 
@@ -284,13 +296,17 @@ export default (context: HTMLDrop.Context): Router => {
   router.patch('/:slug', async (req, res: Response) => {
     const typedReq = req as unknown as RoleRequest
     const { knex, table } = context
+    if (!knex) {
+      return res.status(503).json({ success: false, error: 'Database not available' })
+    }
+    const db = knex
     const { slug } = req.params
     const { name, description } = typedReq.body
 
     const hasAccess = await typedReq.guard.user({ canOneOf: ['manage_roles'], userId: typedReq?.user?.id })
     if (!hasAccess) return res.status(403).json({ error: 'Permission denied' })
 
-    const role = await knex(table('roles')).where('slug', slug).first() as Role | undefined
+    const role = await db(table('roles')).where('slug', slug).first() as Role | undefined
     if (!role) return res.status(404).json({ error: 'Role not found' })
 
     const updates: Record<string, unknown> = {}
@@ -298,16 +314,16 @@ export default (context: HTMLDrop.Context): Router => {
     if (description !== undefined) updates.description = description
     updates.updated_at = knex.fn.now()
 
-    await knex(table('roles')).where('id', role.id).update(updates)
+    await db(table('roles')).where('id', role.id).update(updates)
 
-    const updated = await knex(table('roles')).where('id', role.id).first() as Role
+    const updated = await db(table('roles')).where('id', role.id).first() as Role
 
-    const capabilities = await knex(table('role_capabilities'))
+    const capabilities = await db(table('role_capabilities'))
       .join(table('capabilities'), `${table('role_capabilities')}.capability_id`, '=', `${table('capabilities')}.id`)
       .where(`${table('role_capabilities')}.role_id`, role.id)
       .select(`${table('capabilities')}.id`, `${table('capabilities')}.name`, `${table('capabilities')}.slug`) as Capability[]
 
-    const userCount = await knex(table('user_roles'))
+    const userCount = await db(table('user_roles'))
       .where('role_id', role.id)
       .count('* as count')
       .first() as { count: number } | undefined
@@ -362,6 +378,10 @@ export default (context: HTMLDrop.Context): Router => {
   router.delete('/:slug', async (req, res: Response) => {
     const typedReq = req as unknown as RoleRequest
     const { knex, table } = context
+    if (!knex) {
+      return res.status(503).json({ success: false, error: 'Database not available' })
+    }
+    const db = knex
     const { slug } = req.params
 
     const hasAccess = await typedReq.guard.user({ canOneOf: ['manage_roles'], userId: typedReq?.user?.id })
@@ -371,17 +391,17 @@ export default (context: HTMLDrop.Context): Router => {
       return res.status(400).json({ error: 'Cannot delete the administrator role' })
     }
 
-    const role = await knex(table('roles')).where('slug', slug).first() as Role | undefined
+    const role = await db(table('roles')).where('slug', slug).first() as Role | undefined
     if (!role) return res.status(404).json({ error: 'Role not found' })
 
     // Delete role capabilities first (cascade should handle this, but be explicit)
-    await knex(table('role_capabilities')).where('role_id', role.id).delete()
+    await db(table('role_capabilities')).where('role_id', role.id).delete()
 
     // Delete user roles
-    await knex(table('user_roles')).where('role_id', role.id).delete()
+    await db(table('user_roles')).where('role_id', role.id).delete()
 
     // Delete the role
-    await knex(table('roles')).where('id', role.id).delete()
+    await db(table('roles')).where('id', role.id).delete()
 
     res.json({ success: true, deleted: role })
   })
@@ -444,17 +464,21 @@ export default (context: HTMLDrop.Context): Router => {
   router.put('/:slug/capabilities', async (req, res: Response) => {
     const typedReq = req as unknown as RoleRequest
     const { knex, table } = context
+    if (!knex) {
+      return res.status(503).json({ success: false, error: 'Database not available' })
+    }
+    const db = knex
     const { slug } = req.params
     const { capability_ids } = typedReq.body
 
     const hasAccess = await typedReq.guard.user({ canOneOf: ['manage_roles'], userId: typedReq?.user?.id })
     if (!hasAccess) return res.status(403).json({ error: 'Permission denied' })
 
-    const role = await knex(table('roles')).where('slug', slug).first() as Role | undefined
+    const role = await db(table('roles')).where('slug', slug).first() as Role | undefined
     if (!role) return res.status(404).json({ error: 'Role not found' })
 
     // Delete existing capabilities
-    await knex(table('role_capabilities')).where('role_id', role.id).delete()
+    await db(table('role_capabilities')).where('role_id', role.id).delete()
 
     // Insert new capabilities
     if (capability_ids && capability_ids.length > 0) {
@@ -462,11 +486,11 @@ export default (context: HTMLDrop.Context): Router => {
         role_id: role.id,
         capability_id
       }))
-      await knex(table('role_capabilities')).insert(inserts)
+      await db(table('role_capabilities')).insert(inserts)
     }
 
     // Get updated capabilities
-    const capabilities = await knex(table('role_capabilities'))
+    const capabilities = await db(table('role_capabilities'))
       .join(table('capabilities'), `${table('role_capabilities')}.capability_id`, '=', `${table('capabilities')}.id`)
       .where(`${table('role_capabilities')}.role_id`, role.id)
       .select(`${table('capabilities')}.id`, `${table('capabilities')}.name`, `${table('capabilities')}.slug`) as Capability[]

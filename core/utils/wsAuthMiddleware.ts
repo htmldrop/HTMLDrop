@@ -43,6 +43,14 @@ export default function createWsAuthMiddleware(context: HTMLDrop.Context) {
 
       // Check if token is revoked
       const { knex, table } = context
+      if (!knex) {
+        ws.send(JSON.stringify({
+          type: 'error',
+          message: 'Database not available'
+        }))
+        ws.close(1011, 'Database unavailable')
+        return false
+      }
       const isRevoked = await knex(table('revoked_tokens'))
         .where('token', token)
         .first()

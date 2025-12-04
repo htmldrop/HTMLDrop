@@ -3,8 +3,8 @@ import fs from 'fs'
 import type { Request, Response, NextFunction } from 'express'
 import express from 'express'
 import PluginLifecycleService from '../services/PluginLifecycleService.ts'
-import { TraceCategory } from '../services/PerformanceTracer.mjs'
-import { getFolderHash, invalidateCache, requestWatcherSetup, requestWatcherTeardown } from '../services/FolderHashCache.mjs'
+import { TraceCategory } from '../services/PerformanceTracer.ts'
+import { getFolderHash, invalidateCache, requestWatcherSetup, requestWatcherTeardown } from '../services/FolderHashCache.ts'
 
 interface PluginModule {
   module: (args: { req: HTMLDrop.ExtendedRequest; res: Response; next: NextFunction; router: ReturnType<typeof express.Router> }) => Promise<{ init?: () => Promise<void> }>
@@ -34,6 +34,10 @@ export default class RegisterPlugins {
 
   async init() {
     const { options } = this.context
+    if (!options) {
+      console.warn('[RegisterPlugins] No options available, skipping plugin initialization')
+      return
+    }
     const tracer = this.req.tracer
     const activePlugins = options.active_plugins || []
     const activePluginsKey = JSON.stringify(activePlugins)

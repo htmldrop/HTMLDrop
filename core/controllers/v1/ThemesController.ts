@@ -9,7 +9,7 @@ import { spawn } from 'child_process'
 import type {} from '../../types/index.js'
 import { validatePackageName, validateVersion, buildNpmInstallArgs } from '../../utils/npmValidator.ts'
 import ThemeLifecycleService from '../../services/ThemeLifecycleService.ts'
-import PersistenceService from '../../services/PersistenceService.mjs'
+import PersistenceService from '../../services/PersistenceService.ts'
 
 interface BackupInfo {
   files: string[]
@@ -161,6 +161,7 @@ export default (context: HTMLDrop.Context): Router => {
   // Helper: Get active theme from options
   const getActiveTheme = async (): Promise<string | null> => {
     const { knex, table } = context
+    if (!knex) return null
     const optionRow = await knex(table('options')).where({ name: 'theme' }).first() as { value: string } | undefined
 
     return optionRow ? optionRow.value : null
@@ -169,6 +170,7 @@ export default (context: HTMLDrop.Context): Router => {
   // Helper: Update active theme in options
   const updateActiveTheme = async (themeSlug: string): Promise<void> => {
     const { knex, table } = context
+    if (!knex) return
     await knex(table('options')).where({ name: 'theme' }).update({ value: themeSlug })
     process.send?.({ type: 'options_updated' })
   }

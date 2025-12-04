@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
-import PerformanceTracer, { TraceSpan, TraceCategory } from './PerformanceTracer.mjs'
+import PerformanceTracer, { TraceSpan, TraceCategory } from './PerformanceTracer.ts'
 
 describe('PerformanceTracer', () => {
   let tracer

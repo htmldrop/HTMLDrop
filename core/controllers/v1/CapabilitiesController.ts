@@ -38,6 +38,9 @@ export default (context: HTMLDrop.Context): Router => {
   router.get('/', async (req, res: Response) => {
     const typedReq = req as HTMLDrop.ExtendedRequest
     const { knex, table } = context
+    if (!knex) {
+      return res.status(503).json({ success: false, error: 'Database not available' })
+    }
 
     const hasAccess = await typedReq.guard.user({ canOneOf: ['manage_roles', 'read'], userId: typedReq?.user?.id })
     if (!hasAccess) return res.status(403).json({ error: 'Permission denied' })
@@ -82,6 +85,9 @@ export default (context: HTMLDrop.Context): Router => {
   router.get('/:slug', async (req, res: Response) => {
     const typedReq = req as unknown as HTMLDrop.ExtendedRequest
     const { knex, table } = context
+    if (!knex) {
+      return res.status(503).json({ success: false, error: 'Database not available' })
+    }
     const { slug } = req.params
 
     const hasAccess = await typedReq.guard.user({ canOneOf: ['manage_roles', 'read'], userId: typedReq?.user?.id })

@@ -5,7 +5,7 @@ import crypto from 'crypto'
 import { hash, validate as validatePassword, verify } from '../../utils/password.ts'
 import { validate as validateEmail } from '../../utils/email.ts'
 import { buildPayload } from '../../utils/payload.ts'
-import PasswordResetService from '../../services/PasswordResetService.mjs'
+import PasswordResetService from '../../services/PasswordResetService.ts'
 import EmailService from '../../services/EmailService.mjs'
 
 // JWT expiry values - cast to number to satisfy jsonwebtoken's StringValue type
@@ -72,6 +72,9 @@ export default (context: HTMLDrop.Context): Router => {
    */
   router.post('/login', async (req: Request, res: Response) => {
     const { knex, table, formatDate } = context
+    if (!knex) {
+      return res.status(503).json({ success: false, error: 'Database not available' })
+    }
     try {
       const { email, password } = req.body
 
@@ -136,6 +139,9 @@ export default (context: HTMLDrop.Context): Router => {
    */
   router.post('/logout', async (req: Request, res: Response) => {
     const { knex, table, formatDate } = context
+    if (!knex) {
+      return res.status(503).json({ success: false, error: 'Database not available' })
+    }
     try {
       const token = req.headers.authorization?.split(' ')[1]
       if (!token) return res.status(400).send('No token provided')
@@ -207,6 +213,9 @@ export default (context: HTMLDrop.Context): Router => {
    */
   router.post('/refresh', async (req: Request, res: Response) => {
     const { knex, table, formatDate } = context
+    if (!knex) {
+      return res.status(503).json({ success: false, error: 'Database not available' })
+    }
     try {
       const { refreshToken } = req.body
       if (!refreshToken) return res.status(400).send('Missing refresh token')
@@ -327,6 +336,9 @@ export default (context: HTMLDrop.Context): Router => {
    */
   router.post('/register', async (req: Request, res: Response) => {
     const { knex, table, formatDate } = context
+    if (!knex) {
+      return res.status(503).json({ success: false, error: 'Database not available' })
+    }
     try {
       const { email, password, locale } = req.body
 

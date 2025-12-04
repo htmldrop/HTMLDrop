@@ -48,6 +48,7 @@ export default (context: HTMLDrop.Context): Router => {
   // Helper: merge meta into a user object
   const withMeta = async (user: User | null): Promise<Record<string, unknown> | null> => {
     const { knex, table } = context
+    if (!knex) return user as Record<string, unknown> | null
     if (!user) return null
     const meta = (await knex(table('usermeta')).where('user_id', user.id)) as UserMeta[]
     return {
@@ -64,6 +65,7 @@ export default (context: HTMLDrop.Context): Router => {
 
   const withMetaMany = async (users: User[], req: HTMLDrop.ExtendedRequest): Promise<Record<string, unknown>[]> => {
     const { knex, table } = context
+    if (!knex) return users.map(u => parseRow(u as Record<string, unknown>))
     const { applyFilters } = req.hooks
     const ids = users.map((p) => p.id)
     const metas = (await knex(table('usermeta')).whereIn('user_id', ids)) as UserMeta[]
@@ -101,6 +103,10 @@ export default (context: HTMLDrop.Context): Router => {
   router.get('/', async (req, res: Response, _next: NextFunction) => {
     const typedReq = req as HTMLDrop.ExtendedRequest
     const { knex, table } = context
+    if (!knex) {
+      return res.status(503).json({ success: false, error: 'Database not available' })
+    }
+    const db = knex
 
     const hasAccess = await typedReq.guard.user({ canOneOf: ['read', 'read_user'], userId: typedReq?.user?.id })
 
@@ -157,7 +163,7 @@ export default (context: HTMLDrop.Context): Router => {
     const searchableCore = searchFields?.filter((field) => coreFields.includes(field)) || []
     const searchableMeta = searchFields?.filter((field) => !coreFields.includes(field)) || []
 
-    let query = knex(table('users'))
+    let query = db(table('users'))
 
     if (!hasAccess && !typedReq?.user?.id) {
       return res.json({
@@ -269,10 +275,14 @@ export default (context: HTMLDrop.Context): Router => {
   router.get('/:idOrUsername', async (req, res: Response, _next: NextFunction) => {
     const typedReq = req as unknown as HTMLDrop.ExtendedRequest
     const { knex, table } = context
+    if (!knex) {
+      return res.status(503).json({ success: false, error: 'Database not available' })
+    }
+    const db = knex
     const { idOrUsername } = req.params
     const { applyFilters } = typedReq.hooks
 
-    const user = (await knex(table('users'))
+    const user = (await db(table('users'))
       .where((builder) => builder.where('id', idOrUsername).orWhere('username', idOrUsername))
       .first()) as User | undefined
     if (!user) return res.status(404).json({ error: 'User not found' })
@@ -305,6 +315,10 @@ export default (context: HTMLDrop.Context): Router => {
   router.post('/', async (req, res: Response, next: NextFunction) => {
     const typedReq = req as HTMLDrop.ExtendedRequest
     const { knex, table, normalizeSlug } = context
+    if (!knex) {
+      return res.status(503).json({ success: false, error: 'Database not available' })
+    }
+    const db = knex
     const { applyFilters, doAction } = typedReq.hooks
     let { username, status, first_name, middle_name, last_name, picture, locale, email, phone, password, ...metaData } =
       req.body
@@ -341,7 +355,7 @@ export default (context: HTMLDrop.Context): Router => {
     coreData = filtered?.coreData || {}
     metaData = filtered?.metaData || {}
 
-    const [id] = await knex(table('users')).insert(coreData)
+    const [id] = await db(table('users')).insert(coreData)
 
     const metaInserts = Object.entries(metaData).map(([field_slug, value]) => ({
       user_id: id,
@@ -350,10 +364,10 @@ export default (context: HTMLDrop.Context): Router => {
     }))
 
     if (metaInserts.length > 0) {
-      await knex(table('usermeta')).insert(metaInserts)
+      await db(table('usermeta')).insert(metaInserts)
     }
 
-    const created = (await knex(table('users')).where('id', id).first()) as User
+    const created = (await db(table('users')).where('id', id).first()) as User
     const result = await withMeta(created)
     doAction('save_user', { req, res, next, user: result })
     doAction('insert_user', { req, res, next, user: result })
@@ -375,9 +389,13 @@ export default (context: HTMLDrop.Context): Router => {
   router.patch('/:idOrUsername', async (req, res: Response, next: NextFunction) => {
     const typedReq = req as unknown as HTMLDrop.ExtendedRequest
     const { knex, table, normalizeSlug } = context
+    if (!knex) {
+      return res.status(503).json({ success: false, error: 'Database not available' })
+    }
+    const db = knex
     const { doAction, applyFilters } = typedReq.hooks
     const { idOrUsername } = req.params
-    const user = (await knex(table('users'))
+    const user = (await db(table('users'))
       .where('id', idOrUsername)
       .orWhere('username', idOrUsername)
       .first()) as User | undefined
@@ -461,21 +479,21 @@ export default (context: HTMLDrop.Context): Router => {
     }
 
     if (hasCoreUpdates || hasMetaUpdates) {
-      await knex(table('users')).where('id', id).update(coreUpdates)
+      await db(table('users')).where('id', id).update(coreUpdates)
     }
 
     for (const [field_slug, value] of Object.entries(metaUpdates)) {
-      const exists = await knex(table('usermeta')).where({ user_id: id, field_slug }).first()
+      const exists = await db(table('usermeta')).where({ user_id: id, field_slug }).first()
       if (exists) {
-        await knex(table('usermeta'))
+        await db(table('usermeta'))
           .where({ user_id: id, field_slug })
           .update({ value: JSON.stringify(value) })
       } else {
-        await knex(table('usermeta')).insert({ user_id: id, field_slug, value: JSON.stringify(value) })
+        await db(table('usermeta')).insert({ user_id: id, field_slug, value: JSON.stringify(value) })
       }
     }
 
-    const updated = (await knex(table('users')).where('id', id).first()) as User
+    const updated = (await db(table('users')).where('id', id).first()) as User
     const result = await withMeta(updated)
     doAction('edit_user', { req, res, next, user: result })
     doAction('save_user', { req, res, next, user: result })
@@ -503,9 +521,13 @@ export default (context: HTMLDrop.Context): Router => {
   router.delete('/:idOrUsername', async (req, res: Response, next: NextFunction) => {
     const typedReq = req as unknown as HTMLDrop.ExtendedRequest
     const { knex, table, formatDate } = context
+    if (!knex) {
+      return res.status(503).json({ success: false, error: 'Database not available' })
+    }
+    const db = knex
     const { idOrUsername } = req.params
     const { doAction, applyFilters } = typedReq.hooks
-    const user = (await knex(table('users'))
+    const user = (await db(table('users'))
       .where('id', idOrUsername)
       .orWhere('username', idOrUsername)
       .first()) as User | undefined
@@ -526,9 +548,9 @@ export default (context: HTMLDrop.Context): Router => {
 
     if (typedReq.query?.permanently) {
       doAction('before_delete_user', { req, res, next, user: deleted })
-      await knex(table('users')).where('id', id).delete()
+      await db(table('users')).where('id', id).delete()
     } else {
-      await knex(table('users'))
+      await db(table('users'))
         .where('id', id)
         .update({ deleted_at: formatDate(new Date()) })
     }
@@ -552,9 +574,13 @@ export default (context: HTMLDrop.Context): Router => {
   router.get('/:idOrUsername/roles', async (req, res: Response) => {
     const typedReq = req as unknown as HTMLDrop.ExtendedRequest
     const { knex, table } = context
+    if (!knex) {
+      return res.status(503).json({ success: false, error: 'Database not available' })
+    }
+    const db = knex
     const { idOrUsername } = req.params
 
-    const user = (await knex(table('users'))
+    const user = (await db(table('users'))
       .where((builder) => builder.where('id', idOrUsername).orWhere('username', idOrUsername))
       .first()) as User | undefined
     if (!user) return res.status(404).json({ error: 'User not found' })
@@ -562,7 +588,7 @@ export default (context: HTMLDrop.Context): Router => {
     const hasAccess = await typedReq.guard.user({ canOneOf: ['manage_roles', 'read_user'], userId: typedReq?.user?.id })
     if (!hasAccess && user.id !== typedReq.user?.id) return res.status(403).json({ error: 'Permission denied' })
 
-    const roles = await knex(table('user_roles'))
+    const roles = await db(table('user_roles'))
       .join(table('roles'), `${table('user_roles')}.role_id`, '=', `${table('roles')}.id`)
       .where(`${table('user_roles')}.user_id`, user.id)
       .select(`${table('roles')}.id`, `${table('roles')}.name`, `${table('roles')}.slug`)
@@ -581,28 +607,32 @@ export default (context: HTMLDrop.Context): Router => {
   router.put('/:idOrUsername/roles', async (req, res: Response) => {
     const typedReq = req as unknown as HTMLDrop.ExtendedRequest
     const { knex, table } = context
+    if (!knex) {
+      return res.status(503).json({ success: false, error: 'Database not available' })
+    }
+    const db = knex
     const { idOrUsername } = req.params
     const { role_ids } = req.body
 
     const hasAccess = await typedReq.guard.user({ canOneOf: ['manage_roles'], userId: typedReq?.user?.id })
     if (!hasAccess) return res.status(403).json({ error: 'Permission denied' })
 
-    const user = (await knex(table('users'))
+    const user = (await db(table('users'))
       .where((builder) => builder.where('id', idOrUsername).orWhere('username', idOrUsername))
       .first()) as User | undefined
     if (!user) return res.status(404).json({ error: 'User not found' })
 
-    await knex(table('user_roles')).where('user_id', user.id).delete()
+    await db(table('user_roles')).where('user_id', user.id).delete()
 
     if (role_ids && role_ids.length > 0) {
       const inserts = role_ids.map((role_id: number) => ({
         user_id: user.id,
         role_id
       }))
-      await knex(table('user_roles')).insert(inserts)
+      await db(table('user_roles')).insert(inserts)
     }
 
-    const roles = await knex(table('user_roles'))
+    const roles = await db(table('user_roles'))
       .join(table('roles'), `${table('user_roles')}.role_id`, '=', `${table('roles')}.id`)
       .where(`${table('user_roles')}.user_id`, user.id)
       .select(`${table('roles')}.id`, `${table('roles')}.name`, `${table('roles')}.slug`)

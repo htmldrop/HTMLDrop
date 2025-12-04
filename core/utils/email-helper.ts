@@ -1,14 +1,7 @@
-import type { Knex } from 'knex'
 // EmailService is untyped JavaScript - will be converted to TypeScript later
 import EmailServiceImport from '../services/EmailService.mjs'
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const EmailService = EmailServiceImport as any
-
-interface Context {
-  knex: Knex
-  table: (name: string) => string
-  [key: string]: unknown
-}
 
 interface EmailOptions {
   to: string | string[]
@@ -39,7 +32,7 @@ type TemplateFn<T> = (data: T) => TemplateResult
 /**
  * Send an email using the configured email provider
  */
-export async function sendEmail(context: Context, options: EmailOptions): Promise<unknown> {
+export async function sendEmail(context: HTMLDrop.Context, options: EmailOptions): Promise<unknown> {
   const emailService = new EmailService(context)
   return await emailService.sendEmail(options)
 }
@@ -47,7 +40,7 @@ export async function sendEmail(context: Context, options: EmailOptions): Promis
 /**
  * Send a welcome email to a user
  */
-export async function sendWelcomeEmail(context: Context, user: User): Promise<unknown> {
+export async function sendWelcomeEmail(context: HTMLDrop.Context, user: User): Promise<unknown> {
   const emailService = new EmailService(context)
   return await emailService.sendWelcomeEmail(user)
 }
@@ -56,7 +49,7 @@ export async function sendWelcomeEmail(context: Context, user: User): Promise<un
  * Send a password reset email to a user
  */
 export async function sendPasswordResetEmail(
-  context: Context,
+  context: HTMLDrop.Context,
   user: User,
   resetToken: string,
   expiryMinutes: number = 60
@@ -69,7 +62,7 @@ export async function sendPasswordResetEmail(
  * Send a custom email using a template function
  */
 export async function sendTemplateEmail<T>(
-  context: Context,
+  context: HTMLDrop.Context,
   to: string | string[],
   templateFn: TemplateFn<T>,
   templateData: T
@@ -88,7 +81,7 @@ export async function sendTemplateEmail<T>(
 /**
  * Verify email service connection
  */
-export async function verifyEmailConnection(context: Context): Promise<boolean> {
+export async function verifyEmailConnection(context: HTMLDrop.Context): Promise<boolean> {
   const emailService = new EmailService(context)
   return await emailService.verifyConnection()
 }

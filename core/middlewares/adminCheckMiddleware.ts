@@ -1,12 +1,6 @@
 import type { Request, Response, NextFunction } from 'express'
-import type { Knex } from 'knex'
 
-interface Context {
-  knex?: Knex
-  table: (name: string) => string
-}
-
-export default (context: Context) =>
+export default (context: HTMLDrop.Context) =>
   async (req: Request, res: Response, next: NextFunction): Promise<void | Response> => {
     try {
       const { knex, table } = context

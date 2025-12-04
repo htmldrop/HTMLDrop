@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
-import PasswordResetService from '../../services/PasswordResetService.mjs'
+import PasswordResetService from '../../services/PasswordResetService.ts'
 import bcrypt from 'bcrypt'
 import knex from 'knex'
 

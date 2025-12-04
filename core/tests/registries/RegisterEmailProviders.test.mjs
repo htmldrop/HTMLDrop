@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
-import RegisterEmailProviders from '../../registries/RegisterEmailProviders.mjs'
+import RegisterEmailProviders from '../../registries/RegisterEmailProviders.ts'
 import knex from 'knex'
 
 describe('RegisterEmailProviders', () => {

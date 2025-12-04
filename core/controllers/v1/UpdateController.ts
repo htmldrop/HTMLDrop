@@ -7,8 +7,8 @@
 import type { Router, Request, Response } from 'express'
 import express from 'express'
 import type {} from '../../types/index.js'
-import UpdateService from '../../services/UpdateService.mjs'
-import BadgeCountService from '../../services/BadgeCountService.mjs'
+import UpdateService from '../../services/UpdateService.ts'
+import BadgeCountService from '../../services/BadgeCountService.ts'
 
 interface UpdateStatus {
   available: boolean

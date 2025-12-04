@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import PostService from './PostService.mjs'
+import PostService from './PostService.ts'
 
 describe('PostService', () => {
   let postService

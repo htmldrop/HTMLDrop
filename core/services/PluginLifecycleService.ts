@@ -6,9 +6,9 @@
 
 import fs from 'fs'
 import path from 'path'
-import PluginMigrationService from './PluginMigrationService.mjs'
-import BadgeCountService from './BadgeCountService.mjs'
-import { invalidateCache, requestWatcherTeardown } from './FolderHashCache.mjs'
+import PluginMigrationService from './PluginMigrationService.ts'
+import BadgeCountService from './BadgeCountService.ts'
+import { invalidateCache, requestWatcherTeardown } from './FolderHashCache.ts'
 
 // NPM logo SVG
 const NPM_LOGO_SVG = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 780 250"><path fill="#CB3837" d="M240,250h100v-50h100V0H240V250z M340,50h50v100h-50V50z M480,0v200h100V50h50v150h50V50h50v150h50V0H480z M0,200h100V50h50v150h50V0H0V200z"/></svg>'
@@ -45,9 +45,12 @@ class PluginLifecycleService {
   private migrationService: InstanceType<typeof PluginMigrationService>
 
   constructor(context: HTMLDrop.Context) {
+    if (!context.knex) {
+      throw new Error('PluginLifecycleService requires a database connection')
+    }
     this.context = context
     this.PLUGINS_BASE = path.resolve('./content/plugins')
-    this.migrationService = new PluginMigrationService(context)
+    this.migrationService = new PluginMigrationService({ knex: context.knex, table: context.table })
   }
 
   /**
@@ -121,6 +124,7 @@ class PluginLifecycleService {
     }
 
     const { knex, table } = this.context
+    if (!knex) throw new Error('Database not available')
     const optionRow = await knex(table('options')).where({ name: 'active_plugins' }).first()
 
     const activePlugins: string[] = optionRow ? JSON.parse(optionRow.value) : []
@@ -412,8 +416,8 @@ class PluginLifecycleService {
       const hasMigrations = await this.migrationService.hasPluginMigrations(pluginSlug)
       if (hasMigrations) {
         console.log(`Running migrations for plugin: ${pluginSlug}`)
-        const result = await this.migrationService.runPluginMigrations(pluginSlug) as { count: number }
-        console.log(`Ran ${result.count} migrations`)
+        const result = await this.migrationService.runPluginMigrations(pluginSlug)
+        console.log(`Ran ${result.migrations.length} migrations`)
       }
 
       // Call plugin's onInstall hook
@@ -488,6 +492,7 @@ class PluginLifecycleService {
     const dependents = await this.getDependentPlugins(pluginSlug)
 
     const { knex, table } = this.context
+    if (!knex) throw new Error('Database not available')
     const optionRow = await knex(table('options')).where({ name: 'active_plugins' }).first()
     const activePlugins = optionRow ? JSON.parse(optionRow.value) : []
 
@@ -532,6 +537,7 @@ class PluginLifecycleService {
 
     // Check if plugin is active
     const { knex, table } = this.context
+    if (!knex) throw new Error('Database not available')
     const optionRow = await knex(table('options')).where({ name: 'active_plugins' }).first()
     const activePlugins = optionRow ? JSON.parse(optionRow.value) : []
 
@@ -582,11 +588,11 @@ class PluginLifecycleService {
         // Run any new migrations
         const hasMigrations = await this.migrationService.hasPluginMigrations(pluginSlug)
         if (hasMigrations) {
-          const pendingMigrations = await this.migrationService.getPendingMigrations(pluginSlug) as string[]
+          const pendingMigrations = await this.migrationService.getPendingMigrations(pluginSlug)
           if (pendingMigrations.length > 0) {
             console.log(`Running ${pendingMigrations.length} new migrations for plugin: ${pluginSlug}`)
-            const result = await this.migrationService.runPluginMigrations(pluginSlug) as { count: number }
-            console.log(`Ran ${result.count} migrations`)
+            const result = await this.migrationService.runPluginMigrations(pluginSlug)
+            console.log(`Ran ${result.migrations.length} migrations`)
           }
         }
 
@@ -665,6 +671,7 @@ class PluginLifecycleService {
    */
   async storePluginState(pluginSlug: string, state: Partial<PluginState>): Promise<void> {
     const { knex, table } = this.context
+    if (!knex) throw new Error('Database not available')
     const optionName = `plugin_state_${pluginSlug}`
 
     // Get existing state
@@ -691,6 +698,7 @@ class PluginLifecycleService {
    */
   async getPluginState(pluginSlug: string): Promise<PluginState> {
     const { knex, table } = this.context
+    if (!knex) throw new Error('Database not available')
     const optionName = `plugin_state_${pluginSlug}`
 
     const existing = await knex(table('options')).where({ name: optionName }).first()
@@ -703,6 +711,7 @@ class PluginLifecycleService {
    */
   async removePluginState(pluginSlug: string): Promise<void> {
     const { knex, table } = this.context
+    if (!knex) throw new Error('Database not available')
     const optionName = `plugin_state_${pluginSlug}`
 
     await knex(table('options')).where({ name: optionName }).del()

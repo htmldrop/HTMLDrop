@@ -59,11 +59,8 @@ interface TraceStorage {
   archiveAfterDays?: number
 }
 
-interface TracingRequest extends HTMLDrop.ExtendedRequest {
-  context: HTMLDrop.ExtendedRequest['context'] & {
-    traceStorage?: TraceStorage
-  }
-}
+// Use HTMLDrop.ExtendedRequest directly and cast traceStorage when needed
+type TracingRequest = HTMLDrop.ExtendedRequest
 
 /**
  * GET /api/v1/tracing/traces
@@ -81,7 +78,8 @@ router.get('/traces', async (req, res: Response) => {
   try {
     const queryParams = req.query as Record<string, string | undefined>
     const { limit = '20', offset = '0', path, minDuration, errorsOnly } = queryParams
-    const traceStorage = contextReq.context.traceStorage
+    // Cast to local TraceStorage interface which has all expected properties
+    const traceStorage = contextReq.context.traceStorage as TraceStorage | null | undefined
 
     if (!traceStorage) {
       return res.status(503).json({
@@ -133,7 +131,7 @@ router.get('/traces/:traceId', async (req, res: Response) => {
   const contextReq = req as unknown as TracingRequest
   try {
     const { traceId } = req.params
-    const traceStorage = contextReq.context.traceStorage
+    const traceStorage = contextReq.context.traceStorage as TraceStorage | null | undefined
 
     if (!traceStorage) {
       return res.status(503).json({
@@ -174,7 +172,7 @@ router.get('/slowest', async (req, res: Response) => {
   try {
     const queryParams = req.query as Record<string, string | undefined>
     const { limit = '10', hoursBack = '24' } = queryParams
-    const traceStorage = contextReq.context.traceStorage
+    const traceStorage = contextReq.context.traceStorage as TraceStorage | null | undefined
 
     if (!traceStorage) {
       return res.status(503).json({
@@ -214,7 +212,7 @@ router.get('/errors', async (req, res: Response) => {
   try {
     const queryParams = req.query as Record<string, string | undefined>
     const { limit = '20', hoursBack = '24' } = queryParams
-    const traceStorage = contextReq.context.traceStorage
+    const traceStorage = contextReq.context.traceStorage as TraceStorage | null | undefined
 
     if (!traceStorage) {
       return res.status(503).json({
@@ -253,7 +251,7 @@ router.get('/stats', async (req, res: Response) => {
   try {
     const queryParams = req.query as Record<string, string | undefined>
     const { timeWindow = '300000' } = queryParams
-    const traceStorage = contextReq.context.traceStorage
+    const traceStorage = contextReq.context.traceStorage as TraceStorage | null | undefined
 
     if (!traceStorage) {
       return res.status(503).json({
@@ -291,7 +289,7 @@ router.get('/bottlenecks', async (req, res: Response) => {
   try {
     const queryParams = req.query as Record<string, string | undefined>
     const { limit = '10', timeWindow = '300000' } = queryParams
-    const traceStorage = contextReq.context.traceStorage
+    const traceStorage = contextReq.context.traceStorage as TraceStorage | null | undefined
 
     if (!traceStorage) {
       return res.status(503).json({
@@ -332,7 +330,7 @@ router.get('/waterfall/:traceId', async (req, res: Response) => {
   const contextReq = req as unknown as TracingRequest
   try {
     const { traceId } = req.params
-    const traceStorage = contextReq.context.traceStorage
+    const traceStorage = contextReq.context.traceStorage as TraceStorage | null | undefined
 
     if (!traceStorage) {
       return res.status(503).json({
@@ -373,7 +371,7 @@ router.get('/waterfall/:traceId', async (req, res: Response) => {
 router.delete('/traces', async (req, res: Response) => {
   const contextReq = req as TracingRequest
   try {
-    const traceStorage = contextReq.context.traceStorage
+    const traceStorage = contextReq.context.traceStorage as TraceStorage | null | undefined
 
     if (!traceStorage) {
       return res.status(503).json({
@@ -402,7 +400,7 @@ router.delete('/traces', async (req, res: Response) => {
 router.get('/export', async (req, res: Response) => {
   const contextReq = req as TracingRequest
   try {
-    const traceStorage = contextReq.context.traceStorage
+    const traceStorage = contextReq.context.traceStorage as TraceStorage | null | undefined
 
     if (!traceStorage) {
       return res.status(503).json({
@@ -430,7 +428,7 @@ router.get('/export', async (req, res: Response) => {
 router.get('/config', async (req, res: Response) => {
   const contextReq = req as TracingRequest
   try {
-    const traceStorage = contextReq.context.traceStorage
+    const traceStorage = contextReq.context.traceStorage as TraceStorage | null | undefined
 
     // Get current count - support both sync and async storage
     let currentCount = 0

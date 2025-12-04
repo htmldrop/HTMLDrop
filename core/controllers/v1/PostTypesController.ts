@@ -126,6 +126,10 @@ export default (context: HTMLDrop.Context): Router => {
   router.post('/', async (req, res: Response) => {
     const guardReq = req as unknown as HTMLDrop.ExtendedRequest
     const { normalizeSlug, knex, table } = context
+    if (!knex) {
+      return res.status(503).json({ success: false, error: 'Database not available' })
+    }
+    const db = knex
     if (!(await checkCapability(guardReq, ['create', 'create_post_types']))) {
       return res.status(403).json({ error: 'Permission denied' })
     }
@@ -141,8 +145,8 @@ export default (context: HTMLDrop.Context): Router => {
 
     data.slug = normalizeSlug((data.slug as string) || (data.name_plural as string))
 
-    const [id] = await knex(table('post_types')).insert(data)
-    const created = await knex(table('post_types')).where('id', id).first() as PostType
+    const [id] = await db(table('post_types')).insert(data)
+    const created = await db(table('post_types')).where('id', id).first() as PostType
     res.json(parseRow(created))
   })
 
@@ -180,13 +184,17 @@ export default (context: HTMLDrop.Context): Router => {
   router.get('/:idOrSlug', async (req, res: Response) => {
     const guardReq = req as unknown as HTMLDrop.ExtendedRequest
     const { knex, table } = context
+    if (!knex) {
+      return res.status(503).json({ success: false, error: 'Database not available' })
+    }
+    const db = knex
     const { getPostType } = guardReq.hooks
     if (!(await checkCapability(guardReq, ['read', 'read_post_type']))) {
       return res.status(403).json({ error: 'Permission denied' })
     }
 
     const { idOrSlug } = req.params
-    const query = knex(table('post_types'))
+    const query = db(table('post_types'))
     if (/^\d+$/.test(idOrSlug)) query.where('id', idOrSlug)
     else query.where('slug', idOrSlug)
 
@@ -250,6 +258,10 @@ export default (context: HTMLDrop.Context): Router => {
   router.patch('/:idOrSlug', async (req, res: Response) => {
     const guardReq = req as unknown as HTMLDrop.ExtendedRequest
     const { normalizeSlug, knex, table } = context
+    if (!knex) {
+      return res.status(503).json({ success: false, error: 'Database not available' })
+    }
+    const db = knex
     if (!(await checkCapability(guardReq, ['edit', 'edit_post_types']))) {
       return res.status(403).json({ error: 'Permission denied' })
     }
@@ -262,7 +274,7 @@ export default (context: HTMLDrop.Context): Router => {
       ])
     )
 
-    const query = knex(table('post_types'))
+    const query = db(table('post_types'))
     if (/^\d+$/.test(idOrSlug)) query.where('id', idOrSlug)
     else query.where('slug', idOrSlug)
 
@@ -310,12 +322,16 @@ export default (context: HTMLDrop.Context): Router => {
   router.delete('/:idOrSlug', async (req, res: Response) => {
     const guardReq = req as unknown as HTMLDrop.ExtendedRequest
     const { knex, table } = context
+    if (!knex) {
+      return res.status(503).json({ success: false, error: 'Database not available' })
+    }
+    const db = knex
     if (!(await checkCapability(guardReq, ['delete', 'delete_post_types']))) {
       return res.status(403).json({ error: 'Permission denied' })
     }
 
     const { idOrSlug } = req.params
-    const query = knex(table('post_types'))
+    const query = db(table('post_types'))
     if (/^\d+$/.test(idOrSlug)) query.where('id', idOrSlug)
     else query.where('slug', idOrSlug)
 

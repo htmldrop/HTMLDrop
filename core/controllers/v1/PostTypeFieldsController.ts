@@ -182,6 +182,10 @@ export default (context: HTMLDrop.Context): Router => {
   router.post('/', async (req: Request, res: Response) => {
     const guardReq = req as unknown as HTMLDrop.ExtendedRequest
     const { normalizeSlug, knex, table } = context
+    if (!knex) {
+      return res.status(503).json({ success: false, error: 'Database not available' })
+    }
+    const db = knex
     const { postType } = req.params
     const type = await checkCapability(guardReq, postType, ['edit', 'edit_post_types'])
     if (!type) return res.status(403).json({ error: 'Permission denied or post type not accessible' })
@@ -208,8 +212,8 @@ export default (context: HTMLDrop.Context): Router => {
       data.post_type_id = type.id
     }
 
-    const [id] = await knex(table('post_type_fields')).insert(data)
-    const created = await knex(table('post_type_fields')).where('id', id).first() as HTMLDrop.Field
+    const [id] = await db(table('post_type_fields')).insert(data)
+    const created = await db(table('post_type_fields')).where('id', id).first() as HTMLDrop.Field
     res.json(parseRow(created))
   })
 
@@ -266,11 +270,15 @@ export default (context: HTMLDrop.Context): Router => {
   router.get('/:id', async (req: Request, res: Response) => {
     const guardReq = req as unknown as HTMLDrop.ExtendedRequest
     const { knex, table } = context
+    if (!knex) {
+      return res.status(503).json({ success: false, error: 'Database not available' })
+    }
+    const db = knex
     const { postType, id } = req.params
     const type = await checkCapability(guardReq, postType, ['read', 'read_post_type', 'read_post'])
     if (!type) return res.status(403).json({ error: 'Permission denied or post type not accessible' })
 
-    const field = await knex(table('post_type_fields')).where('id', id).first() as HTMLDrop.Field | undefined
+    const field = await db(table('post_type_fields')).where('id', id).first() as HTMLDrop.Field | undefined
     if (!field) return res.status(404).json({ error: 'Post type field not found' })
 
     res.json(parseRow(field))
@@ -331,6 +339,10 @@ export default (context: HTMLDrop.Context): Router => {
   router.patch('/:id', async (req: Request, res: Response) => {
     const guardReq = req as unknown as HTMLDrop.ExtendedRequest
     const { normalizeSlug, knex, table } = context
+    if (!knex) {
+      return res.status(503).json({ success: false, error: 'Database not available' })
+    }
+    const db = knex
     const { postType, id } = req.params
     const type = await checkCapability(guardReq, postType, ['edit', 'edit_post_types'])
     if (!type) return res.status(403).json({ error: 'Permission denied or post type not accessible' })
@@ -351,8 +363,8 @@ export default (context: HTMLDrop.Context): Router => {
 
     if (typeof data.slug !== 'undefined') data.slug = normalizeSlug(data.slug as string)
 
-    await knex(table('post_type_fields')).where('id', id).update(data)
-    const updated = await knex(table('post_type_fields')).where('id', id).first() as HTMLDrop.Field | undefined
+    await db(table('post_type_fields')).where('id', id).update(data)
+    const updated = await db(table('post_type_fields')).where('id', id).first() as HTMLDrop.Field | undefined
     if (!updated) return res.status(404).json({ error: 'Post type field not found' })
 
     res.json(parseRow(updated))
@@ -399,14 +411,18 @@ export default (context: HTMLDrop.Context): Router => {
   router.delete('/:id', async (req: Request, res: Response) => {
     const guardReq = req as unknown as HTMLDrop.ExtendedRequest
     const { knex, table } = context
+    if (!knex) {
+      return res.status(503).json({ success: false, error: 'Database not available' })
+    }
+    const db = knex
     const { postType, id } = req.params
     const type = await checkCapability(guardReq, postType, ['edit', 'edit_post_types'])
     if (!type) return res.status(403).json({ error: 'Permission denied or post type not accessible' })
 
-    const field = await knex(table('post_type_fields')).where('id', id).first() as HTMLDrop.Field | undefined
+    const field = await db(table('post_type_fields')).where('id', id).first() as HTMLDrop.Field | undefined
     if (!field) return res.status(404).json({ error: 'Post type field not found' })
 
-    await knex(table('post_type_fields')).where('id', id).delete()
+    await db(table('post_type_fields')).where('id', id).delete()
     res.json(parseRow(field))
   })
 
