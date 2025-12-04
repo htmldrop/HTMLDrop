@@ -9,6 +9,7 @@ import { spawn } from 'child_process'
 import type {} from '../../types/index.js'
 import { validatePackageName, validateVersion, buildNpmInstallArgs } from '../../utils/npmValidator.ts'
 import ThemeLifecycleService from '../../services/ThemeLifecycleService.ts'
+import { invalidateCache } from '../../services/FolderHashCache.ts'
 
 interface BackupInfo {
   files: string[]
@@ -1154,6 +1155,10 @@ export default (context: HTMLDrop.Context): Router => {
 
         // Move new version to themes directory
         await fs.promises.rename(nodeModulesPath, themeFolder)
+
+        // Invalidate cache immediately after files are replaced to ensure fresh imports
+        invalidateCache(themeFolder)
+        console.log(`[ThemesController] Invalidated cache for ${themeFolder} after file replacement`)
 
         // Restore persistent files and directories
         if (job) await job.updateProgress(70, { status: 'Restoring persistent files...' })

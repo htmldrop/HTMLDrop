@@ -9,6 +9,7 @@ import { spawn } from 'child_process'
 import type {} from '../../types/index.js'
 import { validatePackageName, validateVersion, buildNpmInstallArgs } from '../../utils/npmValidator.ts'
 import PluginLifecycleService from '../../services/PluginLifecycleService.ts'
+import { invalidateCache } from '../../services/FolderHashCache.ts'
 
 interface BackupInfo {
   files: string[]
@@ -1178,6 +1179,10 @@ export default (context: HTMLDrop.Context): Router => {
 
         // Move new version to plugins directory
         await fs.promises.rename(nodeModulesPath, pluginFolder)
+
+        // Invalidate cache immediately after files are replaced to ensure fresh imports
+        invalidateCache(pluginFolder)
+        console.log(`[PluginsController] Invalidated cache for ${pluginFolder} after file replacement`)
 
         // Restore persistent files and directories
         if (job) await job.updateProgress(70, { status: 'Restoring persistent files...' })
