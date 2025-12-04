@@ -338,5 +338,9 @@ export default (context: any) =>
       }
     })
 
-    next()
+    // Only continue to next middleware if response hasn't been sent
+    // (plugins may handle requests directly during init)
+    if (!res.headersSent) {
+      next()
+    }
   }
