@@ -275,6 +275,16 @@ export default async ({ req, res, next }: ProviderRequest): Promise<void> => {
       menu_title: translate('Roles', locale)
     },
     {
+      capabilities: { manage_jobs: 'manage_jobs' },
+      badge: 0,
+      position: 1000,
+      file: 'JobHistory.vue',
+      parent_slug: 'tools',
+      slug: 'jobs',
+      page_title: translate('Job History', locale),
+      menu_title: translate('Job History', locale)
+    },
+    {
       capabilities: { manage_dashboard: 'manage_options' },
       badge: 0,
       position: 1000,

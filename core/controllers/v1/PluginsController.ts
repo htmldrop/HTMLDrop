@@ -6,6 +6,7 @@ import type { Router, Request, Response, NextFunction } from 'express'
 import express from 'express'
 import AdmZip from 'adm-zip'
 import { spawn } from 'child_process'
+import type {} from '../../types/index.js'
 import { validatePackageName, validateVersion, buildNpmInstallArgs } from '../../utils/npmValidator.ts'
 import PluginLifecycleService from '../../services/PluginLifecycleService.ts'
 
@@ -1094,8 +1095,35 @@ export default (context: HTMLDrop.Context): Router => {
       // Deactivate plugin if active before updating
       const activePlugins = await getActivePlugins()
       const wasActive = activePlugins.includes(slug)
+      const isUpgrade = version > (currentVersion || '')
+
+      // Create job for tracking progress
+      const jobs = guardReq.context.registries?.jobs
+      let job: HTMLDrop.Job | null = null
+
+      if (jobs) {
+        const actionType = isUpgrade ? 'Upgrading' : 'Downgrading'
+        const createdJob = await jobs.createJob({
+          name: `${actionType} ${slug}`,
+          description: `${actionType} plugin from ${currentVersion} to ${version}`,
+          type: 'plugin_update',
+          iconSvg: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M20.5 11H19V7c0-1.1-.9-2-2-2h-4V3.5C13 2.12 11.88 1 10.5 1S8 2.12 8 3.5V5H4c-1.1 0-1.99.9-1.99 2v3.8H3.5c1.49 0 2.7 1.21 2.7 2.7s-1.21 2.7-2.7 2.7H2V20c0 1.1.9 2 2 2h3.8v-1.5c0-1.49 1.21-2.7 2.7-2.7s2.7 1.21 2.7 2.7V22H17c1.1 0 2-.9 2-2v-4h1.5c1.38 0 2.5-1.12 2.5-2.5S21.88 11 20.5 11z"/></svg>',
+          metadata: {
+            pluginSlug: slug,
+            fromVersion: currentVersion,
+            toVersion: version,
+            action: isUpgrade ? 'upgrade' : 'downgrade'
+          },
+          source: slug,
+          showNotification: true
+        })
+        await createdJob.start()
+        await createdJob.updateProgress(5, { status: 'Preparing update...' })
+        job = createdJob
+      }
 
       if (wasActive) {
+        if (job) await job.updateProgress(8, { status: 'Deactivating plugin...' })
         const filtered = activePlugins.filter((p) => p !== slug)
         await updateActivePlugins(filtered)
       }
@@ -1108,16 +1136,19 @@ export default (context: HTMLDrop.Context): Router => {
 
       try {
         // Load persistence config and backup only persistent directories/files
+        if (job) await job.updateProgress(10, { status: 'Backing up persistent files...' })
         const persistConfig = await loadPersistenceConfig(pluginFolder)
         const backupInfo = await backupPersistent(pluginFolder, backupDir, persistConfig)
         console.log(`[PluginsController] Backed up ${backupInfo.files.length} persistent files and ${backupInfo.directories.length} persistent directories`)
 
         // Install specific version to temp directory using safe method
+        if (job) await job.updateProgress(20, { status: `Downloading ${packageName}@${version}...` })
         await safeNpmInstall(packageName, version, {
           prefix: tempDir,
           noSave: true,
           noPackageLock: true
         })
+        if (job) await job.updateProgress(50, { status: 'Download complete, verifying package...' })
 
         // Find the installed package
         const nodeModulesPath = path.join(tempDir, 'node_modules', packageName)
@@ -1125,6 +1156,7 @@ export default (context: HTMLDrop.Context): Router => {
         if (!fs.existsSync(nodeModulesPath)) {
           await fs.promises.rm(backupDir, { recursive: true, force: true })
           await fs.promises.rm(tempDir, { recursive: true, force: true })
+          if (job) await job.fail('Package installation failed')
           return res.status(400).json({ error: 'Package installation failed' })
         }
 
@@ -1136,16 +1168,19 @@ export default (context: HTMLDrop.Context): Router => {
         if (!indexPath) {
           await fs.promises.rm(backupDir, { recursive: true, force: true })
           await fs.promises.rm(tempDir, { recursive: true, force: true })
+          if (job) await job.fail('Invalid plugin structure: missing index')
           return res.status(400).json({ error: 'Invalid plugin structure: missing index' })
         }
 
         // Remove old plugin folder
+        if (job) await job.updateProgress(60, { status: 'Replacing plugin files...' })
         await fs.promises.rm(pluginFolder, { recursive: true, force: true })
 
         // Move new version to plugins directory
         await fs.promises.rename(nodeModulesPath, pluginFolder)
 
         // Restore persistent files and directories
+        if (job) await job.updateProgress(70, { status: 'Restoring persistent files...' })
         const restoreInfo = await restorePersistent(backupDir, pluginFolder, backupInfo)
         console.log(`[PluginsController] Restored ${restoreInfo.files.length} persistent files and ${restoreInfo.directories.length} persistent directories`)
 
@@ -1156,8 +1191,8 @@ export default (context: HTMLDrop.Context): Router => {
         await fs.promises.rm(tempDir, { recursive: true, force: true })
 
         // Call lifecycle hook for version change
+        if (job) await job.updateProgress(80, { status: 'Running lifecycle hooks...' })
         const lifecycleService = new PluginLifecycleService(guardReq.context)
-        const isUpgrade = version > (currentVersion || '')
 
         if (isUpgrade) {
           await lifecycleService.onUpgrade(slug, currentVersion || '', version)
@@ -1167,12 +1202,22 @@ export default (context: HTMLDrop.Context): Router => {
 
         // Reactivate if it was active
         if (wasActive) {
+          if (job) await job.updateProgress(90, { status: 'Reactivating plugin...' })
           activePlugins.push(slug)
           await updateActivePlugins(activePlugins)
         }
 
         // Get updated metadata
         const metadata = await getPluginMetadata(slug)
+
+        if (job) {
+          await job.updateProgress(100, { status: 'Update complete!' })
+          await job.complete({
+            success: true,
+            previousVersion: currentVersion,
+            newVersion: version
+          })
+        }
 
         res.json({
           success: true,
@@ -1184,6 +1229,7 @@ export default (context: HTMLDrop.Context): Router => {
       } catch (updateErr) {
         // Clean up on error
         await fs.promises.rm(tempDir, { recursive: true, force: true }).catch(() => { /* ignore */ })
+        if (job) await job.fail(updateErr instanceof Error ? updateErr.message : 'Version change failed')
         return res.status(500).json({ error: updateErr instanceof Error ? updateErr.message : 'Version change failed' })
       }
     } catch (err) {

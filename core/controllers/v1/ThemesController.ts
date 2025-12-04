@@ -1077,6 +1077,32 @@ export default (context: HTMLDrop.Context): Router => {
       // Check if theme is active
       const activeTheme = await getActiveTheme()
       const wasActive = slug === activeTheme
+      const isUpgrade = version > (currentVersion || '')
+
+      // Create job for tracking progress
+      const jobs = guardReq.context.registries?.jobs
+      let job: HTMLDrop.Job | null = null
+
+      if (jobs) {
+        const actionType = isUpgrade ? 'Upgrading' : 'Downgrading'
+        const createdJob = await jobs.createJob({
+          name: `${actionType} ${slug}`,
+          description: `${actionType} theme from ${currentVersion} to ${version}`,
+          type: 'theme_update',
+          iconSvg: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>',
+          metadata: {
+            themeSlug: slug,
+            fromVersion: currentVersion,
+            toVersion: version,
+            action: isUpgrade ? 'upgrade' : 'downgrade'
+          },
+          source: slug,
+          showNotification: true
+        })
+        await createdJob.start()
+        await createdJob.updateProgress(5, { status: 'Preparing update...' })
+        job = createdJob
+      }
 
       const tempDir = path.join(THEMES_BASE, '.temp-update')
       const backupDir = path.join(THEMES_BASE, `.backup-${slug}-${Date.now()}`)
@@ -1086,16 +1112,19 @@ export default (context: HTMLDrop.Context): Router => {
 
       try {
         // Load persistence config and backup only persistent directories/files
+        if (job) await job.updateProgress(10, { status: 'Backing up persistent files...' })
         const persistConfig = await loadPersistenceConfig(themeFolder)
         const backupInfo = await backupPersistent(themeFolder, backupDir, persistConfig)
         console.log(`[ThemesController] Backed up ${backupInfo.files.length} persistent files and ${backupInfo.directories.length} persistent directories`)
 
         // Install specific version to temp directory using safe method
+        if (job) await job.updateProgress(20, { status: `Downloading ${packageName}@${version}...` })
         await safeNpmInstall(packageName, version, {
           prefix: tempDir,
           noSave: true,
           noPackageLock: true
         })
+        if (job) await job.updateProgress(50, { status: 'Download complete, verifying package...' })
 
         // Find the installed package
         const nodeModulesPath = path.join(tempDir, 'node_modules', packageName)
@@ -1103,6 +1132,7 @@ export default (context: HTMLDrop.Context): Router => {
         if (!fs.existsSync(nodeModulesPath)) {
           await fs.promises.rm(backupDir, { recursive: true, force: true })
           await fs.promises.rm(tempDir, { recursive: true, force: true })
+          if (job) await job.fail('Package installation failed')
           return res.status(400).json({ error: 'Package installation failed' })
         }
 
@@ -1114,16 +1144,19 @@ export default (context: HTMLDrop.Context): Router => {
         if (!indexPath) {
           await fs.promises.rm(backupDir, { recursive: true, force: true })
           await fs.promises.rm(tempDir, { recursive: true, force: true })
+          if (job) await job.fail('Invalid theme structure: missing index')
           return res.status(400).json({ error: 'Invalid theme structure: missing index' })
         }
 
         // Remove old theme folder
+        if (job) await job.updateProgress(60, { status: 'Replacing theme files...' })
         await fs.promises.rm(themeFolder, { recursive: true, force: true })
 
         // Move new version to themes directory
         await fs.promises.rename(nodeModulesPath, themeFolder)
 
         // Restore persistent files and directories
+        if (job) await job.updateProgress(70, { status: 'Restoring persistent files...' })
         const restoreInfo = await restorePersistent(backupDir, themeFolder, backupInfo)
         console.log(`[ThemesController] Restored ${restoreInfo.files.length} persistent files and ${restoreInfo.directories.length} persistent directories`)
 
@@ -1134,8 +1167,8 @@ export default (context: HTMLDrop.Context): Router => {
         await fs.promises.rm(tempDir, { recursive: true, force: true })
 
         // Call lifecycle hook for version change
+        if (job) await job.updateProgress(80, { status: 'Running lifecycle hooks...' })
         const lifecycleService = new ThemeLifecycleService(guardReq.context)
-        const isUpgrade = version > (currentVersion || '')
 
         if (isUpgrade) {
           await lifecycleService.onUpgrade(slug, currentVersion || '', version)
@@ -1151,6 +1184,15 @@ export default (context: HTMLDrop.Context): Router => {
         // Get updated metadata
         const metadata = await getThemeMetadata(slug)
 
+        if (job) {
+          await job.updateProgress(100, { status: 'Update complete!' })
+          await job.complete({
+            success: true,
+            previousVersion: currentVersion,
+            newVersion: version
+          })
+        }
+
         res.json({
           success: true,
           message: 'Theme version changed successfully',
@@ -1161,6 +1203,7 @@ export default (context: HTMLDrop.Context): Router => {
       } catch (updateErr) {
         // Clean up on error
         await fs.promises.rm(tempDir, { recursive: true, force: true }).catch(() => { /* ignore */ })
+        if (job) await job.fail(updateErr instanceof Error ? updateErr.message : 'Version change failed')
         return res.status(500).json({ error: updateErr instanceof Error ? updateErr.message : 'Version change failed' })
       }
     } catch (err) {
