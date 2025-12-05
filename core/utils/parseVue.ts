@@ -46,14 +46,25 @@ function findMatchingBrace(str: string, start: number): number {
         if (str[i] === '$' && str[i + 1] === '{') {
           i += 2 // skip ${
           let exprDepth = 1
+          let exprLastToken = '{' // Track tokens for regex detection inside expressions
           while (i < len && exprDepth > 0) {
-            if (str[i] === '\\') {
+            const ec = str[i]
+            // Skip whitespace
+            if (ec === ' ' || ec === '\t' || ec === '\n' || ec === '\r') {
+              i++
+              continue
+            }
+            if (ec === '\\') {
               i += 2
               continue
             }
-            if (str[i] === '{') exprDepth++
-            else if (str[i] === '}') exprDepth--
-            else if (str[i] === '`') {
+            if (ec === '{') {
+              exprDepth++
+              exprLastToken = '{'
+            } else if (ec === '}') {
+              exprDepth--
+              exprLastToken = '}'
+            } else if (ec === '`') {
               // Nested template literal - recursively skip it (simplified - don't handle nested ${})
               i++
               while (i < len && str[i] !== '`') {
@@ -63,50 +74,88 @@ function findMatchingBrace(str: string, start: number): number {
                 }
                 i++
               }
-            } else if (str[i] === '"' || str[i] === "'") {
+              exprLastToken = 'string'
+            } else if (ec === '"' || ec === "'") {
               // Skip string inside expression
-              const q = str[i]
+              const q = ec
               i++
               while (i < len && str[i] !== q) {
                 if (str[i] === '\\') i++
                 i++
               }
-            } else if (str[i] === '/') {
-              // Could be regex, division, or comment start inside template expression
-              // Check for regex (simplified - after certain tokens)
-              // Skip regex: /.../ (handle [...] character classes)
+              exprLastToken = 'string'
+            } else if (ec === '/') {
               const nextC = str[i + 1]
-              if (nextC !== '/' && nextC !== '*') {
-                // Might be regex - look for closing /
-                i++
-                while (i < len && str[i] !== '/') {
-                  if (str[i] === '\\') i++ // skip escaped char
-                  if (str[i] === '[') {
-                    // character class - skip until ]
-                    i++
-                    while (i < len && str[i] !== ']') {
-                      if (str[i] === '\\') i++
-                      i++
-                    }
-                  }
-                  if (str[i] === '\n') break // regex can't span lines, must be division
-                  i++
-                }
-                if (str[i] === '/') i++ // skip closing /
-                // skip flags
-                while (i < len && /[gimsuy]/.test(str[i])) i++
-                continue
-              } else if (nextC === '/') {
+              if (nextC === '/') {
                 // Single-line comment inside expression
                 i += 2
                 while (i < len && str[i] !== '\n') i++
+                continue
               } else if (nextC === '*') {
                 // Multi-line comment inside expression
                 i += 2
                 while (i < len && !(str[i] === '*' && str[i + 1] === '/')) i++
                 i += 2
                 continue
+              } else {
+                // Could be regex or division - check context
+                const canBeRegex =
+                  exprLastToken === '' ||
+                  exprLastToken === '(' ||
+                  exprLastToken === ',' ||
+                  exprLastToken === '=' ||
+                  exprLastToken === ':' ||
+                  exprLastToken === '[' ||
+                  exprLastToken === '!' ||
+                  exprLastToken === '&' ||
+                  exprLastToken === '|' ||
+                  exprLastToken === '?' ||
+                  exprLastToken === '{' ||
+                  exprLastToken === '}' ||
+                  exprLastToken === ';' ||
+                  exprLastToken === 'return' ||
+                  exprLastToken === 'case' ||
+                  exprLastToken === 'throw'
+
+                if (canBeRegex) {
+                  // Skip regex: /.../ (handle [...] character classes)
+                  i++
+                  while (i < len && str[i] !== '/') {
+                    if (str[i] === '\\') i++ // skip escaped char
+                    if (str[i] === '[') {
+                      // character class - skip until ]
+                      i++
+                      while (i < len && str[i] !== ']') {
+                        if (str[i] === '\\') i++
+                        i++
+                      }
+                    }
+                    if (str[i] === '\n') break // regex can't span lines, must be division
+                    i++
+                  }
+                  if (str[i] === '/') i++ // skip closing /
+                  // skip flags
+                  while (i < len && /[gimsuy]/.test(str[i])) i++
+                  exprLastToken = 'regex'
+                  continue
+                } else {
+                  // It's division, not regex - just treat / as operator
+                  exprLastToken = '/'
+                }
               }
+            } else if (ec === '(' || ec === ',' || ec === '=' || ec === ':' || ec === '[' || ec === ';') {
+              exprLastToken = ec
+            } else if (/[a-zA-Z_$]/.test(ec)) {
+              // Read identifier
+              let ident = ''
+              while (i < len && /[a-zA-Z0-9_$]/.test(str[i])) {
+                ident += str[i]
+                i++
+              }
+              exprLastToken = ident
+              continue // don't increment i again
+            } else {
+              exprLastToken = ec
             }
             i++
           }
