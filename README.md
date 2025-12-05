@@ -22,7 +22,7 @@
 
 <p align="center">
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-GPL--2.0-blue.svg" alt="License"></a>
-  <a href="https://nodejs.org"><img src="https://img.shields.io/badge/node-%3E%3D20.0.0-brightgreen.svg" alt="Node Version"></a>
+  <a href="https://nodejs.org"><img src="https://img.shields.io/badge/node-%3E%3D23.6.0-brightgreen.svg" alt="Node Version"></a>
   <a href="core/docs/CONTRIBUTING.md"><img src="https://img.shields.io/badge/PRs-welcome-brightgreen.svg" alt="PRs Welcome"></a>
 </p>
 
