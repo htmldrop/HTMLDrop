@@ -646,7 +646,7 @@ export default (context: HTMLDrop.Context): Router => {
    *     tags:
    *       - Plugins
    *     summary: Upload and install plugin
-   *     description: Uploads a plugin ZIP file and installs it. The ZIP must contain an index.mjs file in the root folder.
+   *     description: Uploads a plugin ZIP file and installs it. If the plugin already exists, it will be updated (like npm update) with persistent files preserved.
    *     security:
    *       - bearerAuth: []
    *     requestBody:
@@ -664,7 +664,7 @@ export default (context: HTMLDrop.Context): Router => {
    *                 description: Plugin ZIP file
    *     responses:
    *       200:
-   *         description: Plugin uploaded successfully
+   *         description: Plugin uploaded/updated successfully
    *         content:
    *           application/json:
    *             schema:
@@ -685,14 +685,18 @@ export default (context: HTMLDrop.Context): Router => {
    *                       type: string
    *                     version:
    *                       type: string
+   *                 updated:
+   *                   type: boolean
+   *                   description: Whether this was an update to an existing plugin
+   *                 previousVersion:
+   *                   type: string
+   *                   description: Previous version if updated
    *       400:
    *         description: Invalid plugin structure or no file uploaded
    *       401:
    *         description: Unauthorized
    *       403:
    *         description: Forbidden - user lacks upload_plugins capability
-   *       409:
-   *         description: Plugin already exists
    */
   router.post('/upload', upload.single('file'), async (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -734,15 +738,6 @@ export default (context: HTMLDrop.Context): Router => {
         return res.status(400).json({ error: 'Invalid plugin structure. Must contain index.mjs in root folder.' })
       }
 
-      // Extract to plugins directory
-      const targetPath = path.join(PLUGINS_BASE, pluginSlug)
-
-      // Check if already exists
-      if (fs.existsSync(targetPath)) {
-        await fs.promises.unlink(zipPath)
-        return res.status(409).json({ error: 'Plugin already exists' })
-      }
-
       // Validate all zip entries to prevent path traversal (Zip Slip)
       const resolvedBase = path.resolve(PLUGINS_BASE)
       for (const entry of zipEntries) {
@@ -756,19 +751,85 @@ export default (context: HTMLDrop.Context): Router => {
         }
       }
 
+      const targetPath = path.join(PLUGINS_BASE, pluginSlug)
+      const isUpdate = fs.existsSync(targetPath)
+      let previousVersion: string | undefined
+      let wasActive = false
+      let backupDir: string | null = null
+      let backupInfo: BackupInfo | null = null
+
+      if (isUpdate) {
+        // Get current version before update
+        const currentMetadata = await getPluginMetadata(pluginSlug)
+        previousVersion = currentMetadata?.version
+
+        // Check if plugin was active
+        const activePlugins = await getActivePlugins()
+        wasActive = activePlugins.includes(pluginSlug)
+
+        // Deactivate if active
+        if (wasActive) {
+          const filtered = activePlugins.filter((p) => p !== pluginSlug)
+          await updateActivePlugins(filtered)
+        }
+
+        // Backup persistent files
+        backupDir = path.join(PLUGINS_BASE, `.backup-${pluginSlug}-${Date.now()}`)
+        const persistConfig = await loadPersistenceConfig(targetPath)
+        backupInfo = await backupPersistent(targetPath, backupDir, persistConfig)
+        console.log(`[PluginsController] Upload update: Backed up ${backupInfo.files.length} persistent files and ${backupInfo.directories.length} persistent directories`)
+
+        // Remove old plugin folder
+        await fs.promises.rm(targetPath, { recursive: true, force: true })
+      }
+
       // Extract
       zip.extractAllTo(PLUGINS_BASE, true)
 
       // Clean up temp file
       await fs.promises.unlink(zipPath)
 
+      // Invalidate cache for fresh imports
+      invalidateCache(targetPath)
+
+      if (isUpdate && backupDir && backupInfo) {
+        // Restore persistent files
+        const restoreInfo = await restorePersistent(backupDir, targetPath, backupInfo)
+        console.log(`[PluginsController] Upload update: Restored ${restoreInfo.files.length} persistent files and ${restoreInfo.directories.length} persistent directories`)
+
+        // Clean up backup
+        await fs.promises.rm(backupDir, { recursive: true, force: true })
+
+        // Get new metadata for version comparison
+        const newMetadata = await getPluginMetadata(pluginSlug)
+        const newVersion = newMetadata?.version || ''
+        const isUpgrade = newVersion > (previousVersion || '')
+
+        // Call lifecycle hooks
+        const lifecycleService = new PluginLifecycleService(guardReq.context)
+        if (isUpgrade) {
+          await lifecycleService.onUpgrade(pluginSlug, previousVersion || '', newVersion)
+        } else {
+          await lifecycleService.onDowngrade(pluginSlug, previousVersion || '', newVersion)
+        }
+
+        // Reactivate if it was active
+        if (wasActive) {
+          const activePlugins = await getActivePlugins()
+          activePlugins.push(pluginSlug)
+          await updateActivePlugins(activePlugins)
+        }
+      }
+
       // Get metadata
       const metadata = await getPluginMetadata(pluginSlug)
 
       res.json({
         success: true,
-        message: 'Plugin uploaded successfully',
-        plugin: metadata
+        message: isUpdate ? 'Plugin updated successfully' : 'Plugin uploaded successfully',
+        plugin: metadata,
+        updated: isUpdate,
+        previousVersion: isUpdate ? previousVersion : undefined
       })
     } catch (err) {
       // Clean up on error

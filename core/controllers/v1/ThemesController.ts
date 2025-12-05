@@ -628,7 +628,7 @@ export default (context: HTMLDrop.Context): Router => {
    *     tags:
    *       - Themes
    *     summary: Upload and install theme
-   *     description: Uploads a theme ZIP file and installs it. The ZIP must contain an index.mjs file in the root folder.
+   *     description: Uploads a theme ZIP file and installs it. If the theme already exists, it will be updated (like npm update) with persistent files preserved.
    *     security:
    *       - bearerAuth: []
    *     requestBody:
@@ -646,7 +646,7 @@ export default (context: HTMLDrop.Context): Router => {
    *                 description: Theme ZIP file
    *     responses:
    *       200:
-   *         description: Theme uploaded successfully
+   *         description: Theme uploaded/updated successfully
    *         content:
    *           application/json:
    *             schema:
@@ -667,14 +667,18 @@ export default (context: HTMLDrop.Context): Router => {
    *                       type: string
    *                     version:
    *                       type: string
+   *                 updated:
+   *                   type: boolean
+   *                   description: Whether this was an update to an existing theme
+   *                 previousVersion:
+   *                   type: string
+   *                   description: Previous version if updated
    *       400:
    *         description: Invalid theme structure or no file uploaded
    *       401:
    *         description: Unauthorized
    *       403:
    *         description: Forbidden - user lacks upload_themes capability
-   *       409:
-   *         description: Theme already exists
    */
   router.post('/upload', upload.single('file'), async (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -716,15 +720,6 @@ export default (context: HTMLDrop.Context): Router => {
         return res.status(400).json({ error: 'Invalid theme structure. Must contain index.mjs in root folder.' })
       }
 
-      // Extract to themes directory
-      const targetPath = path.join(THEMES_BASE, themeSlug)
-
-      // Check if already exists
-      if (fs.existsSync(targetPath)) {
-        await fs.promises.unlink(zipPath)
-        return res.status(409).json({ error: 'Theme already exists' })
-      }
-
       // Validate all zip entries to prevent path traversal (Zip Slip)
       const resolvedBase = path.resolve(THEMES_BASE)
       for (const entry of zipEntries) {
@@ -738,19 +733,77 @@ export default (context: HTMLDrop.Context): Router => {
         }
       }
 
+      const targetPath = path.join(THEMES_BASE, themeSlug)
+      const isUpdate = fs.existsSync(targetPath)
+      let previousVersion: string | undefined
+      let wasActive = false
+      let backupDir: string | null = null
+      let backupInfo: BackupInfo | null = null
+
+      if (isUpdate) {
+        // Get current version before update
+        const currentMetadata = await getThemeMetadata(themeSlug)
+        previousVersion = currentMetadata?.version
+
+        // Check if theme was active
+        const activeTheme = await getActiveTheme()
+        wasActive = themeSlug === activeTheme
+
+        // Backup persistent files
+        backupDir = path.join(THEMES_BASE, `.backup-${themeSlug}-${Date.now()}`)
+        const persistConfig = await loadPersistenceConfig(targetPath)
+        backupInfo = await backupPersistent(targetPath, backupDir, persistConfig)
+        console.log(`[ThemesController] Upload update: Backed up ${backupInfo.files.length} persistent files and ${backupInfo.directories.length} persistent directories`)
+
+        // Remove old theme folder
+        await fs.promises.rm(targetPath, { recursive: true, force: true })
+      }
+
       // Extract
       zip.extractAllTo(THEMES_BASE, true)
 
       // Clean up temp file
       await fs.promises.unlink(zipPath)
 
+      // Invalidate cache for fresh imports
+      invalidateCache(targetPath)
+
+      if (isUpdate && backupDir && backupInfo) {
+        // Restore persistent files
+        const restoreInfo = await restorePersistent(backupDir, targetPath, backupInfo)
+        console.log(`[ThemesController] Upload update: Restored ${restoreInfo.files.length} persistent files and ${restoreInfo.directories.length} persistent directories`)
+
+        // Clean up backup
+        await fs.promises.rm(backupDir, { recursive: true, force: true })
+
+        // Get new metadata for version comparison
+        const newMetadata = await getThemeMetadata(themeSlug)
+        const newVersion = newMetadata?.version || ''
+        const isUpgrade = newVersion > (previousVersion || '')
+
+        // Call lifecycle hooks
+        const lifecycleService = new ThemeLifecycleService(guardReq.context)
+        if (isUpgrade) {
+          await lifecycleService.onUpgrade(themeSlug, previousVersion || '', newVersion)
+        } else {
+          await lifecycleService.onDowngrade(themeSlug, previousVersion || '', newVersion)
+        }
+
+        // Reactivate if it was active
+        if (wasActive) {
+          await updateActiveTheme(themeSlug)
+        }
+      }
+
       // Get metadata
       const metadata = await getThemeMetadata(themeSlug)
 
       res.json({
         success: true,
-        message: 'Theme uploaded successfully',
-        theme: metadata
+        message: isUpdate ? 'Theme updated successfully' : 'Theme uploaded successfully',
+        theme: metadata,
+        updated: isUpdate,
+        previousVersion: isUpdate ? previousVersion : undefined
       })
     } catch (err) {
       // Clean up on error
