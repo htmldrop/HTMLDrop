@@ -5,6 +5,7 @@ export default defineConfig({
   test: {
     globals: true,
     environment: 'node',
+    testTimeout: 10000,
     root: resolve(__dirname, '..'),
     coverage: {
       provider: 'v8',

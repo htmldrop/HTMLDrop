@@ -200,7 +200,7 @@ export default async ({ req, res, next }: ProviderRequest): Promise<void> => {
       capabilities: { manage_dashboard: 'manage_dashboard' },
       badge: 0,
       position: 7500,
-      file: 'Dashboard.vue',
+      file: 'SystemInfo.vue',
       slug: 'tools',
       page_title: translate('Tools', locale),
       menu_title: translate('Tools', locale),
@@ -277,12 +277,22 @@ export default async ({ req, res, next }: ProviderRequest): Promise<void> => {
     {
       capabilities: { manage_jobs: 'manage_jobs' },
       badge: 0,
-      position: 1000,
+      position: 1100,
       file: 'JobHistory.vue',
       parent_slug: 'tools',
       slug: 'jobs',
       page_title: translate('Job History', locale),
       menu_title: translate('Job History', locale)
+    },
+    {
+      capabilities: { manage_dashboard: 'manage_options' },
+      badge: 0,
+      position: 1000,
+      file: 'SystemInfo.vue',
+      parent_slug: 'tools',
+      slug: '',
+      page_title: translate('System Information', locale),
+      menu_title: translate('System Info', locale)
     },
     {
       capabilities: { manage_dashboard: 'manage_options' },
@@ -355,6 +365,16 @@ export default async ({ req, res, next }: ProviderRequest): Promise<void> => {
       slug: 'post-types',
       page_title: translate('Post Types', locale),
       menu_title: translate('Post Types', locale)
+    },
+    {
+      capabilities: { manage_dashboard: 'manage_options' },
+      badge: 0,
+      position: 1200,
+      file: 'OAuth.vue',
+      parent_slug: 'settings',
+      slug: 'oauth',
+      page_title: translate('OAuth Providers', locale),
+      menu_title: translate('OAuth', locale)
     }
   ]
 

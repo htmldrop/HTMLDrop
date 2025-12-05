@@ -52,6 +52,43 @@ export default (context: HTMLDrop.Context): Router => {
 
   /**
    * @openapi
+   * /oauth/providers:
+   *   get:
+   *     tags:
+   *       - OAuth
+   *     summary: List active OAuth providers
+   *     description: Returns a list of active OAuth providers for display on the login page
+   *     responses:
+   *       200:
+   *         description: List of active providers
+   *         content:
+   *           application/json:
+   *             schema:
+   *               type: array
+   *               items:
+   *                 type: object
+   *                 properties:
+   *                   name:
+   *                     type: string
+   *                   slug:
+   *                     type: string
+   */
+  router.get('/providers', async (req: Request, res: Response) => {
+    const { knex, table } = context
+    if (!knex) {
+      return res.status(503).json({ success: false, error: 'Database not available' })
+    }
+
+    const providers = await knex(table('auth_providers'))
+      .where({ active: true })
+      .select('name', 'slug')
+      .orderBy('name', 'asc')
+
+    res.json(providers)
+  })
+
+  /**
+   * @openapi
    * /oauth/{provider}/login:
    *   get:
    *     tags:
