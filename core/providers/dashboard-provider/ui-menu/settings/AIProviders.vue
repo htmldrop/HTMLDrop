@@ -541,6 +541,7 @@ export default {
   border: 1px solid #ddd;
   border-radius: 4px;
   font-size: 14px;
+  box-sizing: border-box;
 }
 
 #ai-providers .setting-group.checkbox-group label {
@@ -556,6 +557,7 @@ export default {
 
 #ai-providers .setting-group textarea {
   resize: vertical;
+  box-sizing: border-box;
 }
 
 /* Providers Grid */
