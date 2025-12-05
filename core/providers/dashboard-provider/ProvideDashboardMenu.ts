@@ -375,6 +375,26 @@ export default async ({ req, res, next }: ProviderRequest): Promise<void> => {
       slug: 'oauth',
       page_title: translate('OAuth Providers', locale),
       menu_title: translate('OAuth', locale)
+    },
+    {
+      capabilities: { manage_dashboard: 'manage_options' },
+      badge: 0,
+      position: 1300,
+      file: 'AIProviders.vue',
+      parent_slug: 'settings',
+      slug: 'ai',
+      page_title: translate('AI Providers', locale),
+      menu_title: translate('AI Providers', locale)
+    },
+    {
+      capabilities: { manage_dashboard: 'manage_dashboard' },
+      badge: 0,
+      position: 1200,
+      file: 'AICommandCenter.vue',
+      parent_slug: 'tools',
+      slug: 'ai',
+      page_title: translate('AI Command Center', locale),
+      menu_title: translate('AI Command Center', locale)
     }
   ]
 

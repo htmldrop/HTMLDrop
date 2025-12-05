@@ -25,6 +25,7 @@ import RolesController from '../controllers/v1/RolesController.ts'
 import CapabilitiesController from '../controllers/v1/CapabilitiesController.ts'
 import AuthProvidersController from '../controllers/v1/AuthProvidersController.ts'
 import SystemInfoController from '../controllers/v1/SystemInfoController.ts'
+import AIController from '../controllers/v1/AIController.ts'
 import TracingController from '../controllers/TracingController.ts'
 import dbCheckMiddleware from '../middlewares/dbCheckMiddleware.ts'
 import dbRequiredMiddleware from '../middlewares/dbRequiredMiddleware.ts'
@@ -82,6 +83,7 @@ export default (context: HTMLDrop.Context): Router => {
   router.use('/v1/capabilities', jwtMiddleware(context), registryMiddleware(context), CapabilitiesController(context))
   router.use('/v1/auth-providers', jwtMiddleware(context), registryMiddleware(context), AuthProvidersController(context))
   router.use('/v1/system-info', jwtMiddleware(context), registryMiddleware(context), SystemInfoController(context))
+  router.use('/v1/ai', jwtMiddleware(context), registryMiddleware(context), AIController(context))
   router.use('/v1/tracing', jwtMiddleware(context), registryMiddleware(context), TracingController)
   router.use('/v1/post-types', jwtMiddleware(context), registryMiddleware(context), PostTypesController(context))
   router.use(

@@ -9,6 +9,7 @@ import RegisterPlugins from './RegisterPlugins.ts'
 import RegisterJobs from './RegisterJobs.ts'
 import RegisterEmailProviders from './RegisterEmailProviders.ts'
 import RegisterAdminBarButtons from './RegisterAdminBarButtons.ts'
+import RegisterAICommands from './RegisterAICommands.ts'
 import * as emailHelper from '../utils/email-helper.ts'
 import { TraceCategory } from '../services/PerformanceTracer.ts'
 import type { Request, Response, NextFunction } from 'express'
@@ -43,6 +44,7 @@ interface Registries {
   jobs: RegisterJobs
   emailProviders: RegisterEmailProviders
   adminBarButtons: RegisterAdminBarButtons
+  aiCommands: RegisterAICommands
   [key: string]: any
 }
 
@@ -84,7 +86,8 @@ export default class Registry {
       plugins: new RegisterPlugins(req as any, res, next),
       jobs: new RegisterJobs(req.context as any),
       emailProviders: new RegisterEmailProviders(req.context),
-      adminBarButtons: new RegisterAdminBarButtons(req, res, next)
+      adminBarButtons: new RegisterAdminBarButtons(req, res, next),
+      aiCommands: new RegisterAICommands(req.context)
     }
 
     // Attach registry objects for direct access

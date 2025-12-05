@@ -238,6 +238,12 @@ declare global {
 
       /** Email providers registry */
       emailProviders: any
+
+      /** AI commands registry */
+      aiCommands: any
+
+      /** Admin bar buttons registry */
+      adminBarButtons: any
     }
 
     /**
