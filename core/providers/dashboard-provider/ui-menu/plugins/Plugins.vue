@@ -157,6 +157,10 @@
       <div class="upload-message">
         <p>{{ translate('Uploading') }}...</p>
         <p class="filename">{{ uploadingFile.name }}</p>
+        <div class="upload-progress-bar">
+          <div class="upload-progress-fill" :style="{ width: uploadProgress + '%' }"></div>
+        </div>
+        <p class="progress-text">{{ uploadProgress }}%</p>
       </div>
     </div>
 
@@ -173,6 +177,8 @@ export default {
     filter: 'all',
     search: '',
     uploadingFile: null,
+    uploadProgress: 0,
+    uploadXhr: null,
     pluginVersions: {}, // Store available versions for each plugin
     loadingVersions: false,
     changingVersion: null,
@@ -313,35 +319,68 @@ export default {
       // Reset input so same file can be selected again
       event.target.value = ''
     },
-    async uploadFile(file) {
+    uploadFile(file) {
       this.uploadingFile = file
+      this.uploadProgress = 0
 
       const formData = new FormData()
       formData.append('file', file)
 
-      try {
-        const result = await this.apiFetch(`${this.apiBase}/api/v1/plugins/upload`, {
-          method: 'POST',
-          body: formData
-        })
-        const data = await result.json()
+      const xhr = new XMLHttpRequest()
+      this.uploadXhr = xhr
 
-        if (!result.ok) {
-          throw new Error(data.error || 'Upload failed')
+      xhr.upload.onprogress = (e) => {
+        if (e.lengthComputable) {
+          this.uploadProgress = Math.round((e.loaded / e.total) * 100)
         }
-
-        if (data.success) {
-          await this.fetchPlugins()
-          this.uploadingFile = null
-          alert(this.translate('Plugin uploaded successfully'))
-        } else {
-          throw new Error(data.error || 'Upload failed')
-        }
-      } catch (err) {
-        console.error('Failed to upload plugin:', err)
-        alert(err.message || this.translate('Failed to upload plugin'))
-        this.uploadingFile = null
       }
+
+      xhr.onload = async () => {
+        this.uploadXhr = null
+        if (xhr.status >= 200 && xhr.status < 300) {
+          try {
+            const data = JSON.parse(xhr.responseText)
+            if (data.success) {
+              await this.fetchPlugins()
+              this.uploadingFile = null
+              this.uploadProgress = 0
+              alert(this.translate('Plugin uploaded successfully'))
+            } else {
+              throw new Error(data.error || 'Upload failed')
+            }
+          } catch (err) {
+            console.error('Failed to upload plugin:', err)
+            alert(err.message || this.translate('Failed to upload plugin'))
+            this.uploadingFile = null
+            this.uploadProgress = 0
+          }
+        } else {
+          let errorMsg = this.translate('Failed to upload plugin')
+          try {
+            const data = JSON.parse(xhr.responseText)
+            errorMsg = data.error || errorMsg
+          } catch (e) {}
+          console.error('Failed to upload plugin:', errorMsg)
+          alert(errorMsg)
+          this.uploadingFile = null
+          this.uploadProgress = 0
+        }
+      }
+
+      xhr.onerror = () => {
+        this.uploadXhr = null
+        console.error('Failed to upload plugin: Network error')
+        alert(this.translate('Failed to upload plugin'))
+        this.uploadingFile = null
+        this.uploadProgress = 0
+      }
+
+      const tokens = JSON.parse(localStorage.getItem('tokens') || '{}')
+      xhr.open('POST', `${this.apiBase}/api/v1/plugins/upload`, true)
+      if (tokens?.accessToken) {
+        xhr.setRequestHeader('Authorization', `Bearer ${tokens.accessToken}`)
+      }
+      xhr.send(formData)
     },
     async loadAllVersions() {
       this.loadingVersions = true
@@ -846,6 +885,28 @@ export default {
 .plugins-page-container .upload-message .filename {
   color: var(--color-primary);
   font-weight: 600;
+}
+
+.plugins-page-container .upload-progress-bar {
+  width: 100%;
+  height: 8px;
+  background: var(--color-border);
+  border-radius: 4px;
+  overflow: hidden;
+  margin-top: 15px;
+}
+
+.plugins-page-container .upload-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--color-primary), var(--color-accent, var(--color-primary)));
+  transition: width 0.2s ease;
+}
+
+.plugins-page-container .progress-text {
+  margin-top: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-primary);
 }
 
 </style>
