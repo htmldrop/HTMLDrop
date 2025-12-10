@@ -25,6 +25,7 @@ describe('Password Reset API Integration', () => {
       table.string('email').unique()
       table.string('password')
       table.string('reset_token').nullable()
+      table.string('reset_token_prefix', 16).nullable().index()
       table.datetime('reset_token_expires_at').nullable()
       table.datetime('created_at')
       table.datetime('updated_at')
@@ -193,9 +194,11 @@ describe('Password Reset API Integration', () => {
       const crypto = await import('crypto')
       validToken = crypto.randomBytes(32).toString('hex')
       const hashedToken = await bcrypt.hash(validToken, 10)
+      const tokenPrefix = crypto.createHash('sha256').update(validToken).digest('hex').substring(0, 16)
 
       await db('test_users').where('email', 'test@example.com').update({
         reset_token: hashedToken,
+        reset_token_prefix: tokenPrefix,
         reset_token_expires_at: new Date(Date.now() + 60 * 60 * 1000).toISOString()
       })
     })
@@ -246,9 +249,11 @@ describe('Password Reset API Integration', () => {
       const crypto = await import('crypto')
       validToken = crypto.randomBytes(32).toString('hex')
       const hashedToken = await bcrypt.hash(validToken, 10)
+      const tokenPrefix = crypto.createHash('sha256').update(validToken).digest('hex').substring(0, 16)
 
       await db('test_users').where('email', 'test@example.com').update({
         reset_token: hashedToken,
+        reset_token_prefix: tokenPrefix,
         reset_token_expires_at: new Date(Date.now() + 60 * 60 * 1000).toISOString()
       })
     })
@@ -369,9 +374,11 @@ describe('Password Reset API Integration', () => {
       const crypto = await import('crypto')
       const resetToken = crypto.randomBytes(32).toString('hex')
       const hashedToken = await bcrypt.hash(resetToken, 10)
+      const tokenPrefix = crypto.createHash('sha256').update(resetToken).digest('hex').substring(0, 16)
 
       await db('test_users').where('email', 'test@example.com').update({
         reset_token: hashedToken,
+        reset_token_prefix: tokenPrefix,
         reset_token_expires_at: new Date(Date.now() + 60 * 60 * 1000).toISOString()
       })
 

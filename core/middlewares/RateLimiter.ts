@@ -5,8 +5,11 @@
  */
 
 import rateLimit from 'express-rate-limit'
-import { Request, Response } from 'express'
+import type { Request, Response } from 'express'
 import { RATE_LIMITS, HTTP_STATUS, ERROR_CODES } from '../utils/constants.ts'
+
+// Skip rate limiting in test environment
+const isTestEnv = process.env.NODE_ENV === 'test'
 
 interface RateLimitInfo {
   resetTime: Date
@@ -23,6 +26,7 @@ interface RequestWithRateLimit extends Request {
 export const apiLimiter = rateLimit({
   windowMs: RATE_LIMITS.WINDOW_MS,
   limit: RATE_LIMITS.MAX_REQUESTS,
+  skip: () => isTestEnv,
   message: {
     error: 'Too many requests from this IP, please try again later.',
     code: ERROR_CODES.SERVICE_UNAVAILABLE
@@ -46,6 +50,7 @@ export const apiLimiter = rateLimit({
 export const authLimiter = rateLimit({
   windowMs: RATE_LIMITS.AUTH.WINDOW_MS,
   limit: RATE_LIMITS.AUTH.MAX_REQUESTS,
+  skip: () => isTestEnv,
   skipSuccessfulRequests: true, // Don't count successful login attempts
   message: {
     error: 'Too many authentication attempts, please try again later.',
@@ -70,6 +75,7 @@ export const authLimiter = rateLimit({
 export const uploadLimiter = rateLimit({
   windowMs: RATE_LIMITS.WINDOW_MS,
   limit: 20,
+  skip: () => isTestEnv,
   message: {
     error: 'Too many upload attempts, please try again later.',
     code: ERROR_CODES.SERVICE_UNAVAILABLE
@@ -93,6 +99,7 @@ export const uploadLimiter = rateLimit({
 export const readLimiter = rateLimit({
   windowMs: RATE_LIMITS.WINDOW_MS,
   limit: 200,
+  skip: () => isTestEnv,
   message: {
     error: 'Too many requests, please try again later.',
     code: ERROR_CODES.SERVICE_UNAVAILABLE
@@ -108,6 +115,7 @@ export const readLimiter = rateLimit({
 export const strictLimiter = rateLimit({
   windowMs: RATE_LIMITS.WINDOW_MS,
   limit: 3,
+  skip: () => isTestEnv,
   message: {
     error: 'Too many requests, please try again later.',
     code: ERROR_CODES.SERVICE_UNAVAILABLE
@@ -140,6 +148,7 @@ export const createRateLimiter = (options: {
   return rateLimit({
     windowMs: options.windowMs ?? RATE_LIMITS.WINDOW_MS,
     limit: options.limit ?? RATE_LIMITS.MAX_REQUESTS,
+    skip: () => isTestEnv,
     standardHeaders: options.standardHeaders ?? true,
     legacyHeaders: options.legacyHeaders ?? false,
     handler: (req: Request, res: Response) => {

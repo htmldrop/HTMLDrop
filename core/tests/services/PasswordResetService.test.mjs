@@ -23,6 +23,7 @@ describe('PasswordResetService', () => {
       table.string('email').unique()
       table.string('password')
       table.string('reset_token').nullable()
+      table.string('reset_token_prefix', 16).nullable().index()
       table.datetime('reset_token_expires_at').nullable()
       table.datetime('created_at')
       table.datetime('updated_at')

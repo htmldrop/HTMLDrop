@@ -7,6 +7,7 @@ import { validate as validateEmail } from '../../utils/email.ts'
 import { buildPayload } from '../../utils/payload.ts'
 import PasswordResetService from '../../services/PasswordResetService.ts'
 import EmailService from '../../services/EmailService.mjs'
+import { authLimiter, strictLimiter } from '../../middlewares/RateLimiter.ts'
 
 // JWT expiry values - cast to number to satisfy jsonwebtoken's StringValue type
 // These are parsed by the ms library internally, so string values like '1h' work
@@ -70,7 +71,7 @@ export default (context: HTMLDrop.Context): Router => {
    *             schema:
    *               $ref: '#/components/schemas/Error'
    */
-  router.post('/login', async (req: Request, res: Response) => {
+  router.post('/login', authLimiter, async (req: Request, res: Response) => {
     const { knex, table, formatDate } = context
     if (!knex) {
       return res.status(503).json({ success: false, error: 'Database not available' })
@@ -334,7 +335,7 @@ export default (context: HTMLDrop.Context): Router => {
    *             schema:
    *               $ref: '#/components/schemas/Error'
    */
-  router.post('/register', async (req: Request, res: Response) => {
+  router.post('/register', authLimiter, async (req: Request, res: Response) => {
     const { knex, table, formatDate } = context
     if (!knex) {
       return res.status(503).json({ success: false, error: 'Database not available' })
@@ -434,7 +435,7 @@ export default (context: HTMLDrop.Context): Router => {
    *       500:
    *         description: Internal server error
    */
-  router.post('/forgot-password', async (req: Request, res: Response) => {
+  router.post('/forgot-password', strictLimiter, async (req: Request, res: Response) => {
     try {
       const { email } = req.body
 
@@ -519,7 +520,7 @@ export default (context: HTMLDrop.Context): Router => {
    *       500:
    *         description: Internal server error
    */
-  router.post('/reset-password', async (req: Request, res: Response) => {
+  router.post('/reset-password', authLimiter, async (req: Request, res: Response) => {
     try {
       const { token, password } = req.body
 
@@ -582,7 +583,7 @@ export default (context: HTMLDrop.Context): Router => {
    *       500:
    *         description: Internal server error
    */
-  router.post('/validate-reset-token', async (req: Request, res: Response) => {
+  router.post('/validate-reset-token', authLimiter, async (req: Request, res: Response) => {
     try {
       const { token } = req.body
 

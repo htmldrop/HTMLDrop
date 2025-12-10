@@ -5,6 +5,9 @@ import { hash } from '../../utils/password.ts'
 import { buildPayload } from '../../utils/payload.ts'
 import crypto from 'crypto'
 
+// OAuth state tokens expire after 10 minutes
+const OAUTH_STATE_EXPIRY_MS = 10 * 60 * 1000
+
 interface AuthProvider {
   id: number
   slug: string
@@ -126,12 +129,25 @@ export default (context: HTMLDrop.Context): Router => {
       .first() as AuthProvider | undefined
     if (!config) return res.status(400).send('Provider not supported or inactive')
 
+    // Generate CSRF state token
+    const state = crypto.randomBytes(32).toString('hex')
+    const stateHash = crypto.createHash('sha256').update(state).digest('hex')
+    const expiresAt = new Date(Date.now() + OAUTH_STATE_EXPIRY_MS)
+
+    // Store hashed state in database
+    await knex(table('oauth_states')).insert({
+      state_hash: stateHash,
+      provider: provider,
+      expires_at: expiresAt
+    })
+
     // Build query string from DB fields
     const query = new URLSearchParams({
       client_id: process.env[config.client_id] || '',
       redirect_uri: config.redirect_uri,
       response_type: 'code',
       scope: (config.scope || []).join(' '),
+      state,
       ...config.response_params
     })
 
@@ -212,8 +228,26 @@ export default (context: HTMLDrop.Context): Router => {
       return res.status(503).json({ success: false, error: 'Database not available' })
     }
     const { provider } = req.params
-    const { code } = req.query as { code?: string }
+    const { code, state } = req.query as { code?: string; state?: string }
     if (!code) return res.status(400).send('Missing code')
+    if (!state) return res.status(400).send('Missing state parameter')
+
+    // Validate CSRF state token
+    const stateHash = crypto.createHash('sha256').update(state).digest('hex')
+    const stateRecord = await knex(table('oauth_states'))
+      .where({ state_hash: stateHash, provider })
+      .where('expires_at', '>', new Date())
+      .first()
+
+    if (!stateRecord) {
+      return res.status(400).send('Invalid or expired state parameter')
+    }
+
+    // Delete used state token (one-time use)
+    await knex(table('oauth_states')).where({ state_hash: stateHash }).del()
+
+    // Clean up expired state tokens asynchronously
+    knex(table('oauth_states')).where('expires_at', '<', new Date()).del()
 
     const config = await knex(table('auth_providers'))
       .where({ slug: provider, active: true })
@@ -299,7 +333,7 @@ export default (context: HTMLDrop.Context): Router => {
 
     await knex(table('refresh_tokens')).insert({
       user_id: user!.id,
-      token: appRefreshToken,
+      token: crypto.createHash('sha256').update(appRefreshToken).digest('hex'),
       expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
     })
 

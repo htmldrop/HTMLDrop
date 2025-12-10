@@ -57,11 +57,15 @@ export default class PasswordResetService {
     const expiresAt = new Date()
     expiresAt.setMinutes(expiresAt.getMinutes() + this.tokenExpiryMinutes)
 
-    // Store hashed token in database
+    // Create a SHA256 prefix for fast indexed lookup
+    const tokenPrefix = crypto.createHash('sha256').update(token).digest('hex').substring(0, 16)
+
+    // Store hashed token and prefix in database
     await knex(table('users'))
       .where('id', user.id)
       .update({
         reset_token: hashedToken,
+        reset_token_prefix: tokenPrefix,
         reset_token_expires_at: this.context.formatDate(expiresAt),
         updated_at: this.context.formatDate()
       })
@@ -79,6 +83,7 @@ export default class PasswordResetService {
 
   /**
    * Validate a password reset token
+   * Uses SHA256 prefix index for fast lookup, then bcrypt for full verification
    */
   async validateResetToken(token: string): Promise<User> {
     const { knex, table } = this.context
@@ -90,12 +95,17 @@ export default class PasswordResetService {
       throw new Error('Invalid or expired reset token')
     }
 
-    // Get all users with reset tokens (we'll check expiry after bcrypt compare)
+    // Create a SHA256 prefix of the token for fast indexed lookup
+    // This avoids scanning all users with reset tokens
+    const tokenPrefix = crypto.createHash('sha256').update(token).digest('hex').substring(0, 16)
+
+    // Find users with matching token prefix (should be very few, typically 1)
     const users = await knex(table('users'))
       .whereNotNull('reset_token')
+      .where('reset_token_prefix', tokenPrefix)
       .whereNull('deleted_at') as User[]
 
-    // Check each user's hashed token
+    // Check each matching user's full hashed token with bcrypt
     for (const user of users) {
       if (!user.reset_token) continue
 
@@ -158,6 +168,7 @@ export default class PasswordResetService {
       .update({
         password: hashedPassword,
         reset_token: null,
+        reset_token_prefix: null,
         reset_token_expires_at: null,
         updated_at: this.context.formatDate()
       })
@@ -210,6 +221,7 @@ export default class PasswordResetService {
           .where('id', user.id)
           .update({
             reset_token: null,
+            reset_token_prefix: null,
             reset_token_expires_at: null,
             updated_at: this.context.formatDate()
           })
