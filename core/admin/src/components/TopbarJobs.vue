@@ -10,7 +10,7 @@
       <div class="job-progress-bg" :style="{ width: `${job.progress}%` }"></div>
 
       <!-- Job icon -->
-      <div class="job-icon" v-if="job.iconSvg" v-html="job.iconSvg"></div>
+      <div class="job-icon" v-if="job.iconSvg" v-html="sanitizeIcon(job.iconSvg)"></div>
       <div class="job-icon-default" v-else>
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <circle cx="12" cy="12" r="10"/>
@@ -23,6 +23,7 @@
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted, inject } from 'vue'
+import DOMPurify from 'dompurify'
 
 const jobs = ref([])
 const apiBase = inject('apiBase')
@@ -33,6 +34,16 @@ const maxDisplayJobs = parseInt(import.meta.env.VITE_TOPBAR_MAX_JOBS || '3', 10)
 
 let ws = null
 let reconnectTimeout = null
+
+// Sanitize SVG icons to prevent XSS attacks
+const sanitizeIcon = (icon) => {
+  if (!icon) return ''
+  return DOMPurify.sanitize(icon, {
+    ALLOWED_TAGS: ['svg', 'path', 'circle', 'rect', 'g', 'line', 'polyline', 'polygon', 'ellipse'],
+    ALLOWED_ATTR: ['viewBox', 'd', 'fill', 'stroke', 'stroke-width', 'stroke-linecap', 'stroke-linejoin', 'cx', 'cy', 'r', 'x', 'y', 'width', 'height', 'points', 'transform', 'xmlns', 'style'],
+    KEEP_CONTENT: false
+  })
+}
 
 // Filter and sort jobs: only pending/running, sorted by progress descending, limit to max
 const displayJobs = computed(() => {

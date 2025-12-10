@@ -11,7 +11,7 @@
         class="job-item"
         :class="[`job-${job.status}`, { 'job-completed': job.status === 'completed' }]"
       >
-        <div class="job-icon" v-if="job.iconSvg" v-html="job.iconSvg"></div>
+        <div class="job-icon" v-if="job.iconSvg" v-html="sanitizeIcon(job.iconSvg)"></div>
         <div class="job-icon-default" v-else>
           <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <circle cx="12" cy="12" r="10"/>
@@ -56,6 +56,7 @@
 
 <script setup>
 import { ref, onMounted, onUnmounted, inject } from 'vue'
+import DOMPurify from 'dompurify'
 
 const jobs = ref([])
 const apiBase = inject('apiBase')
@@ -63,6 +64,16 @@ const apiFetch = inject('apiFetch')
 
 let ws = null
 let reconnectTimeout = null
+
+// Sanitize SVG icons to prevent XSS attacks
+const sanitizeIcon = (icon) => {
+  if (!icon) return ''
+  return DOMPurify.sanitize(icon, {
+    ALLOWED_TAGS: ['svg', 'path', 'circle', 'rect', 'g', 'line', 'polyline', 'polygon', 'ellipse'],
+    ALLOWED_ATTR: ['viewBox', 'd', 'fill', 'stroke', 'stroke-width', 'stroke-linecap', 'stroke-linejoin', 'cx', 'cy', 'r', 'x', 'y', 'width', 'height', 'points', 'transform', 'xmlns', 'style'],
+    KEEP_CONTENT: false
+  })
+}
 
 const formatStatus = (status) => {
   const statusMap = {
